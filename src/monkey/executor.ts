@@ -1,6 +1,8 @@
 import { type BrowserContext, errors, type Locator, type Page } from "playwright";
+import { parseLocator } from "../replay/locator.ts";
 import { resolve } from "../snapshot/snapshot.ts";
 import type { Action } from "./actions.ts";
+import { HIGHLIGHT_STYLE, type Spectator } from "./spectator.ts";
 
 export interface ActionResult {
   ok: boolean;
@@ -27,13 +29,15 @@ export interface Tabs {
 /**
  * Executes one action with a timeout and waits for the page to settle: if the main document changed, until it has
  * loaded. Never throws for problems of the page under test; they come back as `{ ok: false, error }`. Element
- * actions act on `target` when given (replay), else on the element their ref points to.
+ * actions act on `target` when given (replay), else on the element their ref points to. With a `spectator`, the
+ * element is outlined for a moment first; `locator` (its durable locator) only makes the outline's label readable.
  */
 export async function executeAction(
   tabs: Tabs,
   action: Action,
   timeoutMs: number,
   target?: Locator,
+  spectator?: Spectator & { locator?: string },
 ): Promise<ActionResult> {
   let tab = tabs.current;
   let page = currentPage(tabs.context, tab);
@@ -44,7 +48,13 @@ export async function executeAction(
     if (frame.parentFrame() === null) navigated = true;
   };
   page.on("framenavigated", onNavigated);
-  const element = async (ref: string) => target ?? (await resolve(page, ref));
+  const element = async (ref: string) => {
+    const locator = target ?? (await resolve(page, ref));
+    if (spectator !== undefined && spectator.highlightMs > 0) {
+      await show(page, readable(page, spectator.locator) ?? locator, spectator.highlightMs);
+    }
+    return locator;
+  };
   try {
     switch (action.type) {
       case "click":
@@ -94,6 +104,26 @@ export async function executeAction(
     return { ok: false, error: firstLine(error), ...(hang ? { hang } : {}), navigated, url: safeUrl(page), tab };
   } finally {
     page.off("framenavigated", onNavigated);
+  }
+}
+
+/** Outlines the element, waits, and removes the outline again so the next snapshot never contains it. */
+async function show(page: Page, locator: Locator, ms: number): Promise<void> {
+  try {
+    await locator.highlight({ style: HIGHLIGHT_STYLE });
+    await new Promise((resolve) => setTimeout(resolve, ms));
+  } catch {
+    // Only cosmetic: the action itself reports a missing element.
+  } finally {
+    await page.hideHighlight().catch(() => undefined);
+  }
+}
+
+function readable(page: Page, text: string | undefined): Locator | undefined {
+  try {
+    return text === undefined ? undefined : parseLocator(page, text);
+  } catch {
+    return undefined;
   }
 }
 

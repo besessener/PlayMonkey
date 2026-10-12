@@ -11,6 +11,9 @@ seeded random generator, executes it and hands the result on. The same seed and 
 - **Inputs to every choice** are the snapshot (elements in document order), what the run has explored so far and the
   generator. As long as the site renders the same, the same seed yields the same sequence of actions, values and
   durable locators; a test runs the fixture twice and compares.
+- **With an LLM** the run stays seeded, but each step the LLM takes is one the generator does not, so the sequence
+  differs from a run without `llm` from the first handoff on. Until then it is identical; a test checks this. See
+  [the LLM](llm.md).
 
 ## Choosing an action
 

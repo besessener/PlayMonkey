@@ -1,3 +1,4 @@
+import type { LlmReport, LlmSummary } from "../llm/usage.ts";
 import type { ActionContext } from "../oracles/finding.ts";
 import type { Report, ReportFinding, RoleSummary } from "./report.ts";
 
@@ -46,6 +47,7 @@ ${report.roles.map(roleRow).join("\n")}
     </tbody>
   </table></div>
 </section>
+${report.llm === undefined ? "" : llmSection(report.llm)}
 <section>
   <h2>Findings</h2>
 ${total === 0 ? '  <p class="empty">The oracles found nothing.</p>' : report.findings.map((f) => findingCard(f, report.roles, screenshots)).join("\n")}
@@ -58,6 +60,45 @@ ${total === 0 ? '  <p class="empty">The oracles found nothing.</p>' : report.fin
 </body>
 </html>
 `;
+}
+
+function llmSection(llm: LlmReport): string {
+  const notes: string[] = [];
+  if (llm.status === "disabled")
+    notes.push(`LLM disabled: ${e(llm.disabledReason ?? "")}; the run was a pure random monkey.`);
+  if (llm.budget.exhausted !== undefined) {
+    const { role, step, reason } = llm.budget.exhausted;
+    notes.push(
+      `Budget exhausted at step ${e(step)} of role ${e(role)}: ${e(reason)}; the rest of the run was a pure random monkey.`,
+    );
+  }
+  const rows = [{ role: "Total", ...llm.total }, ...llm.roles].map(llmRow).join("\n");
+  const cost =
+    llm.total.estimatedCost === undefined ? "" : `<th title="Estimate from llm.pricing, not a bill">Est. cost</th>`;
+  return `<section>
+  <h2>LLM usage</h2>
+  <p class="meta">${e(llm.provider)} · deployment <code>${e(llm.deployment)}</code>${llm.preflight === undefined ? "" : ` · preflight ${llm.preflight.ok ? `ok (${e(llm.preflight.latencyMs ?? 0)} ms)` : `failed: ${e(llm.preflight.error ?? "")}`}`}</p>
+  ${notes.map((note) => `<p class="note">${note}</p>`).join("\n  ")}
+  <div class="scroll"><table>
+    <thead><tr><th>Role</th><th>Calls</th><th>Failed</th><th>Input</th><th>Output</th><th>Cached</th><th>Retries</th><th>Handoffs</th><th>LLM actions</th><th>Fallbacks</th><th>Breaker</th><th>Latency avg / p95</th>${cost}</tr></thead>
+    <tbody>
+${rows}
+    </tbody>
+  </table></div>
+  ${llm.total.estimatedCost === undefined ? "" : '<p class="meta">Costs are estimates from <code>llm.pricing</code>, not a bill.</p>'}
+</section>`;
+}
+
+function llmRow(row: LlmSummary & { role: string }): string {
+  const counts = (map: Partial<Record<string, number>>) => {
+    const entries = Object.entries(map).filter(([, count]) => (count ?? 0) > 0);
+    const total = entries.reduce((sum, [, count]) => sum + (count ?? 0), 0);
+    return entries.length === 0
+      ? "0"
+      : `${e(total)} <span class="on">(${entries.map(([k, c]) => `${e(k)} ${e(c)}`).join(", ")})</span>`;
+  };
+  const cost = row.estimatedCost === undefined ? "" : `<td>≈ ${e(row.estimatedCost.toFixed(4))}</td>`;
+  return `      <tr><td>${e(row.role)}</td><td>${e(row.calls)}</td><td>${counts(row.errors)}</td><td>${e(row.inputTokens)}</td><td>${e(row.outputTokens)}</td><td>${e(row.cachedTokens)}</td><td>${e(row.retries)}</td><td>${counts(row.handoffs)}</td><td>${e(row.actions)}</td><td>${counts(row.fallbacks)}</td><td>${e(row.breakerTrips)}</td><td>${e(row.avgLatencyMs)} / ${e(row.p95LatencyMs)} ms</td>${cost}</tr>`;
 }
 
 function roleRow(role: RoleSummary): string {
@@ -171,6 +212,7 @@ h2 { font-size: 1.15rem; margin: 1.5rem 0 0.75rem; }
 h3 { font-size: 1rem; margin: 0 0 0.5rem; overflow-wrap: anywhere; }
 h4 { font-size: 0.9rem; margin: 0.75rem 0 0.25rem; color: var(--muted); }
 .meta, .on, footer, .empty { color: var(--muted); }
+.note { border-left: 3px solid var(--medium); padding-left: 0.6rem; }
 .meta { margin: 0.25rem 0; overflow-wrap: anywhere; }
 .total { margin: 0.5rem 0 0; font-weight: 600; }
 code, kbd, pre { font: 0.85em ui-monospace, SFMono-Regular, Menlo, monospace; background: var(--code); border-radius: 4px; }

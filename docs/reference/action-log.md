@@ -51,7 +51,7 @@ every step (to a temporary file, then renamed), so it is always complete JSON, a
 | `seed`, `baseUrl`, `role`, `viewport` | The run's settings; replay uses them instead of the config's. |
 | `placeholders` | Variables whose values the log stores as `${VAR}`; see below. |
 | `actions[].step` | 1, 2, … in execution order. |
-| `actions[].source` | `monkey`, or `llm` once the LLM arrives (M2). |
+| `actions[].source` | `monkey`, or `llm` for an action the LLM chose. Replay executes both alike. |
 | `actions[].type` and its fields | The action: `click`, `check`, `uncheck` (`ref`); `fill`, `select` (`ref`, `value`); `press` (`key`); `scroll` (`deltaY`); `back`; `navigate` (`url`); `setViewport` (`width`, `height`); `switchTab` (`index`). |
 | `actions[].ref` | The element's ref in that step's snapshot. Informational: refs do not survive page loads. |
 | `actions[].locator` | **Durable locator** of the element, as Playwright's `codegen` writes it. Replay finds the element by it. |

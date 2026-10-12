@@ -42,3 +42,6 @@ It does not include the URL; the monkey tracks states as (URL, hash) pairs.
 character budget (default 8000, roughly 2000 tokens). Elements in the viewport come first, then the rest in document
 order; names are shortened, the page text gets at most a quarter of the budget when elements need the rest, and the
 output always says what was left out (`[312 more elements omitted to fit the budget]`).
+
+The serializer also lists open dialogs (`Open dialogs: "Cookies"`); the snapshot records them in `dialogs` for the
+[stuck detection](llm.md#when-the-monkey-hands-over).

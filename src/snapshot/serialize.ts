@@ -24,6 +24,9 @@ export function serializeSnapshot(snapshot: Snapshot, options: SerializeOptions 
   if (snapshot.crossOriginFrames > 0) {
     header.push(`Cross-origin frames (not entered): ${snapshot.crossOriginFrames}`);
   }
+  if (snapshot.dialogs.length > 0) {
+    header.push(`Open dialogs: ${snapshot.dialogs.map((name) => JSON.stringify(shorten(name, maxName))).join(", ")}`);
+  }
 
   const ordered = [
     ...snapshot.elements.filter((element) => element.inViewport),

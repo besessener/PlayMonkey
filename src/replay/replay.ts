@@ -3,6 +3,7 @@ import { launchBrowser } from "../auth/browser.ts";
 import { ANONYMOUS_ROLE } from "../auth/session.ts";
 import { type Config, type LoadedConfig, loadConfig, parseConfig } from "../config/config.ts";
 import { maskSecrets, Secrets } from "../config/secrets.ts";
+import type { Spectator } from "../monkey/spectator.ts";
 import { type RoleOutcome, runRole } from "../run.ts";
 import { type LoggedFinding, readActionLog, toAction } from "./log.ts";
 
@@ -14,6 +15,8 @@ export interface ReplayOptions {
   env: NodeJS.ProcessEnv;
   log: (line: string) => void;
   signal?: AbortSignal;
+  /** Spectator mode (`--watch`). */
+  spectator?: Spectator;
 }
 
 export interface ReplayResult {
@@ -60,7 +63,10 @@ export async function replayActionLog(file: string, options: ReplayOptions): Pro
     );
   }
 
-  const browser = await launchBrowser(config.browser);
+  const browser = await launchBrowser(
+    config.browser,
+    options.spectator === undefined ? {} : { spectator: options.spectator },
+  );
   let outcome: RoleOutcome;
   try {
     outcome = await runRole(
@@ -80,6 +86,7 @@ export async function replayActionLog(file: string, options: ReplayOptions): Pro
           })),
         },
         ...(options.signal === undefined ? {} : { signal: options.signal }),
+        ...(options.spectator === undefined ? {} : { spectator: options.spectator }),
       },
     );
   } finally {

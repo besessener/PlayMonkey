@@ -6,6 +6,7 @@ import { type Action, isElementAction } from "./actions.ts";
 import { chooseAction, Exploration } from "./chooser.ts";
 import { type ActionResult, executeAction, type Tabs } from "./executor.ts";
 import { Random } from "./random.ts";
+import type { Spectator } from "./spectator.ts";
 
 /** One executed step, handed to the action log. */
 export interface StepRecord {
@@ -22,7 +23,7 @@ export interface StepRecord {
   skipped?: boolean;
 }
 
-/** Who chose an action. The LLM arrives with M2; replay keeps the recorded source. */
+/** Who chose an action. Replay keeps the recorded source. */
 export type ActionSource = "monkey" | "llm";
 
 /** A recorded action to replay. Element actions are found by `locator`; their ref is stale. */
@@ -64,6 +65,20 @@ export interface RunOptions {
   now?: () => number;
   /** Execute these recorded actions in order instead of choosing; `maxSteps` does not apply. */
   replay?: ReplayPlan;
+  /** Takes over steps when the monkey is stuck (the LLM); ignored with `replay`. */
+  advisor?: StepAdvisor;
+  /** Spectator mode: outline each element before acting on it. */
+  spectator?: Spectator;
+}
+
+/** Something that may choose a step instead of the random monkey; see `LlmDriver`. */
+export interface StepAdvisor {
+  /** Every new snapshot, before choosing; `isNewState` when its (URL, hash) state is new in this run. */
+  observe(snapshot: Snapshot, isNewState: boolean): void;
+  /** The action for `step`, or undefined to let the monkey choose. */
+  choose(snapshot: Snapshot, step: number): Promise<Action | undefined>;
+  /** Every executed step, with the snapshot it was chosen in. */
+  record(record: StepRecord, snapshot: Snapshot): void;
 }
 
 /**
@@ -131,14 +146,21 @@ export async function runMonkey(context: BrowserContext, options: RunOptions): P
         if (crashed.has(page)) continue;
         throw error;
       }
-      exploration.visit(snap.url, snap.hash);
+      const isNewState = exploration.visit(snap.url, snap.hash);
+      const advisor = options.replay === undefined ? options.advisor : undefined;
+      advisor?.observe(snap, isNewState);
 
       let action: Action;
       let source: ActionSource = "monkey";
       let locator: string | undefined;
       // Replay: the recorded element, or why it cannot be found.
       let target: Locator | string | undefined;
-      if (options.replay === undefined) {
+      const advised = await advisor?.choose(snap, step + 1);
+      if (advised !== undefined) {
+        action = advised;
+        source = "llm";
+        locator = isElementAction(action) ? await durableLocator(page, action.ref).catch(() => undefined) : undefined;
+      } else if (options.replay === undefined) {
         const viewport = page.viewportSize() ?? {
           width: config.browser.viewport[0],
           height: config.browser.viewport[1],
@@ -167,23 +189,26 @@ export async function runMonkey(context: BrowserContext, options: RunOptions): P
         skippedActions++;
         result = { ok: false, error: target, navigated: false, url: page.url(), tab: tabs.current };
       } else {
-        result = await executeAction(tabs, action, config.monkey.actionTimeoutMs, target);
+        const spectator =
+          options.spectator === undefined
+            ? undefined
+            : { ...options.spectator, ...(locator === undefined ? {} : { locator }) };
+        result = await executeAction(tabs, action, config.monkey.actionTimeoutMs, target, spectator);
         if (!result.ok) failedActions++;
       }
       tabs.current = result.tab;
-      await options.onStep?.(
-        {
-          step,
-          action,
-          ...(locator === undefined ? {} : { locator }),
-          url: snap.url,
-          snapshotHash: snap.hash,
-          source,
-          result,
-          ...(typeof target === "string" ? { skipped: true } : {}),
-        },
-        snap,
-      );
+      const record: StepRecord = {
+        step,
+        action,
+        ...(locator === undefined ? {} : { locator }),
+        url: snap.url,
+        snapshotHash: snap.hash,
+        source,
+        result,
+        ...(typeof target === "string" ? { skipped: true } : {}),
+      };
+      advisor?.record(record, snap);
+      await options.onStep?.(record, snap);
     }
   } catch (error) {
     return finish("error", error instanceof Error ? error.message.split("\n")[0] : String(error));

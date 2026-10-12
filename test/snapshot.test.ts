@@ -41,6 +41,16 @@ describe("page snapshot against the fixture site", () => {
     return page;
   }
 
+  it("records open dialogs by name, and none on ordinary pages", async () => {
+    for (const path of PAGES) assert.deepEqual((await snapshot(await open(path))).dialogs, [], path);
+    const p = await open("/clean");
+    await p.setContent(`<dialog open aria-label="Cookies"><p>We use cookies.</p><button>Accept</button></dialog>
+      <div role="alertdialog"><button>OK</button></div><dialog aria-label="Closed"></dialog>`);
+    const snap = await snapshot(p);
+    assert.deepEqual(snap.dialogs, ["Cookies", ""]);
+    assert.match(serializeSnapshot(snap), /^Open dialogs: "Cookies", ""$/m);
+  });
+
   it("lists the interactive elements of the form", async () => {
     const snap = await snapshot(await open("/form"));
     assert.equal(snap.url, `${site.url}/form`);
@@ -200,6 +210,7 @@ describe("serializeSnapshot", () => {
     elements: Array.from({ length: 5000 }, (_, i) => element(i, i >= 4900)),
     text: "lorem ipsum ".repeat(5000),
     crossOriginFrames: 2,
+    dialogs: [],
     hash: "0".repeat(16),
   };
 
@@ -238,6 +249,7 @@ describe("serializeSnapshot", () => {
       ],
       text: "Welcome",
       crossOriginFrames: 0,
+      dialogs: [],
       hash: "0".repeat(16),
     };
     assert.equal(
