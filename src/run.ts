@@ -6,7 +6,7 @@ import { ANONYMOUS_ROLE, LoginError, openRoleSession } from "./auth/session.ts";
 import type { AuthRole, LoadedConfig } from "./config/config.ts";
 import { maskSecrets, type Secrets } from "./config/secrets.ts";
 import { DebugLog } from "./llm/debug-log.ts";
-import { LlmDriver } from "./llm/driver.ts";
+import { LlmBreaker, LlmDriver } from "./llm/driver.ts";
 import { PromptPlaceholders } from "./llm/placeholders.ts";
 import type { LlmProvider } from "./llm/provider.ts";
 import { StuckDetector } from "./llm/stuck.ts";
@@ -21,26 +21,28 @@ import { ActionLogWriter } from "./replay/log.ts";
 
 export interface RoleOutcome {
   role: string;
-  /** Absent when the role could not start (login failed). */
+  /** The seed of this run. */
+  seed: number;
+  /** Absent when the run could not start (login failed) or crashed. */
   result?: RunResult;
-  /** Why the role could not start; masked. */
+  /** Why the run could not start or crashed; masked. */
   error?: string;
-  /** Deduplicated, in order of discovery; masked. Empty when the role could not start. */
+  /** Deduplicated, in order of discovery; masked. Empty when the run could not start. */
   findings: Finding[];
   blockedNavigations: number;
-  /** The role's `actions.json`, when one was written. */
+  /** The run's `actions.json`, when one was written. */
   actionLog?: string;
-  /** Playwright trace and videos of the role's context; absent when the role could not start. */
+  /** Playwright trace and videos of the run's context; absent when the run could not start. */
   tracePath?: string;
   videoPaths?: string[];
 }
 
 export interface RunAllOptions {
-  /** Called with a one-line message for every role start and end. */
+  /** Called with a one-line message for every run start and end. */
   log: (line: string) => void;
-  onStep?: (role: string, record: StepRecord) => void | Promise<void>;
+  onStep?: (role: string, record: StepRecord, seed: number) => void | Promise<void>;
   signal?: AbortSignal;
-  /** The LLM for stuck situations; shared by all roles, like its budget. Requires `config.llm`. */
+  /** The LLM for stuck situations; shared by all runs, like its budget and circuit breaker. Requires `config.llm`. */
   llm?: RunLlm;
   /** Spectator mode (`--watch`): visible, slowed-down browser and one console line per step. */
   spectator?: Spectator;
@@ -50,50 +52,100 @@ export interface RunLlm {
   provider: LlmProvider;
   stats: LlmStats;
   debugLog?: DebugLog;
+  /** Created by `runAllRoles` when absent. */
+  breaker?: LlmBreaker;
+}
+
+/** One run of an invocation: a role (undefined: anonymous) with a seed. */
+export interface PlannedRun {
+  role: AuthRole | undefined;
+  seed: number;
+  /** `role`, or `role/seed` with `seeds`; prefixes log lines and keys LLM usage. */
+  label: string;
+  /** `<report.dir>/<role>`, or `<report.dir>/<role>/<seed>` with `seeds`. */
+  outputDir: string;
+}
+
+/** Every run of the config, roles first, then seeds: the order of the report, whatever order they finish in. */
+export function planRuns(config: LoadedConfig["config"]): PlannedRun[] {
+  const roles = config.auth.length > 0 ? config.auth : [undefined];
+  return roles.flatMap((role) => {
+    const name = role?.name ?? ANONYMOUS_ROLE;
+    const roleDir = join(config.report.dir, roleDirectory(name));
+    if (config.seeds === undefined) return [{ role, seed: config.seed, label: name, outputDir: roleDir }];
+    return config.seeds.map((seed) => ({
+      role,
+      seed,
+      label: `${name}/${seed}`,
+      outputDir: join(roleDir, String(seed)),
+    }));
+  });
 }
 
 /**
- * Runs the monkey for every role (one anonymous role without `auth`) in sequence, each in its own browser context.
- * A role that cannot log in is recorded and the others still run.
+ * Runs the monkey for every role (one anonymous role without `auth`) and seed, up to `config.parallel` at a time,
+ * each in its own browser context of one shared browser. A run that cannot log in or crashes is recorded and the
+ * others still run. Outcomes are in `planRuns` order; runs not started because of the signal are left out.
  */
 export async function runAllRoles(loaded: LoadedConfig, options: RunAllOptions): Promise<RoleOutcome[]> {
-  const { config } = loaded;
+  const { config, secrets } = loaded;
   let llm = options.llm;
   if (llm !== undefined && config.llm?.debugLog === true && llm.debugLog === undefined) {
     const file = join(config.report.dir, "llm-debug.jsonl");
     await rm(file, { force: true });
     llm = { ...llm, debugLog: new DebugLog(file, loaded.secrets) };
   }
+  if (llm !== undefined && llm.breaker === undefined) llm = { ...llm, breaker: new LlmBreaker() };
   const browser = await launchBrowser(
     config.browser,
     options.spectator === undefined ? {} : { spectator: options.spectator },
   );
-  const outcomes: RoleOutcome[] = [];
-  try {
-    const roles = config.auth.length > 0 ? config.auth : [undefined];
-    for (const role of roles) {
-      if (options.signal?.aborted) break;
-      const name = role?.name ?? ANONYMOUS_ROLE;
-      outcomes.push(
-        await runRole(browser, role, loaded, {
-          log: options.log,
-          outputDir: join(config.report.dir, roleDirectory(name)),
-          actionLog: true,
-          ...(options.signal === undefined ? {} : { signal: options.signal }),
-          ...(options.onStep === undefined ? {} : { onStep: (record) => options.onStep?.(name, record) }),
-          ...(llm === undefined ? {} : { llm }),
-          ...(options.spectator === undefined ? {} : { spectator: options.spectator }),
-        }),
-      );
+  const plans = planRuns(config);
+  const outcomes: (RoleOutcome | undefined)[] = plans.map(() => undefined);
+  let next = 0;
+  const worker = async () => {
+    while (next < plans.length && options.signal?.aborted !== true) {
+      const index = next++;
+      const plan = plans[index] as PlannedRun;
+      const name = plan.role?.name ?? ANONYMOUS_ROLE;
+      try {
+        outcomes[index] = await runRole(
+          browser,
+          plan.role,
+          { config: { ...config, seed: plan.seed }, secrets },
+          {
+            log: options.log,
+            label: plan.label,
+            outputDir: plan.outputDir,
+            actionLog: true,
+            ...(options.signal === undefined ? {} : { signal: options.signal }),
+            ...(options.onStep === undefined ? {} : { onStep: (record) => options.onStep?.(name, record, plan.seed) }),
+            ...(llm === undefined ? {} : { llm }),
+            ...(options.spectator === undefined ? {} : { spectator: options.spectator }),
+          },
+        );
+      } catch (error) {
+        // One crashed run must not take the others down.
+        const message = secrets.mask(
+          `crashed: ${error instanceof Error ? error.message.split("\n")[0] : String(error)}`,
+        );
+        options.log(`[${secrets.mask(plan.label)}] ${message}`);
+        outcomes[index] = { role: name, seed: plan.seed, error: message, findings: [], blockedNavigations: 0 };
+      }
     }
+  };
+  try {
+    await Promise.all(Array.from({ length: Math.min(config.parallel, plans.length) }, worker));
   } finally {
     await browser.close();
   }
-  return outcomes;
+  return outcomes.filter((outcome) => outcome !== undefined);
 }
 
 export interface RoleOptions {
   log: (line: string) => void;
+  /** Log prefix and LLM usage key; default: the role name. */
+  label?: string;
   /** Directory for the trace, video, screenshots and `actions.json`. */
   outputDir: string;
   /** Write `actions.json`. */
@@ -117,7 +169,8 @@ export async function runRole(
 ): Promise<RoleOutcome> {
   const { config, secrets } = loaded;
   const name = role?.name ?? ANONYMOUS_ROLE;
-  const log = (line: string) => options.log(`[${secrets.mask(name)}] ${line}`);
+  const label = options.label ?? name;
+  const log = (line: string) => options.log(`[${secrets.mask(label)}] ${line}`);
   log(options.replay === undefined ? "starting" : `replaying ${plural(options.replay.actions.length, "action")}`);
   let session: Awaited<ReturnType<typeof openRoleSession>>;
   try {
@@ -125,7 +178,7 @@ export async function runRole(
   } catch (error) {
     if (!(error instanceof LoginError)) throw error;
     log(error.message);
-    return { role: name, error: error.message, findings: [], blockedNavigations: 0 };
+    return { role: name, seed: config.seed, error: error.message, findings: [], blockedNavigations: 0 };
   }
   const oracles = new Oracles(session.context, {
     config,
@@ -154,6 +207,8 @@ export async function runRole(
           }),
           placeholders: new PromptPlaceholders(config, secrets),
           role: name,
+          run: label,
+          ...(options.llm.breaker === undefined ? {} : { breaker: options.llm.breaker }),
           findings: () => oracles.findings.map((f) => `${f.severity} ${f.oracle}: ${f.message}`),
           ...(config.stayOnDomain ? { origin: new URL(config.baseUrl).origin } : {}),
           ...(options.llm.debugLog === undefined ? {} : { debugLog: options.llm.debugLog }),
@@ -183,10 +238,11 @@ export async function runRole(
     const findings = raw.map((finding) => maskFinding(finding, secrets));
     log(`${secrets.mask(summarize(result))}, ${plural(findings.length, "finding")}`);
     for (const finding of findings) log(`  ${describeFinding(finding)}`);
-    if (advisor !== undefined && options.llm !== undefined) log(describeUsage(options.llm.stats.role(name)));
+    if (advisor !== undefined && options.llm !== undefined) log(describeUsage(options.llm.stats.role(label)));
     if (writer !== undefined) log(`actions: ${writer.file}`);
     outcome = {
       role: name,
+      seed: config.seed,
       result,
       findings,
       blockedNavigations: session.events.length,

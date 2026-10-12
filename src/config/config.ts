@@ -27,7 +27,11 @@ import { Secrets } from "./secrets.ts";
 /** The validated config with all defaults applied and relative paths resolved against the config file. */
 export interface Config {
   baseUrl: string;
+  /** With `seeds`, the first of them. */
   seed: number;
+  /** Present only when configured: one run per seed and role, each in `<role>/<seed>/`. */
+  seeds?: number[];
+  parallel: number;
   limits: { maxSteps: number; maxMinutes: number };
   browser: { engine: Engine; viewport: [number, number]; headless: boolean };
   stayOnDomain: boolean;
@@ -175,9 +179,10 @@ export function parseConfig(text: string, options: ParseOptions = {}): LoadedCon
   }
 
   const config = raw as RawConfig;
-  const seedGenerated = config.seed === undefined;
+  const seedGenerated = config.seed === undefined && config.seeds === undefined;
+  const seed = config.seeds?.[0] ?? config.seed ?? randomInt(0, MAX_SEED + 1);
   return {
-    config: normalize(config, seedGenerated ? randomInt(0, MAX_SEED + 1) : (config.seed as number), baseDir),
+    config: normalize(config, seed, baseDir),
     secrets,
     seedGenerated,
   };
@@ -187,6 +192,7 @@ function normalize(raw: RawConfig, seed: number, baseDir: string): Config {
   const config: Config = {
     baseUrl: raw.baseUrl,
     seed,
+    parallel: raw.parallel ?? DEFAULTS.parallel,
     limits: {
       maxSteps: raw.limits?.maxSteps ?? DEFAULTS.limits.maxSteps,
       maxMinutes: raw.limits?.maxMinutes ?? DEFAULTS.limits.maxMinutes,
@@ -220,6 +226,7 @@ function normalize(raw: RawConfig, seed: number, baseDir: string): Config {
       ) as Record<ActionType, number>,
     },
   };
+  if (raw.seeds !== undefined) config.seeds = [...raw.seeds];
   if (raw.llm !== undefined) config.llm = normalizeLlm(raw.llm);
   return config;
 }
@@ -275,6 +282,9 @@ function semanticIssues(raw: unknown): { path: PathSegment[]; message: string }[
   const issues: { path: PathSegment[]; message: string }[] = [];
   if (!isObject(raw)) return issues;
 
+  if (raw.seed !== undefined && raw.seeds !== undefined) {
+    issues.push({ path: ["seeds"], message: "use either seed or seeds, not both" });
+  }
   if (typeof raw.baseUrl === "string" && !isHttpUrl(raw.baseUrl)) {
     issues.push({ path: ["baseUrl"], message: "must be an absolute http(s) URL" });
   }

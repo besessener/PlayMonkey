@@ -1,6 +1,6 @@
 import type { LlmReport, LlmSummary } from "../llm/usage.ts";
 import type { ActionContext } from "../oracles/finding.ts";
-import type { Report, ReportFinding, RoleSummary } from "./report.ts";
+import type { AggregatedFinding, Report, ReportFinding, RoleSummary } from "./report.ts";
 
 const ESCAPES: Record<string, string> = { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" };
 
@@ -16,7 +16,8 @@ const e = (value: unknown) => escapeHtml(String(value));
  * network. Traces, videos and action logs are linked relative to the report directory.
  */
 export function renderHtml(report: Report, screenshots: Map<string, string>): string {
-  const total = report.findings.length;
+  const total = report.aggregated.length;
+  const seeds = report.seeds === undefined ? `seed ${e(report.seed)}` : `seeds ${e(report.seeds.join(", "))}`;
   const counts = Object.entries(report.counts)
     .filter(([, count]) => count > 0)
     .map(([severity, count]) => `<span class="badge ${e(severity)}">${e(count)} ${e(severity)}</span>`)
@@ -34,14 +35,14 @@ export function renderHtml(report: Report, screenshots: Map<string, string>): st
 <body>
 <header>
   <h1>PlayMonkey report</h1>
-  <p class="meta">${e(baseUrl ?? "")} · seed ${e(report.seed)} · ${e(report.startedAt)} · playmonkey ${e(report.tool.version)}</p>
+  <p class="meta">${e(baseUrl ?? "")} · ${seeds} · ${e(report.startedAt)} · playmonkey ${e(report.tool.version)}</p>
   <p class="total">${total === 0 ? "No findings." : `${e(total)} finding${total === 1 ? "" : "s"} ${counts}`}</p>
 </header>
 <main>
 <section>
-  <h2>Roles</h2>
+  <h2>Runs</h2>
   <div class="scroll"><table>
-    <thead><tr><th>Role</th><th>Steps</th><th>Duration</th><th>Stopped</th><th>Findings</th><th>Artifacts</th></tr></thead>
+    <thead><tr><th>Role</th><th>Seed</th><th>Steps</th><th>Duration</th><th>Stopped</th><th>Findings</th><th>Artifacts</th></tr></thead>
     <tbody>
 ${report.roles.map(roleRow).join("\n")}
     </tbody>
@@ -50,11 +51,11 @@ ${report.roles.map(roleRow).join("\n")}
 ${report.llm === undefined ? "" : llmSection(report.llm)}
 <section>
   <h2>Findings</h2>
-${total === 0 ? '  <p class="empty">The oracles found nothing.</p>' : report.findings.map((f) => findingCard(f, report.roles, screenshots)).join("\n")}
+${total === 0 ? '  <p class="empty">The oracles found nothing.</p>' : report.aggregated.map((f) => findingCard(f, report, screenshots)).join("\n")}
 </section>
 <footer>
-  <p>Open a trace with <code>npx playwright show-trace &lt;trace.zip&gt;</code>. Repeat a role's run with
-  <code>monkey replay &lt;role&gt;/actions.json --config &lt;config.json&gt;</code>.</p>
+  <p>Open a trace with <code>npx playwright show-trace &lt;trace.zip&gt;</code>. Repeat a run with
+  <code>monkey replay &lt;actions.json&gt; --config &lt;config.json&gt;</code>, using the run's action log.</p>
 </footer>
 </main>
 </body>
@@ -115,11 +116,16 @@ function roleRow(role: RoleSummary): string {
   ]
     .filter((item) => item !== "")
     .join(" · ");
-  return `      <tr><td>${e(role.role)}</td><td>${e(role.steps ?? "–")}</td><td>${role.durationMs === undefined ? "–" : `${e((role.durationMs / 1000).toFixed(1))} s`}</td><td>${stopped}</td><td>${e(role.findings)}</td><td>${links}</td></tr>`;
+  return `      <tr id="${e(runId(role.role, role.seed))}"><td>${e(role.role)}</td><td>${e(role.seed)}</td><td>${e(role.steps ?? "–")}</td><td>${role.durationMs === undefined ? "–" : `${e((role.durationMs / 1000).toFixed(1))} s`}</td><td>${stopped}</td><td>${e(role.findings)}</td><td>${links}</td></tr>`;
 }
 
-function findingCard(finding: ReportFinding, roles: RoleSummary[], screenshots: Map<string, string>): string {
-  const role = roles.find((r) => r.role === finding.role);
+function findingCard(group: AggregatedFinding, report: Report, screenshots: Map<string, string>): string {
+  // The first run that found it supplies the steps, screenshot and details.
+  const [first] = group.runs;
+  const finding = report.findings.find(
+    (f) => f.key === group.key && f.role === first?.role && f.seed === first.seed,
+  ) as ReportFinding;
+  const role = report.roles.find((r) => r.role === finding.role && r.seed === finding.seed);
   const image = finding.screenshot === undefined ? undefined : screenshots.get(finding.screenshot);
   const links = [
     role?.actionLog === undefined ? "" : link(role.actionLog, "actions.json"),
@@ -128,11 +134,21 @@ function findingCard(finding: ReportFinding, roles: RoleSummary[], screenshots: 
   ]
     .filter((item) => item !== "")
     .join(" · ");
-  return `  <article class="finding" id="${e(finding.role)}-${e(finding.id)}">
-    <h3><span class="badge ${e(finding.severity)}">${e(finding.severity)}</span> <code>${e(finding.oracle)}</code> ${e(finding.message)}</h3>
+  const multiSeed = report.seeds !== undefined;
+  const runs = group.runs
+    .map(
+      (run) =>
+        `<a href="#${e(runId(run.role, run.seed))}">${e(run.role)}${multiSeed ? ` seed ${e(run.seed)}` : ""}</a> ${e(run.id)}`,
+    )
+    .join(", ");
+  const where = multiSeed ? ` · seed ${e(finding.seed)}` : "";
+  return `  <article class="finding" id="${e(group.key)}">
+    <h3><span class="badge ${e(group.severity)}">${e(group.severity)}</span> <code>${e(group.oracle)}</code> ${e(group.message)}</h3>
     <dl>
-      <dt>Where</dt><dd><code>${e(finding.url)}</code></dd>
-      <dt>Role</dt><dd>${e(finding.role)} · ${e(finding.id)} · first at step ${e(finding.step)} · seen ${e(finding.occurrences)}×</dd>
+      <dt>Where</dt><dd><code>${e(group.url)}</code></dd>
+      <dt>Found in</dt><dd>${e(group.roles.join(", "))} · seen ${e(group.occurrences)}×${group.runs.length > 1 ? ` in ${e(group.runs.length)} runs` : ""}</dd>
+      <dt>Runs</dt><dd>${runs}</dd>
+      <dt>Shown</dt><dd>${e(finding.role)}${where} · ${e(finding.id)} · first at step ${e(finding.step)} · seen ${e(finding.occurrences)}×</dd>
       ${links === "" ? "" : `<dt>Artifacts</dt><dd>${links}</dd>`}
     </dl>
     <div class="body">
@@ -148,6 +164,11 @@ function findingCard(finding: ReportFinding, roles: RoleSummary[], screenshots: 
       ${image === undefined ? "" : `<img class="shot" src="${e(image)}" alt="Screenshot at step ${e(finding.step)}">`}
     </div>
   </article>`;
+}
+
+/** Anchor of a run's row in the runs table. */
+function runId(role: string, seed: number): string {
+  return `run-${role}-${seed}`;
 }
 
 /** A repro step in words, with the durable locator so it can be found by hand or in Playwright. */

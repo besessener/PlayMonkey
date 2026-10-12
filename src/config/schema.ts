@@ -43,6 +43,7 @@ export const DEFAULTS = {
   limits: { maxSteps: 500, maxMinutes: 20 },
   browser: { engine: "chromium" as Engine, viewport: [1280, 800] as [number, number], headless: true },
   stayOnDomain: true,
+  parallel: 1,
   oracle: true,
   report: { dir: "./monkey-report", keepDownloads: false },
   findings: { lastActions: 10, ignoreStatus: [] as number[] },
@@ -99,6 +100,8 @@ export interface RawConfig {
   $schema?: string;
   baseUrl: string;
   seed?: number;
+  seeds?: number[];
+  parallel?: number;
   limits?: { maxSteps?: number; maxMinutes?: number };
   browser?: { engine?: Engine; viewport?: [number, number]; headless?: boolean };
   stayOnDomain?: boolean;
@@ -185,6 +188,23 @@ export const configSchema: JSONSchemaType<RawConfig> = {
       maximum: MAX_SEED,
       nullable: true,
       description: "Seed for the random monkey. A random seed is generated and printed when absent.",
+    },
+    seeds: {
+      type: "array",
+      items: { type: "integer", minimum: 0, maximum: MAX_SEED },
+      minItems: 1,
+      uniqueItems: true,
+      nullable: true,
+      description:
+        "One run per seed and role, instead of seed. Each run writes to <role>/<seed>/ in the report directory.",
+    },
+    parallel: {
+      type: "integer",
+      minimum: 1,
+      maximum: 64,
+      nullable: true,
+      default: DEFAULTS.parallel,
+      description: "Runs (roles × seeds) at the same time, each in its own browser context.",
     },
     limits: {
       type: "object",

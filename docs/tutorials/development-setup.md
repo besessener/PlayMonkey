@@ -39,4 +39,5 @@ npm test
 ```
 
 CI (`.github/workflows/ci.yml`) runs `npm ci`, installs Chromium with `--with-deps`, then build, lint and test on
-Node 22. See [commands](../reference/commands.md) for every script.
+Node 22. `.github/workflows/monkey.yml`, the [CI example](../how-to/run-in-ci.md), runs `monkey run` against the
+fixture site as a user's project would. See [commands](../reference/commands.md) for every script.

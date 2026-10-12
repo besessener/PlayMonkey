@@ -20,7 +20,7 @@ with a report.
 | `src/auth/` | Browser launch, one context per role, login, `stayOnDomain`, trace and video | done |
 | `src/snapshot/` | Page snapshot with element refs, snapshot hash, LLM serializer | done |
 | `src/monkey/` | Seeded random action generator, executor and run loop | done |
-| `src/run.ts` | Runs every role in turn: session, monkey or replay, oracles, action log, artifacts | done |
+| `src/run.ts` | Plans the runs (roles × seeds) and runs them, `parallel` at a time: session, monkey or replay, oracles, action log, artifacts | done |
 | `src/oracles/` | Detect and deduplicate findings, screenshots | done |
 | `src/replay/` | Action log writer and reader, durable locator parser, `monkey replay` | done |
 | `src/report/` | `report.json` and the self-contained `report.html` | done |
@@ -35,4 +35,5 @@ with a report.
   so runs stay cheap and an LLM outage never stops a run.
 - **Findings must be reproducible.** LLM decisions are not deterministic, so every action is logged with a durable
   locator and `monkey replay` re-executes the log without an LLM.
-- **One context per role:** cookies and storage never leak between roles, and roles can later run in parallel.
+- **One context per run:** cookies and storage never leak between roles or seeds, so runs can execute in parallel
+  in one browser. The LLM budget and circuit breaker are shared by all runs.

@@ -16,12 +16,19 @@ export interface Report {
   tool: { name: "playmonkey"; version: string };
   startedAt: string;
   finishedAt: string;
+  /** The seed, or with `seeds` the first of them. */
   seed: number;
+  /** Present with `seeds` in the config. */
+  seeds?: number[];
   /** The config with defaults applied and every secret value masked. */
   config: unknown;
+  /** One entry per run (role and seed), in config order: roles, then seeds. */
   roles: RoleSummary[];
-  /** All roles' findings: by severity, then occurrences, then discovery. */
+  /** Every run's findings, deduplicated per run: by severity, then occurrences, then run order and discovery. */
   findings: ReportFinding[];
+  /** The findings across runs: one entry per dedup key, with the runs that found it. */
+  aggregated: AggregatedFinding[];
+  /** Aggregated findings per severity. */
   counts: Record<Severity, number>;
   /** LLM usage; present when `llm` is configured. */
   llm?: LlmReport;
@@ -29,6 +36,7 @@ export interface Report {
 
 export interface RoleSummary {
   role: string;
+  seed: number;
   /** Absent when the role could not start. */
   steps?: number;
   durationMs?: number;
@@ -44,7 +52,22 @@ export interface RoleSummary {
   videos: string[];
 }
 
-export type ReportFinding = Omit<Finding, "screenshotPath"> & { screenshot?: string };
+export type ReportFinding = Omit<Finding, "screenshotPath"> & { seed: number; screenshot?: string };
+
+/** One problem across runs. Message, URL and severity are those of the first run that found it. */
+export interface AggregatedFinding {
+  key: string;
+  oracle: Finding["oracle"];
+  severity: Severity;
+  message: string;
+  url: string;
+  /** Sum over all runs. */
+  occurrences: number;
+  /** Distinct roles that found it, in config order. */
+  roles: string[];
+  /** Every run that found it, in run order, with the finding's per-run id. */
+  runs: { role: string; seed: number; id: string }[];
+}
 
 export interface ReportInput {
   loaded: LoadedConfig;
@@ -61,23 +84,49 @@ export function buildReport(input: ReportInput): Report {
   const dir = config.report.dir;
   const path = (file: string) => relative(dir, file).split(sep).join("/");
 
-  const findings = input.outcomes
-    .flatMap((outcome) => outcome.findings)
-    .map(({ screenshotPath, ...finding }) => ({
+  // Run order first, so the stable sort below breaks ties deterministically, whatever order the runs finished in.
+  const findings: ReportFinding[] = input.outcomes.flatMap((outcome) =>
+    outcome.findings.map(({ screenshotPath, ...finding }) => ({
       ...finding,
+      seed: outcome.seed,
       ...(screenshotPath === undefined ? {} : { screenshot: path(screenshotPath) }),
-    }));
-  const order = (finding: ReportFinding) => SEVERITIES.indexOf(finding.severity);
+    })),
+  );
+  const aggregated = new Map<string, AggregatedFinding>();
+  for (const finding of findings) {
+    let entry = aggregated.get(finding.key);
+    if (entry === undefined) {
+      entry = {
+        key: finding.key,
+        oracle: finding.oracle,
+        severity: finding.severity,
+        message: finding.message,
+        url: finding.url,
+        occurrences: 0,
+        roles: [],
+        runs: [],
+      };
+      aggregated.set(finding.key, entry);
+    }
+    entry.occurrences += finding.occurrences;
+    if (!entry.roles.includes(finding.role)) entry.roles.push(finding.role);
+    entry.runs.push({ role: finding.role, seed: finding.seed, id: finding.id });
+  }
+  const order = (finding: { severity: Severity }) => SEVERITIES.indexOf(finding.severity);
   findings.sort((a, b) => order(a) - order(b) || b.occurrences - a.occurrences);
+  const groups = [...aggregated.values()].sort(
+    (a, b) => order(a) - order(b) || b.runs.length - a.runs.length || b.occurrences - a.occurrences,
+  );
 
   const counts = Object.fromEntries(SEVERITIES.map((severity) => [severity, 0])) as Record<Severity, number>;
-  for (const finding of findings) counts[finding.severity]++;
+  for (const finding of groups) counts[finding.severity]++;
 
   const roles = input.outcomes.map((outcome): RoleSummary => {
     const result = outcome.result;
     const error = result?.error ?? outcome.error;
     return {
       role: secrets.mask(outcome.role),
+      seed: outcome.seed,
       ...(result === undefined
         ? {}
         : {
@@ -102,9 +151,11 @@ export function buildReport(input: ReportInput): Report {
     startedAt: input.startedAt.toISOString(),
     finishedAt: input.finishedAt.toISOString(),
     seed: config.seed,
+    ...(config.seeds === undefined ? {} : { seeds: [...config.seeds] }),
     config: maskSecrets(config, secrets),
     roles,
     findings,
+    aggregated: groups,
     counts,
     ...(input.llm === undefined ? {} : { llm: maskSecrets(input.llm, secrets) }),
   };
