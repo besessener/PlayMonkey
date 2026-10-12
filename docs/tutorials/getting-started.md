@@ -3,8 +3,8 @@
 This walks you from a fresh clone to a first `monkey run` against the local fixture site. You need
 Node.js 22 (22.18 or newer if you also want to run the tests) and git.
 
-> PlayMonkey is in early development: `monkey run` logs in, explores and reports findings on the console; the action
-> log, replay and HTML report arrive next, see the [roadmap](../explanation/roadmap.md).
+> PlayMonkey is in early development: `monkey run` logs in, explores, reports findings on the console and records
+> an action log you can replay; the HTML report arrives next, see the [roadmap](../explanation/roadmap.md).
 
 ## 1. Install
 
@@ -54,6 +54,7 @@ seed: 42
 [user]   F3 medium http4xx: GET /missing-page responded 404 Not Found (step 20, 10×)
 [user]   F4 low overflow: horizontal overflow on /overflow: div makes the page 1664px wide in a 1280px viewport (step 26, 12×)
 [user]   F5 high http5xx: POST /form responded 500 Internal Server Error (step 99, 2×)
+[user] actions: …/fixtures/configs/monkey-report/user/actions.json
 [user] trace: …/fixtures/configs/monkey-report/user/trace.zip
 findings: 5
 ```
@@ -64,7 +65,32 @@ The exit code is `1` because there are findings. A screenshot of each one is in
 Watch what it did with `npx playwright show-trace fixtures/configs/monkey-report/user/trace.zip`, or look at the video
 next to it. Run it again: with the same seed it takes the same steps.
 
-## 4. See a config error
+## 4. Replay the run
+
+Every action went to `actions.json`. Replay it, with the config for the login:
+
+```sh
+npx monkey replay fixtures/configs/monkey-report/user/actions.json --config fixtures/configs/fixture.json
+```
+
+It repeats the 300 steps without choosing anything and checks which findings recur:
+
+```text
+[user] replaying 300 actions
+[user] 300 steps in 29.3s, 47 states, 0 failed actions, stopped: end, 5 findings
+…
+reproduced      F1 medium console: Seeded bug: console error on load
+reproduced      F2 high pageerror: Error: Seeded bug: click handler crashed
+reproduced      F3 medium http4xx: GET /missing-page responded 404 Not Found
+reproduced      F4 low overflow: horizontal overflow on /overflow: div makes the page 1664px wide in a 1280px viewport
+reproduced      F5 high http5xx: POST /form responded 500 Internal Server Error
+reproduced: 5 of 5
+```
+
+The log stores the URL and the login as `${FIXTURE_URL}` and friends, so it also replays after you restart the
+fixture on another port. See [replay](../explanation/replay.md).
+
+## 5. See a config error
 
 Unset a variable and run again:
 

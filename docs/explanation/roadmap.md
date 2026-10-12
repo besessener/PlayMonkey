@@ -5,7 +5,7 @@ carrying its milestone in the title. Work goes in milestone order, with a review
 
 | Milestone | Scope | Status |
 | --- | --- | --- |
-| **M1** Monkey without LLM | Scaffold, config, fixture site, auth, snapshot and refs, random monkey, oracles, action log and replay, report | in progress: scaffold, config, fixture site, auth, snapshot, random monkey and oracles done |
+| **M1** Monkey without LLM | Scaffold, config, fixture site, auth, snapshot and refs, random monkey, oracles, action log and replay, report | in progress: scaffold, config, fixture site, auth, snapshot, random monkey, oracles, action log and replay done |
 | **M2** LLM backend `anthropic-foundry` | Provider interface, preflight, stuck detection and fallback, token accounting | planned |
 | **M3** Backend `openai` and hardening | OpenAI-compatible backend; cookie banners, dialogs, iframes, popups, file inputs, downloads | planned |
 | **M4** Comfort | Parallel runs per role and seed, documentation, CI example | planned |

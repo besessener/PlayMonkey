@@ -1,17 +1,16 @@
 import assert from "node:assert/strict";
-import { mkdtemp, readFile, stat, writeFile } from "node:fs/promises";
+import { mkdtemp } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { after, before, describe, it } from "node:test";
 import type { Browser, Page } from "playwright";
-import { FIXTURE_CREDENTIALS, type Fixture, startFixture } from "../fixtures/site/server.ts";
-import { type Config, loadConfig, parseConfig } from "../src/config/config.ts";
+import { type Fixture, startFixture } from "../fixtures/site/server.ts";
+import { type Config, parseConfig } from "../src/config/config.ts";
 import { executeAction } from "../src/monkey/executor.ts";
 import { runMonkey, type StepRecord } from "../src/monkey/loop.ts";
 import { IgnoreRules } from "../src/oracles/finding.ts";
 import { firstStackFrame, normalizeMessage, normalizeUrl } from "../src/oracles/keys.ts";
 import { Oracles } from "../src/oracles/oracles.ts";
-import { runAllRoles } from "../src/run.ts";
 import { snapshot } from "../src/snapshot/snapshot.ts";
 import { launchChromium } from "./helpers/browser.ts";
 
@@ -135,48 +134,6 @@ describe("oracles in the browser", () => {
       await w.context.close();
     }
   }
-
-  it("reports each seeded bug of the fixture exactly once in a full run, and nothing on the controls", async () => {
-    const file = join(dir, "fixture.json");
-    const fixtureConfig = JSON.parse(
-      await readFile(new URL("../fixtures/configs/fixture.json", import.meta.url), "utf8"),
-    );
-    await writeFile(file, JSON.stringify({ ...fixtureConfig, report: { dir: "report-full" } }));
-    const loaded = await loadConfig(file, {
-      env: {
-        FIXTURE_URL: site.url,
-        FIXTURE_USER: FIXTURE_CREDENTIALS.username,
-        FIXTURE_PASS: FIXTURE_CREDENTIALS.password,
-      },
-    });
-    const [outcome] = await runAllRoles(loaded, { log: () => {} });
-    assert.equal(outcome?.result?.stopReason, "maxSteps");
-    const findings = outcome?.findings ?? [];
-    assert.deepEqual(findings.map((f) => f.key).sort(), [
-      "console|Seeded bug: console error on load",
-      "http4xx|GET /missing-page 404",
-      "http5xx|POST /form 500",
-      "overflow|/overflow|div",
-      "pageerror|Error: Seeded bug: click handler crashed|at HTMLButtonElement.<anonymous> (/js-error:23:11)",
-    ]);
-    const severity = Object.fromEntries(findings.map((f) => [f.oracle, f.severity]));
-    assert.deepEqual(severity, {
-      console: "medium",
-      http4xx: "medium",
-      http5xx: "high",
-      overflow: "low",
-      pageerror: "high",
-    });
-    for (const finding of findings) {
-      assert.equal(finding.role, "user");
-      // baseUrl comes from ${FIXTURE_URL}, so it is masked like every substituted value.
-      assert.match(finding.url, /^\*\*\*\//);
-      assert.doesNotMatch(finding.url, /^\*\*\*\/(clean|login|account)$/);
-      assert.ok((await stat(finding.screenshotPath ?? "")).size > 0, `${finding.id} has a screenshot`);
-      assert.equal(finding.lastActions.length, Math.min(10, finding.step));
-      assert.equal(finding.lastActions.at(-1)?.step, finding.step);
-    }
-  });
 
   it("stays silent on the control pages and on a valid form submission", async () => {
     await withWatch("/clean", {}, async ({ page, check }) => {

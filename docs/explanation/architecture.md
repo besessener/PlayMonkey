@@ -20,9 +20,10 @@ with a report.
 | `src/auth/` | Browser launch, one context per role, login, `stayOnDomain`, trace and video | done |
 | `src/snapshot/` | Page snapshot with element refs, snapshot hash, LLM serializer | done |
 | `src/monkey/` | Seeded random action generator, executor and run loop | done |
-| `src/run.ts` | Runs every role in turn: session, monkey, oracles, artifacts | done |
+| `src/run.ts` | Runs every role in turn: session, monkey or replay, oracles, action log, artifacts | done |
 | `src/oracles/` | Detect and deduplicate findings, screenshots | done |
-| `src/report/` | Action log, replay, `report.json`, `report.html` | planned (#9, #10) |
+| `src/replay/` | Action log writer and reader, durable locator parser, `monkey replay` | done |
+| `src/report/` | `report.json`, `report.html` | planned (#10) |
 | `src/llm/` | Provider interface, backends, stuck detection | planned (M2, M3) |
 | `fixtures/site/` | Local site with seeded bugs, the ground truth for end-to-end tests | done |
 

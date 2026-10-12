@@ -1,5 +1,6 @@
-import type { BrowserContext, Page } from "playwright";
+import type { BrowserContext, Locator, Page } from "playwright";
 import type { Config } from "../config/config.ts";
+import { findElement } from "../replay/locator.ts";
 import { durableLocator, type Snapshot, snapshot } from "../snapshot/snapshot.ts";
 import { type Action, isElementAction } from "./actions.ts";
 import { chooseAction, Exploration } from "./chooser.ts";
@@ -15,11 +16,30 @@ export interface StepRecord {
   /** URL and snapshot hash of the state the action was chosen in. */
   url: string;
   snapshotHash: string;
-  source: "monkey";
+  source: ActionSource;
   result: ActionResult;
+  /** Replay only: the recorded element could not be found, so the action was not executed. */
+  skipped?: boolean;
 }
 
-export type StopReason = "maxSteps" | "maxMinutes" | "aborted" | "error";
+/** Who chose an action. The LLM arrives with M2; replay keeps the recorded source. */
+export type ActionSource = "monkey" | "llm";
+
+/** A recorded action to replay. Element actions are found by `locator`; their ref is stale. */
+export interface PlannedAction {
+  action: Action;
+  source: ActionSource;
+  locator?: string;
+}
+
+export interface ReplayPlan {
+  actions: PlannedAction[];
+  /** End the run with `error` when a recorded element cannot be found, instead of skipping the action. */
+  strict: boolean;
+}
+
+/** `end`: a replay executed its last action. */
+export type StopReason = "maxSteps" | "maxMinutes" | "aborted" | "error" | "end";
 
 export interface RunResult {
   steps: number;
@@ -30,6 +50,8 @@ export interface RunResult {
   /** Distinct (URL, snapshot hash) states seen. */
   states: number;
   failedActions: number;
+  /** Replay only: actions skipped because their element was not found. */
+  skippedActions: number;
 }
 
 export interface RunOptions {
@@ -40,11 +62,14 @@ export interface RunOptions {
   signal?: AbortSignal;
   /** Clock for the time limit; tests replace it. */
   now?: () => number;
+  /** Execute these recorded actions in order instead of choosing; `maxSteps` does not apply. */
+  replay?: ReplayPlan;
 }
 
 /**
  * Runs the seeded random monkey in the context's first page until `maxSteps`, `maxMinutes` or the signal. Failed
- * actions are recorded and the run continues; only losing the browser itself ends it with `error`.
+ * actions are recorded and the run continues; only losing the browser itself ends it with `error`. With `replay`,
+ * it executes the recorded actions instead, with the same page handling (stayOnDomain, crashes) as the original run.
  */
 export async function runMonkey(context: BrowserContext, options: RunOptions): Promise<RunResult> {
   const { config } = options;
@@ -61,6 +86,7 @@ export async function runMonkey(context: BrowserContext, options: RunOptions): P
   for (const page of context.pages()) watch(page);
   context.on("page", watch);
   let failedActions = 0;
+  let skippedActions = 0;
   let step = 0;
 
   const finish = (stopReason: StopReason, error?: string): RunResult => ({
@@ -70,6 +96,7 @@ export async function runMonkey(context: BrowserContext, options: RunOptions): P
     durationMs: now() - started,
     states: exploration.states.size,
     failedActions,
+    skippedActions,
   });
 
   try {
@@ -78,7 +105,9 @@ export async function runMonkey(context: BrowserContext, options: RunOptions): P
 
     while (true) {
       if (options.signal?.aborted) return finish("aborted");
-      if (step >= config.limits.maxSteps) return finish("maxSteps");
+      if (options.replay !== undefined) {
+        if (step >= options.replay.actions.length) return finish("end");
+      } else if (step >= config.limits.maxSteps) return finish("maxSteps");
       if (now() >= deadline) return finish("maxMinutes");
 
       let page = context.pages()[tabs.current] ?? context.pages()[0];
@@ -103,24 +132,45 @@ export async function runMonkey(context: BrowserContext, options: RunOptions): P
         throw error;
       }
       exploration.visit(snap.url, snap.hash);
-      const viewport = page.viewportSize() ?? { width: config.browser.viewport[0], height: config.browser.viewport[1] };
-      const { action, elementKey } = chooseAction(snap, exploration, random, {
-        weights: config.monkey.weights,
-        testData: config.testData,
-        ...(origin === undefined ? {} : { origin }),
-        tabCount: context.pages().length,
-        currentTab: tabs.current,
-        viewport,
-      });
-      const locator = isElementAction(action)
-        ? await durableLocator(page, action.ref).catch(() => undefined)
-        : undefined;
-      if (elementKey !== undefined) exploration.recordAction(`${snap.url}#${snap.hash}`, elementKey);
+
+      let action: Action;
+      let source: ActionSource = "monkey";
+      let locator: string | undefined;
+      // Replay: the recorded element, or why it cannot be found.
+      let target: Locator | string | undefined;
+      if (options.replay === undefined) {
+        const viewport = page.viewportSize() ?? {
+          width: config.browser.viewport[0],
+          height: config.browser.viewport[1],
+        };
+        const choice = chooseAction(snap, exploration, random, {
+          weights: config.monkey.weights,
+          testData: config.testData,
+          ...(origin === undefined ? {} : { origin }),
+          tabCount: context.pages().length,
+          currentTab: tabs.current,
+          viewport,
+        });
+        action = choice.action;
+        locator = isElementAction(action) ? await durableLocator(page, action.ref).catch(() => undefined) : undefined;
+        if (choice.elementKey !== undefined) exploration.recordAction(`${snap.url}#${snap.hash}`, choice.elementKey);
+      } else {
+        const planned = options.replay.actions[step] as PlannedAction;
+        ({ action, source, locator } = planned);
+        if (isElementAction(action)) target = await findElement(page, locator, config.monkey.actionTimeoutMs);
+      }
 
       step++;
-      const result = await executeAction(tabs, action, config.monkey.actionTimeoutMs);
+      let result: ActionResult;
+      if (typeof target === "string") {
+        if (options.replay?.strict) return finish("error", `step ${step}: ${target}`);
+        skippedActions++;
+        result = { ok: false, error: target, navigated: false, url: page.url(), tab: tabs.current };
+      } else {
+        result = await executeAction(tabs, action, config.monkey.actionTimeoutMs, target);
+        if (!result.ok) failedActions++;
+      }
       tabs.current = result.tab;
-      if (!result.ok) failedActions++;
       await options.onStep?.(
         {
           step,
@@ -128,8 +178,9 @@ export async function runMonkey(context: BrowserContext, options: RunOptions): P
           ...(locator === undefined ? {} : { locator }),
           url: snap.url,
           snapshotHash: snap.hash,
-          source: "monkey",
+          source,
           result,
+          ...(typeof target === "string" ? { skipped: true } : {}),
         },
         snap,
       );
