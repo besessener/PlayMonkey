@@ -87,7 +87,20 @@ describe("LLM tools", () => {
     }
     assert.deepEqual(
       ACTION_TOOLS.map((tool) => tool.name),
-      ["click", "fill", "select", "check", "uncheck", "press", "scroll", "back", "navigate", "done"],
+      [
+        "click",
+        "dblclick",
+        "hover",
+        "fill",
+        "select",
+        "check",
+        "uncheck",
+        "press",
+        "scroll",
+        "back",
+        "navigate",
+        "done",
+      ],
     );
   });
 

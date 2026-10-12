@@ -7,7 +7,7 @@ carrying its milestone in the title. Work goes in milestone order, with a review
 | --- | --- | --- |
 | **M1** Monkey without LLM | Scaffold, config, fixture site, auth, snapshot and refs, random monkey, oracles, action log and replay, report | done (v0.1) |
 | **M2** LLM backend `anthropic-foundry` | Provider interface, preflight, stuck detection and fallback, token accounting | done |
-| **M3** Backend `openai` and hardening | OpenAI-compatible backend; cookie banners, dialogs, iframes, popups, file inputs, downloads | planned |
+| **M3** Backend `openai` and hardening | OpenAI-compatible backend; cookie banners, dialogs, iframes, popups, file inputs, downloads | done |
 | **M4** Comfort | Parallel runs per role and seed, documentation, CI example | planned |
 
 ## Definition of done for v0.1 (M1 complete)

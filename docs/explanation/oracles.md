@@ -16,11 +16,13 @@ lives in `src/oracles/`.
 | `hang` | A navigation or page load exceeded `monkey.actionTimeoutMs`, or the page stopped answering a trivial script. | high |
 | `errorPage` | A navigation landed on an error page (see below). | medium |
 | `overflow` | Horizontal overflow: the document's `scrollWidth` is larger than its `clientWidth`. | low |
+| `download` | A download the site started failed, e.g. the connection dropped mid-file (`download.failure()`). | medium |
 
 Each one can be switched off with `oracles.<name>: false` in the [config](../reference/configuration.md).
 
 The event oracles (`pageerror`, `console`, `http*`, `crash`) listen on every page of the role's browser context,
-including tabs the site opens. The state oracles (`hang`, `errorPage`, `overflow`) look at the page the monkey is on
+including tabs and popups the site opens and the iframes inside them. `download` looks at the downloads of each step
+(see [the monkey](monkey.md#pages-that-ask-for-something)). The state oracles (`hang`, `errorPage`, `overflow`) look at the page the monkey is on
 after each step, with one script evaluation per step.
 
 ### What is not a finding
@@ -69,6 +71,7 @@ context (step, screenshot, last actions) of its **first** occurrence, which is u
 | `errorPage` | Normalized page URL + status. |
 | `hang` | Kind (`navigation` or `unresponsive`) + normalized URL. |
 | `crash` | Normalized page URL. |
+| `download` | Normalized download URL. |
 
 **Normalization** removes what changes between occurrences of the same bug:
 

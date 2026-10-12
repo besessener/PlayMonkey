@@ -2,13 +2,19 @@ import { readFile, rename, writeFile } from "node:fs/promises";
 import { resolvePlaceholders } from "../config/placeholders.ts";
 import type { Secrets } from "../config/secrets.ts";
 import type { Action } from "../monkey/actions.ts";
+import type { StepEvent } from "../monkey/events.ts";
 import type { StepRecord } from "../monkey/loop.ts";
 import type { Finding } from "../oracles/finding.ts";
 
-export const ACTION_LOG_VERSION = 1;
+/**
+ * Version 2 added the actions `dblclick`, `rightclick`, `hover`, `longPress` and `drag` (with `toRef` and
+ * `toLocator`) and the `events` of a step. Version 1 logs are a subset and still read.
+ */
+export const ACTION_LOG_VERSION = 2;
+const READABLE_VERSIONS: readonly number[] = [1, 2];
 
 /** Fields of a logged action that hold free text, where secret values are replaced by their placeholders. */
-const TEXT_FIELDS = ["value", "url", "key", "locator", "pageUrl", "error"] as const;
+const TEXT_FIELDS = ["value", "url", "key", "locator", "toLocator", "pageUrl", "error"] as const;
 
 /** One executed action: the action's own fields (`type`, `ref`, `value`, …) plus where and how it ran. */
 export type LoggedAction = Action & {
@@ -16,11 +22,15 @@ export type LoggedAction = Action & {
   source: StepRecord["source"];
   /** Durable locator of the element; replay resolves element actions by it, since refs do not survive page loads. */
   locator?: string;
+  /** Durable locator of the drop target of a `drag`. */
+  toLocator?: string;
   /** URL and snapshot hash of the state the action was chosen in (`url` is the target of `navigate`). */
   pageUrl: string;
   snapshotHash: string;
   ok: boolean;
   error?: string;
+  /** Dialogs answered, files uploaded and downloads during the step; replay gives the same answers. */
+  events?: StepEvent[];
 };
 
 /** What replay compares against. */
@@ -31,7 +41,7 @@ export type LoggedFinding = Pick<Finding, "id" | "oracle" | "severity" | "key" |
  * as the placeholder (listed in `placeholders`) and resolved from the environment again on replay.
  */
 export interface ActionLog {
-  version: typeof ACTION_LOG_VERSION;
+  version: number;
   seed: number;
   baseUrl: string;
   role: string;
@@ -78,10 +88,14 @@ export class ActionLogWriter {
       source: record.source,
       ...record.action,
       ...(record.locator === undefined ? {} : { locator: record.locator }),
+      ...(record.toLocator === undefined ? {} : { toLocator: record.toLocator }),
       pageUrl: record.url,
       snapshotHash: record.snapshotHash,
       ok: record.result.ok,
       ...(record.result.error === undefined ? {} : { error: record.result.error }),
+      ...(record.events === undefined || record.events.length === 0
+        ? {}
+        : { events: record.events.map((event) => this.#maskEvent(event)) }),
     } as LoggedAction;
     // Only free text can carry a secret; structural fields (type, source, ref, hash) stay as they are.
     for (const key of TEXT_FIELDS) {
@@ -90,6 +104,23 @@ export class ActionLogWriter {
     }
     this.#log.actions.push(entry);
     await this.#write();
+  }
+
+  /** Pages may echo secrets in dialog messages, and URLs may contain them. */
+  #maskEvent(event: StepEvent): StepEvent {
+    const hide = (text: string) => this.#secrets.toPlaceholders(text);
+    switch (event.kind) {
+      case "dialog":
+        return {
+          ...event,
+          message: hide(event.message),
+          ...(event.text === undefined ? {} : { text: hide(event.text) }),
+        };
+      case "download":
+        return { ...event, name: hide(event.name), url: hide(event.url) };
+      case "upload":
+        return event;
+    }
   }
 
   async setFindings(findings: Finding[]): Promise<void> {
@@ -133,8 +164,10 @@ export async function readActionLog(
     throw new ActionLogError(file, reason);
   };
   if (!isObject(json)) return fail("not a PlayMonkey action log");
-  if (json.version !== ACTION_LOG_VERSION) {
-    return fail(`unsupported version ${JSON.stringify(json.version)}; this monkey reads version ${ACTION_LOG_VERSION}`);
+  if (typeof json.version !== "number" || !READABLE_VERSIONS.includes(json.version)) {
+    return fail(
+      `unsupported version ${JSON.stringify(json.version)}; this monkey reads versions ${READABLE_VERSIONS.join(" and ")}`,
+    );
   }
   if (!Array.isArray(json.placeholders) || !json.placeholders.every((name) => typeof name === "string")) {
     fail("placeholders must be a list of variable names");
@@ -174,6 +207,11 @@ function checkAction(entry: unknown): string | undefined {
   if (entry.source !== "monkey" && entry.source !== "llm") return 'source must be "monkey" or "llm"';
   const fields: Record<string, Record<string, "string" | "number">> = {
     click: { ref: "string" },
+    dblclick: { ref: "string" },
+    rightclick: { ref: "string" },
+    hover: { ref: "string" },
+    longPress: { ref: "string" },
+    drag: { ref: "string", toRef: "string" },
     check: { ref: "string" },
     uncheck: { ref: "string" },
     fill: { ref: "string", value: "string" },
@@ -191,17 +229,41 @@ function checkAction(entry: unknown): string | undefined {
     if (typeof entry[key] !== type) return `${entry.type} needs ${key} (${type})`;
   }
   if (entry.locator !== undefined && typeof entry.locator !== "string") return "locator must be a string";
+  if (entry.toLocator !== undefined && typeof entry.toLocator !== "string") return "toLocator must be a string";
+  if (entry.events !== undefined && !(Array.isArray(entry.events) && entry.events.every(isEvent))) {
+    return "events must be a list of dialog, upload and download events";
+  }
   if (typeof entry.pageUrl !== "string") return "pageUrl must be a string";
   return undefined;
+}
+
+function isEvent(event: unknown): boolean {
+  if (!isObject(event)) return false;
+  switch (event.kind) {
+    case "dialog":
+      return typeof event.dialog === "string" && typeof event.accepted === "boolean";
+    case "upload":
+      return Array.isArray(event.files) && event.files.every((name) => typeof name === "string");
+    case "download":
+      return typeof event.name === "string" && typeof event.url === "string";
+    default:
+      return false;
+  }
 }
 
 /** The action part of a logged entry. */
 export function toAction(entry: LoggedAction): Action {
   switch (entry.type) {
     case "click":
+    case "dblclick":
+    case "rightclick":
+    case "hover":
+    case "longPress":
     case "check":
     case "uncheck":
       return { type: entry.type, ref: entry.ref };
+    case "drag":
+      return { type: "drag", ref: entry.ref, toRef: entry.toRef };
     case "fill":
     case "select":
       return { type: entry.type, ref: entry.ref, value: entry.value };

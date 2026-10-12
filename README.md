@@ -13,8 +13,9 @@
 environment**. It clicks, types and submits its way through the site with seeded randomness and reports what breaks,
 with the steps to reproduce it. An LLM steps in only when the random monkey gets stuck.
 
-> **Status:** milestone M2: the seeded random monkey with oracles, reports and replay, plus Claude on Microsoft
-> Foundry as the LLM for stuck situations. Next: an OpenAI-compatible backend and hardening, see the
+> **Status:** milestone M3: the seeded random monkey with oracles, reports and replay; Claude on Microsoft Foundry
+> or any OpenAI-compatible endpoint as the LLM for stuck situations; cookie banners, native dialogs, iframes,
+> popups, file uploads and downloads handled. Next: parallel runs and a CI example, see the
 > [roadmap](docs/explanation/roadmap.md).
 
 ## Usage
@@ -61,6 +62,18 @@ session, no new pages), it hands a few decisions to an LLM; if the LLM fails, th
 }
 ```
 
+Two backends: `anthropic-foundry` (Claude on Microsoft Foundry) and `openai` (OpenAI models on Foundry or any
+OpenAI-compatible endpoint, through the Responses API or Chat Completions):
+
+```json
+"llm": {
+  "provider": "openai",
+  "baseUrl": "https://<resource>.openai.azure.com/openai/v1",
+  "deployment": "<deployment-name>",
+  "apiKey": "${FOUNDRY_API_KEY}"
+}
+```
+
 Secrets never enter a prompt: the model refers to login fields and test data by placeholders such as
 `{{admin.password}}`, filled in after it answered. The report shows calls, tokens, fallbacks and, with
 `llm.pricing`, an estimated cost. Details: [configure the LLM](docs/how-to/configure-llm.md) and
@@ -76,10 +89,10 @@ that must come back as a tool call. On failure it prints the cause and a hint an
 | --- | --- | --- |
 | `unreachable`, `tls`, `timeout` | – | Check `llm.baseUrl`, DNS, proxy, certificates (`NODE_EXTRA_CA_CERTS`), `llm.timeoutMs`. |
 | `auth` | 401 | `llm.apiKey` must be a key of this resource. |
-| `forbidden` | 403 | Give the identity a role such as Foundry User on the resource. |
-| `notFound` | 404 | `llm.deployment` is the deployment name, not the model ID; `llm.baseUrl` ends in `/anthropic`. |
+| `forbidden` | 403 | Give the identity a role such as Foundry User (Cognitive Services OpenAI User for `openai`) on the resource. |
+| `notFound` | 404 | `llm.deployment` is the deployment name, not the model ID; `llm.baseUrl` ends in `/anthropic` or is the full OpenAI-compatible base URL (`…/openai/v1`). With `openai`, try the other `llm.options.api`. |
 | `rateLimited` | 429 | Wait or raise the quota; requests are retried `llm.maxRetries` times first. |
-| `badRequest` | 400 | Remove an `llm.options` value the model rejects. |
+| `badRequest` | 400 | Remove an `llm.options` value the model rejects; with `openai`, try the other `llm.options.api`. |
 | `invalid` | 200 | The model did not return a tool call: tool calling is unsupported on this endpoint. |
 
 ### Adding a backend

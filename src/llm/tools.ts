@@ -50,6 +50,8 @@ export const ACTION_TOOLS: readonly ToolDefinition[] = [
   tool("click", "Click an element (link, button or anything clickable) by its ref from the current snapshot.", {
     ref,
   }),
+  tool("dblclick", "Double-click an element by its ref, e.g. to edit text in place.", { ref }),
+  tool("hover", "Move the mouse over an element by its ref, e.g. to open a hover menu.", { ref }),
   tool(
     "fill",
     "Replace the content of a text field by its ref. The value may contain placeholders such as " +
@@ -108,6 +110,8 @@ export function parseToolCall(name: string, input: unknown, refs: ReadonlySet<st
   }
   switch (name) {
     case "click":
+    case "dblclick":
+    case "hover":
     case "check":
     case "uncheck":
       return { type: name, ref: args.ref as string };

@@ -43,7 +43,7 @@ describe("spectator mode", () => {
 
   /** One role run on the shared headless browser; spectator mode itself does not need a visible window. */
   async function role(name: string, spectator?: { slowMoMs: number; highlightMs: number }) {
-    const loaded = parseConfig(JSON.stringify({ baseUrl: site.url, seed: 7, limits: { maxSteps: 8 } }));
+    const loaded = parseConfig(JSON.stringify({ baseUrl: site.url, seed: 4, limits: { maxSteps: 8 } }));
     const lines: string[] = [];
     const outputDir = join(dir, name);
     await runRole(browser, undefined, loaded, {

@@ -58,7 +58,7 @@
 | `testData` | object of strings | `{}` | Valid values the monkey may use when filling fields (keys are free). |
 | `llm` | object | absent | LLM used when the monkey is stuck. Absent means pure random monkey. |
 | `llm.provider` | `anthropic-foundry` \| `openai` | – | Backend. Required in `llm`. |
-| `llm.baseUrl` | string | – | Endpoint base URL. Required in `llm`. |
+| `llm.baseUrl` | string | – | Endpoint base URL: up to `/anthropic` for `anthropic-foundry`, the full OpenAI-compatible base URL (e.g. `…/openai/v1`) for `openai`. Required in `llm`. |
 | `llm.deployment` | string | – | Deployment name, used as the model. Required in `llm`. |
 | `llm.apiKey` | string | – | API key; use a `${VAR}` placeholder. Required in `llm`. |
 | `llm.required` | boolean | `true` | A failed [preflight](../how-to/configure-llm.md#troubleshooting) exits with code `2`; `false` warns and runs as pure random monkey. |
@@ -84,9 +84,10 @@
 | `llm.pricing.outputPerMTok` | number ≥ 0 | – | Price per million output tokens (thinking included). Required in `pricing`. |
 | `llm.pricing.cacheReadPerMTok` | number ≥ 0 | `inputPerMTok` | Price per million tokens read from the prompt cache. |
 | `llm.pricing.cacheWritePerMTok` | number ≥ 0 | `inputPerMTok` | Price per million tokens written to the prompt cache. |
-| `llm.options.maxOutputTokens` | integer ≥ 16 | `4096` | `max_tokens` of a request. Thinking tokens count against it. |
-| `llm.options.thinking` | `adaptive` \| `disabled` \| `between_tools` | model default | Thinking mode sent to the model. Absent sends nothing; which values a model accepts differs, see [configure the LLM](../how-to/configure-llm.md#thinking-and-effort). |
-| `llm.options.effort` | `low` \| `medium` \| `high` \| `xhigh` \| `max` | model default | Effort level sent to the model. |
+| `llm.options.maxOutputTokens` | integer ≥ 16 | `4096` | Output token limit of a request (`max_tokens`, `max_output_tokens` or `max_completion_tokens`). Thinking and reasoning tokens count against it. |
+| `llm.options.thinking` | `adaptive` \| `disabled` \| `between_tools` | model default | `anthropic-foundry` only. Thinking mode sent to the model. Absent sends nothing; which values a model accepts differs, see [configure the LLM](../how-to/configure-llm.md#thinking-and-effort). |
+| `llm.options.effort` | `low` \| `medium` \| `high` \| `xhigh` \| `max` | model default | Effort level sent to the model: Anthropic's effort, OpenAI's reasoning effort. |
+| `llm.options.api` | `responses` \| `chat` | `responses` | `openai` only. The Responses API, or Chat Completions for models that only offer that; see [configure the LLM](../how-to/configure-llm.md#openai-models-and-other-openai-compatible-endpoints). |
 | `oracles.pageerror` | boolean | `true` | Report uncaught exceptions. |
 | `oracles.console` | boolean | `true` | Report `console.error` messages. |
 | `oracles.http5xx` | boolean | `true` | Report responses with status ≥ 500. |
@@ -95,6 +96,7 @@
 | `oracles.hang` | boolean | `true` | Report actions or navigations that exceed their timeout. |
 | `oracles.errorPage` | boolean | `true` | Report navigations that land on an error page. |
 | `oracles.overflow` | boolean | `true` | Report horizontal overflow. |
+| `oracles.download` | boolean | `true` | Report downloads that fail (e.g. the connection drops). |
 | `findings.lastActions` | integer ≥ 0 | `10` | Number of actions before a finding that it records, for reproduction. |
 | `findings.ignoreStatus` | array of integers 400 … 599 | `[]` | HTTP statuses that are never findings, e.g. `[401, 403]`. |
 | `findings.ignore` | array | `[]` | Rules that drop known noise; see [ignore rules](../explanation/oracles.md#ignore-rules). |
@@ -102,8 +104,15 @@
 | `findings.ignore[].url` | regular expression | – | Matched against the request URL (HTTP findings) or the page URL. |
 | `findings.ignore[].message` | regular expression | – | Matched against the finding message. Each rule needs `url` or `message`. |
 | `report.dir` | string | `./monkey-report` | Report output directory, relative to the config file. |
-| `monkey.actionTimeoutMs` | integer ≥ 100 | `5000` | Timeout of one action in milliseconds; a slower action fails and the run continues. |
+| `report.keepDownloads` | boolean | `false` | Keep the files the site downloaded, in `<role>/downloads/` of the report directory. Off: they are measured (name, size) and deleted when the role ends. |
+| `monkey.actionTimeoutMs` | integer ≥ 100 | `5000` | Timeout of one action in milliseconds; a slower action fails and the run continues. Also how long a step waits for dialogs, uploads and downloads to finish. |
+| `monkey.maxTabs` | integer ≥ 1 | `5` | Open tabs per role. When popups open more, the oldest ones the monkey left behind are closed (never the first tab or the current one). |
 | `monkey.weights.click` | number ≥ 0 | `10` | Relative weight of clicking links, buttons and other clickable elements. |
+| `monkey.weights.dblclick` | number ≥ 0 | `0.5` | Relative weight of double-clicking a clickable element. |
+| `monkey.weights.rightclick` | number ≥ 0 | `0.5` | Relative weight of right-clicking a clickable element (context menus). |
+| `monkey.weights.hover` | number ≥ 0 | `1` | Relative weight of moving the mouse over a clickable element (hover menus, tooltips). |
+| `monkey.weights.longPress` | number ≥ 0 | `0.3` | Relative weight of pressing and holding a clickable element; only in viewports narrower than 1024 px. |
+| `monkey.weights.drag` | number ≥ 0 | `0.3` | Relative weight of dragging a clickable element onto another element (best effort). |
 | `monkey.weights.fill` | number ≥ 0 | `6` | Relative weight of typing into text fields. |
 | `monkey.weights.select` | number ≥ 0 | `3` | Relative weight of choosing a dropdown option. |
 | `monkey.weights.check` | number ≥ 0 | `3` | Relative weight of toggling checkboxes, radios and switches. |
@@ -115,8 +124,7 @@
 | `monkey.weights.switchTab` | number ≥ 0 | `1` | Relative weight of switching to another open tab. |
 
 How the LLM is used is explained in [the LLM](../explanation/llm.md); setting up a backend in
-[configure the LLM](../how-to/configure-llm.md). `llm.provider: "openai"` is accepted by the schema but not available
-before milestone M3. What each oracle reports is explained in [oracles and findings](../explanation/oracles.md).
+[configure the LLM](../how-to/configure-llm.md). What each oracle reports is explained in [oracles and findings](../explanation/oracles.md).
 
 ## Rules
 

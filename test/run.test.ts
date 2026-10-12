@@ -25,7 +25,7 @@ describe("monkey run against the fixture site", () => {
 
   async function run(config: Record<string, unknown>) {
     const file = join(dir, `config-${Math.random().toString(36).slice(2)}.json`);
-    await writeFile(file, JSON.stringify({ baseUrl: site.url, seed: 7, limits: { maxSteps: 8 }, ...config }));
+    await writeFile(file, JSON.stringify({ baseUrl: site.url, seed: 4, limits: { maxSteps: 8 }, ...config }));
     let stdout = "";
     let stderr = "";
     const code = await runCli(["run", file], {
@@ -46,9 +46,9 @@ describe("monkey run against the fixture site", () => {
 
   it("logs in, runs the monkey for the role and writes its trace", async () => {
     const { code, stdout } = await run({ auth: [role("user", "${FIXTURE_PASS}")], report: { dir: "out-ok" } });
-    // Seed 7 follows the broken link within 8 steps.
+    // Seed 4 follows the broken link within 8 steps.
     assert.equal(code, 1, stdout);
-    assert.match(stdout, /^seed: 7\n/);
+    assert.match(stdout, /^seed: 4\n/);
     assert.match(stdout, /\[user\] 8 steps in [\d.]+s, \d+ states, \d+ failed actions, stopped: maxSteps, 1 finding\n/);
     assert.match(stdout, /\[user\] {3}F1 medium http4xx: GET \/missing-page responded 404 Not Found \(step \d\)\n/);
     assert.match(stdout, /\nfindings: 1 \(1 medium\)\nreport: .*out-ok\/report\.html\nexit 1: findings present\n$/);

@@ -1,6 +1,11 @@
 /** Everything the monkey (and later the LLM) can do. Element actions name a ref from the current snapshot. */
 export type Action =
   | { type: "click"; ref: string }
+  | { type: "dblclick"; ref: string }
+  | { type: "rightclick"; ref: string }
+  | { type: "hover"; ref: string }
+  | { type: "longPress"; ref: string }
+  | { type: "drag"; ref: string; toRef: string }
   | { type: "fill"; ref: string; value: string }
   | { type: "select"; ref: string; value: string }
   | { type: "check"; ref: string }
@@ -23,9 +28,15 @@ export function describeAction(action: Action): string {
   const value = (text: string) => JSON.stringify(text.length > 40 ? `${text.slice(0, 39)}…` : text);
   switch (action.type) {
     case "click":
+    case "dblclick":
+    case "rightclick":
+    case "hover":
+    case "longPress":
     case "check":
     case "uncheck":
       return `${action.type} ${action.ref}`;
+    case "drag":
+      return `drag ${action.ref} to ${action.toRef}`;
     case "fill":
     case "select":
       return `${action.type} ${action.ref} ${value(action.value)}`;

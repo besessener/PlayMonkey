@@ -1,5 +1,6 @@
 import type { RawHandoff } from "../config/schema.ts";
 import type { StepRecord } from "../monkey/loop.ts";
+import { blockingUi } from "../snapshot/blocking.ts";
 import type { Snapshot } from "../snapshot/snapshot.ts";
 
 export const STUCK_TRIGGERS = [
@@ -18,9 +19,6 @@ export interface Stuck {
   detail: string;
 }
 
-/** Text that suggests a cookie or consent banner, when a button to answer it is present too. */
-const CONSENT_TEXT = /\b(cookies?|consent|tracking|datenschutz|privacy (settings|preferences))\b/i;
-const CONSENT_BUTTON = /\b(accept|agree|allow|got it|ok|reject|decline|akzeptieren|zustimmen|erlauben|ablehnen)\b/i;
 /** Text a form shows when it rejects its input. */
 const VALIDATION_TEXT =
   /\b(invalid|required|is not valid|must (be|contain|not)|please (enter|provide|fill|select|choose)|ungültig|erforderlich|pflichtfeld|bitte (geben|füllen|wählen))\b/i;
@@ -134,21 +132,6 @@ export class StuckDetector {
     );
     return password && button;
   }
-}
-
-/** Why the page is blocked, or undefined: an open dialog, or a cookie or consent banner. */
-export function blockingUi(snapshot: Snapshot): string | undefined {
-  if (snapshot.dialogs.length > 0) {
-    const name = snapshot.dialogs[0] as string;
-    return name === "" ? "a dialog is open" : `a dialog is open: ${JSON.stringify(name)}`;
-  }
-  if (
-    CONSENT_TEXT.test(snapshot.text) &&
-    snapshot.elements.some((element) => element.role === "button" && CONSENT_BUTTON.test(element.name))
-  ) {
-    return "a cookie or consent banner seems to be showing";
-  }
-  return undefined;
 }
 
 export function showsValidationErrors(snapshot: Snapshot): boolean {

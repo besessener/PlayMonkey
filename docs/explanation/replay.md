@@ -29,6 +29,10 @@ Replay parses that text back into a Playwright locator. It accepts only Playwrig
 arguments (`getByRole`, `getByText`, `getByLabel`, `locator`, `contentFrame`, `nth`, …) and never evaluates the
 text, so a log cannot run code.
 
+A `drag` also finds its drop target by `toLocator`. Native dialogs and file choosers get the answers recorded in the
+step's `events` (accepted or dismissed, the prompt text, the uploaded file names), so a replay takes the same path
+through `confirm` dialogs and uploads as the recording.
+
 Each element gets `monkey.actionTimeoutMs` to appear. When it does not, the site has **drifted** since the recording:
 replay logs `step N skipped: element not found: …` and continues with the next action. With `--strict` it stops
 there instead and exits `2`.

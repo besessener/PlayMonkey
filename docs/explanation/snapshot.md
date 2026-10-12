@@ -12,7 +12,8 @@ Playwright (since 1.59) takes an "AI mode" aria snapshot that assigns a ref to e
 - **Elements:** nodes with an interactive role (link, button, textbox, checkbox, combobox, …) plus anything the page
   marks clickable (`cursor: pointer`). Each carries role, accessible name, link target, placeholder, combobox
   options, checked and expanded state, whether it is enabled, whether it is in the viewport (from its bounding box)
-  and whether it is inside an iframe.
+  whether it is inside an iframe, and whether it is inside an open dialog (the monkey prefers those while one is
+  open).
 - **Open shadow DOM** is part of the snapshot. **Same-origin iframes** (including `srcdoc` and `about:blank`) are
   entered; their elements resolve like any other. **Cross-origin iframes** are counted, not entered: acting inside
   them would act on another origin.

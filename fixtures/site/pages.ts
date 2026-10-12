@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { escapeHtml, layout } from "./html.ts";
+import { labRoutes } from "./lab.ts";
 
 export interface Credentials {
   username: string;
@@ -9,6 +10,8 @@ export interface Credentials {
 export interface Request {
   method: string;
   url: URL;
+  /** The `Host` header, e.g. `127.0.0.1:41234`. */
+  host: string;
   cookies: Record<string, string>;
   /** Parsed `application/x-www-form-urlencoded` body of a POST. */
   form: URLSearchParams;
@@ -18,6 +21,8 @@ export interface Response {
   status: number;
   headers?: Record<string, string>;
   body?: string;
+  /** Drop the connection after sending `body`, although the headers promised more (a broken download). */
+  abort?: boolean;
 }
 
 export interface Route {
@@ -250,6 +255,7 @@ export function createRoutes(state: SiteState): Route[] {
           ),
         ),
     },
+    ...labRoutes(),
   ];
   return routes;
 }

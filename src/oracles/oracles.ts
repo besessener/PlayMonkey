@@ -43,9 +43,10 @@ interface PageFacts {
 const TIMEOUT = Symbol("timeout");
 
 /**
- * Watches every page of a context and turns problems into deduplicated findings. Event-based oracles (`pageerror`,
- * `console`, `http4xx`, `http5xx`, `crash`) collect signals as they happen; `check` runs after every step, adds the
- * state-based ones (`hang`, `errorPage`, `overflow`) and files all collected signals under that step.
+ * Watches every page of a context, popups and iframes included, and turns problems into deduplicated findings.
+ * Event-based oracles (`pageerror`, `console`, `http4xx`, `http5xx`, `crash`) collect signals as they happen; `check`
+ * runs after every step, adds the state-based ones (`hang`, `errorPage`, `overflow`) and failed downloads of the
+ * step (`download`), and files all collected signals under that step.
  */
 export class Oracles {
   readonly findings: Finding[] = [];
@@ -83,6 +84,7 @@ export class Oracles {
       step: record.step,
       action: record.action,
       ...(record.locator === undefined ? {} : { locator: record.locator }),
+      ...(record.toLocator === undefined ? {} : { toLocator: record.toLocator }),
       url: record.url,
     });
     if (this.#history.length > limit) this.#history.splice(0, this.#history.length - limit);
@@ -94,6 +96,17 @@ export class Oracles {
         message: `page did not load within ${this.#config.monkey.actionTimeoutMs}ms: ${record.result.error ?? ""}`,
         url: record.result.url,
         details: { kind: "navigation", action: record.action, error: record.result.error },
+      });
+    }
+    for (const event of record.events ?? []) {
+      if (event.kind !== "download" || event.failure === undefined) continue;
+      const path = normalizeUrl(event.url, this.#origin);
+      this.#add("download", {
+        severity: "medium",
+        key: path,
+        message: `download of ${event.name} from ${path} failed: ${event.failure}`,
+        url: event.url,
+        details: { name: event.name, url: event.url, failure: event.failure },
       });
     }
     if (page !== undefined && !this.#crashed.has(page) && /^https?:/.test(page.url())) {

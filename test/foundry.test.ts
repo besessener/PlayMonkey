@@ -143,7 +143,7 @@ describe("anthropic-foundry provider", () => {
     assert.equal("thinking" in request.body, false);
     assert.equal(request.body.max_tokens, 4096);
     const tools = request.body.tools as { name: string; input_schema: { additionalProperties: boolean } }[];
-    assert.equal(tools.length, 10);
+    assert.equal(tools.length, 12);
     assert.ok(tools.every((tool) => tool.input_schema.additionalProperties === false));
     const system = request.body.system as { text: string; cache_control: unknown }[];
     assert.deepEqual(system[0]?.cache_control, { type: "ephemeral" });

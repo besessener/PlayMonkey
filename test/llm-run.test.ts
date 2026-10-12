@@ -276,10 +276,19 @@ describe("monkey run with an LLM against the fixture site", () => {
       assert.match(none.stderr, /no llm section/);
     });
 
-    it("rejects a provider that is not available yet", async () => {
-      const result = await run({ llm: { provider: "openai" } });
+    it("creates the openai provider and fails fast when its endpoint is unreachable", async () => {
+      const result = await run(
+        { llm: { provider: "openai", baseUrl: "http://127.0.0.1:1/openai/v1", maxRetries: 0 } },
+        undefined,
+        "preflight",
+      );
       assert.equal(result.code, 2);
-      assert.match(result.stderr, /llm\.provider "openai" is not available yet/);
+      assert.match(
+        result.stderr,
+        /llm preflight failed: openai at http:\/\/127\.0\.0\.1:1\/openai\/v1, deployment claude/,
+      );
+      assert.match(result.stderr, /cause: unreachable/);
+      assert.ok(!result.stderr.includes(KEY));
     });
   });
 });

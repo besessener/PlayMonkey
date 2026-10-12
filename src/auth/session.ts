@@ -1,6 +1,6 @@
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
-import type { Browser, BrowserContext, BrowserContextOptions, Cookie, Page } from "playwright";
+import type { Browser, BrowserContext, BrowserContextOptions, Cookie, Page, Request } from "playwright";
 import type { AuthRole, Config, FieldsLoginRole, StorageStateRole } from "../config/config.ts";
 import type { Secrets } from "../config/secrets.ts";
 
@@ -228,7 +228,7 @@ async function readStorageState(
  */
 async function guardOrigin(context: BrowserContext, origin: string, events: SessionEvent[], secrets: Secrets) {
   await context.route("**/*", async (route, request) => {
-    const isTopLevel = request.isNavigationRequest() && request.frame().parentFrame() === null;
+    const isTopLevel = request.isNavigationRequest() && isMainFrame(request);
     if (isTopLevel && new URL(request.url()).origin !== origin) {
       events.push({ kind: "blocked-navigation", url: secrets.mask(request.url()), time: new Date().toISOString() });
       await route.abort("aborted");
@@ -236,6 +236,18 @@ async function guardOrigin(context: BrowserContext, origin: string, events: Sess
     }
     await route.fallback();
   });
+}
+
+/**
+ * True for a request of a page's main frame. The first navigation of a popup has no frame yet (`request.frame()`
+ * throws); it is the popup's main frame.
+ */
+function isMainFrame(request: Request): boolean {
+  try {
+    return request.frame().parentFrame() === null;
+  } catch {
+    return true;
+  }
 }
 
 function fingerprint(cookies: Cookie[]): string {

@@ -12,6 +12,7 @@ import type { LlmProvider } from "./llm/provider.ts";
 import { StuckDetector } from "./llm/stuck.ts";
 import { describeUsage, type LlmStats } from "./llm/usage.ts";
 import { type Action, describeAction } from "./monkey/actions.ts";
+import { describeEvent, removeDownloads } from "./monkey/events.ts";
 import { type ReplayPlan, type RunResult, runMonkey, type StepRecord } from "./monkey/loop.ts";
 import type { Spectator } from "./monkey/spectator.ts";
 import type { Finding } from "./oracles/finding.ts";
@@ -159,9 +160,11 @@ export async function runRole(
           log,
         })
       : undefined;
+  const downloadDir = join(options.outputDir, "downloads");
   try {
     const result = await runMonkey(session.context, {
       config,
+      downloadDir,
       ...(options.signal === undefined ? {} : { signal: options.signal }),
       ...(options.replay === undefined ? {} : { replay: options.replay }),
       ...(advisor === undefined ? {} : { advisor }),
@@ -191,6 +194,7 @@ export async function runRole(
     };
   } finally {
     const artifacts = await session.close();
+    if (!config.report.keepDownloads) await removeDownloads(downloadDir);
     if (artifacts.tracePath !== undefined) log(`trace: ${artifacts.tracePath}`);
     if (outcome !== undefined) {
       if (artifacts.tracePath !== undefined) outcome.tracePath = artifacts.tracePath;
@@ -208,7 +212,8 @@ export function describeStep(record: StepRecord): string {
     locator === undefined || !("ref" in action) ? action : ({ ...action, ref: locator } as Action),
   );
   const outcome = record.result.ok ? "" : ` -> failed: ${record.result.error ?? "unknown error"}`;
-  return `step ${record.step} ${record.source}: ${text}${outcome}`;
+  const events = record.events === undefined ? "" : ` [${record.events.map(describeEvent).join("; ")}]`;
+  return `step ${record.step} ${record.source}: ${text}${outcome}${events}`;
 }
 
 /** A directory name for a role: safe characters only. */

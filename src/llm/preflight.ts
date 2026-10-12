@@ -2,7 +2,7 @@ import type { LlmConfig } from "../config/config.ts";
 import type { Secrets } from "../config/secrets.ts";
 import type { LlmErrorKind, LlmProvider, PreflightResult } from "./provider.ts";
 
-/** One line per failure class, telling what to check. */
+/** One line per failure class, telling what to check (`anthropic-foundry`; see `preflightHint`). */
 export const PREFLIGHT_HINTS: Record<LlmErrorKind, string> = {
   unreachable: "endpoint not reachable: check llm.baseUrl, DNS, proxy and firewall",
   tls: "TLS handshake failed: check the certificate chain (corporate proxy? set NODE_EXTRA_CA_CERTS)",
@@ -21,6 +21,23 @@ export const PREFLIGHT_HINTS: Record<LlmErrorKind, string> = {
   other: "unexpected error",
 };
 
+/** Where the `openai` backend needs other advice than the default. */
+const OPENAI_HINTS: Partial<Record<LlmErrorKind, string>> = {
+  forbidden: "access denied: the key or identity lacks a role such as Cognitive Services OpenAI User on the resource",
+  notFound:
+    "not found: llm.deployment must be the deployment name, not the model ID; llm.baseUrl must be the full " +
+    "OpenAI-compatible base URL, e.g. https://<resource>.openai.azure.com/openai/v1; if the deployment does not " +
+    'offer the Responses API, set llm.options.api to "chat"',
+  badRequest:
+    "request rejected: the deployment may not support a sent option (llm.options), tool calling, or this API " +
+    'surface (try llm.options.api "chat" or "responses")',
+};
+
+/** The hint for a failure of `provider`. */
+export function preflightHint(provider: string, kind: LlmErrorKind): string {
+  return (provider === "openai" ? OPENAI_HINTS[kind] : undefined) ?? PREFLIGHT_HINTS[kind];
+}
+
 /** Runs the provider's probe and returns the result with a ready-to-print message. Never throws. */
 export async function runPreflight(
   provider: LlmProvider,
@@ -35,7 +52,7 @@ export async function runPreflight(
   const message = [
     `llm preflight failed: ${where}${status}`,
     `  cause: ${error.kind}: ${error.message}`,
-    `  hint: ${PREFLIGHT_HINTS[error.kind]}`,
+    `  hint: ${preflightHint(provider.name, error.kind)}`,
   ].join("\n");
   return { result, message: secrets.mask(message) };
 }
