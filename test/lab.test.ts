@@ -192,7 +192,7 @@ describe("the lab: hard parts of real pages", () => {
       assert.equal(run.result.stopReason, "end", run.result.error);
       const uploads = run.records.map((r) => r.events?.find((e) => e.kind === "upload"));
       assert.ok(
-        uploads.every((u) => u !== undefined && u.files.length >= 1),
+        uploads.every((u) => u !== undefined && u.files.length > 0),
         JSON.stringify(uploads),
       );
       const page = run.context.pages()[0];

@@ -19,39 +19,180 @@
     "rules": {
       "preset": "recommended",
       "correctness": {
+        "noGlobalDirnameFilename": "error",
         "noUndeclaredDependencies": "error",
         "noUnusedFunctionParameters": "error",
         "noUnusedImports": "error",
+        "noUnusedLabels": "error",
         "noUnusedPrivateClassMembers": "error",
         "noUnusedVariables": "error",
-        "useImportExtensions": "error"
+        "useImportExtensions": "error",
+        "useJsonImportAttributes": "error"
       },
       "nursery": {
+        "noExtendNative": "error",
         "noFloatingPromises": "error",
+        "noIdenticalTestTitle": "error",
+        "noImpliedEval": "error",
+        "noLoopFunc": "error",
+        "noMeaninglessVoidOperator": "error",
+        "noMisleadingReturnType": "error",
         "noMisusedPromises": "error",
+        "noNegationInEqualityCheck": "error",
         "noPlaywrightElementHandle": "error",
         "noPlaywrightForceOption": "error",
         "noPlaywrightMissingAwait": "error",
         "noPlaywrightNetworkidle": "error",
         "noPlaywrightWaitForTimeout": "error",
         "noReturnInFinally": "error",
+        "noUnmodifiedLoopCondition": "error",
+        "noUnnecessaryTemplateExpression": "error",
+        "noUnsafePlusOperands": "error",
+        "noUselessTypeConversion": "error",
+        "useArraySome": "error",
         "useAwaitThenable": "error",
-        "useExhaustiveSwitchCases": "error"
+        "useConsistentTestIt": "error",
+        "useExhaustiveSwitchCases": "error",
+        "useExpect": "error",
+        "useFlatMathMinMax": "error",
+        "useImportsFirst": "error",
+        "useIncludes": "error",
+        "useMathMinMax": "error",
+        "useModernMathApis": "error",
+        "useNullishCoalescing": "error",
+        "usePromiseRejectErrors": "error",
+        "useReduceTypeParameter": "error",
+        "useRegexpExec": "error",
+        "useRegexpTest": "error",
+        "useStrictBooleanExpressions": "error",
+        "useStringStartsEndsWith": "error"
       },
       "style": {
+        "noCommonJs": "error",
+        "noExcessiveLinesPerFile": {
+          "level": "error",
+          "options": {
+            "maxLines": 350,
+            "skipBlankLines": true
+          }
+        },
+        "noExportedImports": "error",
+        "noInferrableTypes": "error",
+        "noMultiAssign": "error",
+        "noNegationElse": "error",
+        "noNestedTernary": "error",
         "noNonNullAssertion": "error",
         "noParameterAssign": "error",
+        "noParameterProperties": "error",
+        "noProcessEnv": "error",
+        "noShoutyConstants": "error",
+        "noSubstr": "error",
+        "noUselessElse": "error",
+        "noYodaExpression": "error",
+        "useArrayLiterals": "error",
+        "useAtIndex": "error",
+        "useCollapsedElseIf": "error",
+        "useCollapsedIf": "error",
+        "useConsistentArrayType": "error",
+        "useConsistentArrowReturn": "error",
+        "useConsistentBuiltinInstantiation": "error",
+        "useConsistentMemberAccessibility": "error",
+        "useConsistentObjectDefinitions": "error",
+        "useConsistentTypeDefinitions": "error",
+        "useDefaultParameterLast": "error",
+        "useExplicitLengthCheck": "error",
+        "useExponentiationOperator": "error",
+        "useFilenamingConvention": "error",
+        "useForOf": "error",
+        "useGlobalThis": "error",
         "useNodeAssertStrict": "error",
         "useNodejsImportProtocol": "error",
-        "useThrowOnlyError": "error"
+        "useNumberNamespace": "error",
+        "useNumericSeparators": "error",
+        "useObjectSpread": "error",
+        "useReadonlyClassProperties": "error",
+        "useShorthandAssign": "error",
+        "useSymbolDescription": "error",
+        "useTemplate": "error",
+        "useThrowNewError": "error",
+        "useThrowOnlyError": "error",
+        "useTrimStartEnd": "error",
+        "useUnifiedTypeSignatures": "error"
       },
       "suspicious": {
+        "noAlert": "error",
+        "noConfusingVoidType": "error",
         "noConsole": "error",
+        "noConstantBinaryExpressions": "error",
+        "noDeprecatedImports": "error",
+        "noDuplicateTestHooks": "error",
+        "noEmptyBlockStatements": "error",
+        "noEqualsToNull": "error",
         "noEvolvingTypes": "error",
+        "noExplicitAny": "error",
+        "noExportsInTest": "error",
         "noFocusedTests": "error",
+        "noForIn": "error",
+        "noImplicitAnyLet": "error",
         "noImportCycles": "error",
+        "noNonNullAssertedOptionalChain": "error",
+        "noParametersOnlyUsedInRecursion": "error",
+        "noShadow": "error",
         "noSkippedTests": "error",
-        "noTemplateCurlyInString": "off"
+        "noTemplateCurlyInString": "off",
+        "noTsIgnore": "error",
+        "noUnassignedVariables": "error",
+        "noUnusedExpressions": "error",
+        "noUselessEscapeInString": "error",
+        "noUselessRegexBackrefs": "error",
+        "noVar": "error",
+        "useAwait": "error",
+        "useErrorMessage": "error",
+        "useGuardForIn": "error",
+        "useIterableCallbackReturn": "error",
+        "useNumberToFixedDigitsArgument": "error",
+        "useStaticResponseMethods": "error"
+      },
+      "complexity": {
+        "noExcessiveCognitiveComplexity": {
+          "level": "error",
+          "options": {
+            "maxAllowedComplexity": 15
+          }
+        },
+        "noExcessiveLinesPerFunction": {
+          "level": "error",
+          "options": {
+            "maxLines": 50,
+            "skipBlankLines": true
+          }
+        },
+        "noExcessiveNestedTestSuites": "error",
+        "noForEach": "error",
+        "noImplicitCoercions": "error",
+        "noUselessCatchBinding": "error",
+        "noUselessContinue": "error",
+        "noUselessReturn": "error",
+        "noUselessStringConcat": "error",
+        "noUselessUndefined": "error",
+        "useArrayFind": "error",
+        "useDateNow": "error",
+        "useIndexOf": "error",
+        "useMaxParams": {
+          "level": "error",
+          "options": {
+            "max": 4
+          }
+        },
+        "useSimplifiedLogicExpression": "error",
+        "useWhile": "error"
+      },
+      "performance": {
+        "noAccumulatingSpread": "error",
+        "noBarrelFile": "error",
+        "noDelete": "error",
+        "noNamespaceImport": "error",
+        "noReExportAll": "error"
       }
     }
   },
@@ -70,7 +211,10 @@
                   "openai": "LLM SDKs are imported only in src/llm/, behind the provider interface."
                 },
                 "patterns": [
-                  { "group": ["./cli/**", "../cli/**"], "message": "Only the CLI entry point imports src/cli/." }
+                  {
+                    "group": ["./cli/**", "../cli/**"],
+                    "message": "Only the CLI entry point imports src/cli/."
+                  }
                 ]
               }
             }
@@ -99,6 +243,39 @@
                 ]
               }
             }
+          }
+        }
+      }
+    },
+    {
+      "includes": ["test/**"],
+      "linter": {
+        "rules": {
+          "complexity": {
+            "noExcessiveLinesPerFunction": "off"
+          },
+          "style": {
+            "noExcessiveLinesPerFile": {
+              "level": "error",
+              "options": {
+                "maxLines": 600,
+                "skipBlankLines": true
+              }
+            },
+            "noProcessEnv": "off"
+          },
+          "suspicious": {
+            "noEmptyBlockStatements": "off"
+          }
+        }
+      }
+    },
+    {
+      "includes": ["src/config/**", "src/cli/**", "src/auth/browser.ts", "fixtures/**"],
+      "linter": {
+        "rules": {
+          "style": {
+            "noProcessEnv": "off"
           }
         }
       }

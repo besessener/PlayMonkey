@@ -29,16 +29,44 @@ The thresholds sit just below the measured values and are only ever raised, neve
 
 ## Stricter Biome rules
 
-On top of the recommended set, [`biome.json`](../../biome.json) turns these on as errors:
+On top of the recommended set, [`biome.json`](../../biome.json) sets about 140 rules to error. The main
+groups:
 
-- **Correctness:** unused imports, variables, parameters and private members; imports of undeclared dependencies;
-  relative imports without their file extension.
-- **Promises:** floating promises, promises used where a value is expected, `await` on non-thenables.
-- **Tests:** no `.only` and no `.skip`.
+- **Size and complexity:**
+
+  | Limit | Value | Applies to |
+  | --- | --- | --- |
+  | Cognitive complexity per function | 15 | everything |
+  | Parameters per function | 4, else a named options object | everything |
+  | Lines per function (blank lines not counted) | 50 | `src/`, `fixtures/` (not test suites) |
+  | Lines per file (blank lines not counted) | 350 in `src/` and `fixtures/`, 600 in `test/` | everything |
+
+- **Correctness:** unused imports, variables, parameters, labels and private members; imports of undeclared
+  dependencies; relative imports without their file extension; no shadowed names; no `== null`.
+- **Promises:** floating promises, promises used where a value is expected, `await` on non-thenables, `async`
+  functions without `await`, rejections with non-`Error` values.
+- **Types:** no `any`, no implicit `any` in `let`, no evolving types, strict boolean conditions, no `@ts-ignore`, no
+  non-null assertions.
+- **Tests:** no `.only`, no `.skip`, no identical test titles, no deeply nested suites.
 - **Playwright:** no `waitForTimeout`, element handles, `force: true`, `networkidle` or un-awaited Playwright calls.
-- **Style and safety:** `node:assert/strict`, the `node:` protocol, no non-null assertions, no parameter reassignment,
-  only `Error` objects thrown, no `console` (the CLI writes through its `io`), exhaustive `switch` over unions.
+- **Modern, unambiguous code:** `node:` imports, `node:assert/strict`, `for…of` over `forEach`, `at()`, `includes()`,
+  `startsWith()`, `??`, template literals, numeric separators, no nested ternaries, no implicit coercions, no
+  `delete`, no barrel files or `export *`, consistent array and type definitions, readonly class fields where possible.
+- **Environment:** `process.env` is read only in `src/config/`, `src/cli/` and `src/auth/browser.ts`, so values reach
+  the code through the config, where they are masked.
+- **Output:** no `console` (the CLI writes through its `io`).
 - **Import cycles:** no module imports itself through a chain of imports (type-only imports excepted).
+
+Deliberately off:
+
+| Rule | Why |
+| --- | --- |
+| `useErrorCause` | A caught error can carry an unmasked secret (for example a `TypeError` from `new URL()` keeps the filled-in URL in its `input`); a rethrown error says what failed without it. |
+| `noAwaitInLoops` | Browser steps run one after another on purpose. |
+| `useDefaultSwitchClause` | Exhaustive `switch` over a union (`useExhaustiveSwitchCases`) catches a new member at compile time; a `default` would hide it. |
+| `noVoid` | `void` marks the fire-and-forget promises that `noFloatingPromises` requires to be explicit. |
+| `noSecrets` | Entropy-based and noisy on test data; gitleaks is the secret gate. |
+| `noMagicNumbers`, `useBlockStatements`, `useNamingConvention`, `useExplicitReturnType` | Style that would churn hundreds of lines; `useNamingConvention` would also reject the LLM APIs' wire names (`max_tokens`). |
 
 ## Import boundaries
 

@@ -49,7 +49,7 @@ describe("role sessions against the fixture site", () => {
       config: loaded.config,
       secrets: loaded.secrets,
       outputDir: join(outputRoot, role?.name ?? ANONYMOUS_ROLE),
-      loginTimeoutMs: 5_000,
+      loginTimeoutMs: 5000,
       ...extra,
     });
     open.push(session);
@@ -116,7 +116,7 @@ describe("role sessions against the fixture site", () => {
     assert.match(error.message, /role "user": login did not succeed/);
     assert.ok(!`${error.message}\n${error.stack}`.includes(wrong));
     // The re-rendered login page settles the attempt; it must not wait for the timeout.
-    assert.ok(Date.now() - started < 4_000, `took ${Date.now() - started}ms`);
+    assert.ok(Date.now() - started < 4000, `took ${Date.now() - started}ms`);
   });
 
   it("fails clearly when a login field does not exist", async () => {

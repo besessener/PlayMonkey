@@ -11,10 +11,10 @@ export class Random {
   constructor(seed: number) {
     let state = seed >>> 0;
     const splitmix = () => {
-      state = (state + 0x9e3779b9) >>> 0;
+      state = (state + 0x9e_37_79_b9) >>> 0;
       let z = state;
-      z = Math.imul(z ^ (z >>> 16), 0x85ebca6b);
-      z = Math.imul(z ^ (z >>> 13), 0xc2b2ae35);
+      z = Math.imul(z ^ (z >>> 16), 0x85_eb_ca_6b);
+      z = Math.imul(z ^ (z >>> 13), 0xc2_b2_ae_35);
       return (z ^ (z >>> 16)) >>> 0;
     };
     this.#a = splitmix();
@@ -32,7 +32,7 @@ export class Random {
     this.#b = (this.#c + (this.#c << 3)) >>> 0;
     this.#c = ((this.#c << 21) | (this.#c >>> 11)) >>> 0;
     this.#c = (this.#c + t) >>> 0;
-    return t / 4294967296;
+    return t / 4_294_967_296;
   }
 
   /** An integer in [0, max). */
@@ -61,6 +61,6 @@ export class Random {
       point -= Math.max(0, weights[index] ?? 0);
       if (point < 0) return item;
     }
-    return items[items.length - 1] as T;
+    return items.at(-1) as T;
   }
 }

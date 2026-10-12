@@ -24,8 +24,8 @@ describe("Random", () => {
     );
     // Pinned values: a change here changes every recorded run.
     assert.deepEqual(
-      [0, 1, 42, 4294967295].map((seed) => new Random(seed).int(1_000_000)),
-      [979145, 425649, 239553, 329163],
+      [0, 1, 42, 4_294_967_295].map((seed) => new Random(seed).int(1_000_000)),
+      [979_145, 425_649, 239_553, 329_163],
     );
     assert.ok(first.every((value) => value >= 0 && value < 1));
   });

@@ -60,6 +60,9 @@ quietly. Reasoning lives in `docs/explanation/`, not here.
   note in a PR description does not count as asking.
 - **Smallest necessary change.** Preserve behaviour unless changing it is what was asked.
 - **When principles collide:** correctness and security, then KISS/YAGNI, then clean code, then DRY.
+- **Small units:** cognitive complexity at most 15, at most 4 parameters (else a named options object), functions
+  under 50 lines, files under 350 lines (tests under 600); Biome enforces it. Hard-to-reach coverage or a function
+  over a limit means extract the logic, not suppress the rule.
 - **Comments:** one line, only for a non-obvious constraint, workaround, invariant or external behaviour.
 - **Tests:** assert behaviour, not implementation. A new kind of bug gets a fixture page first, then the code, then a
   test that it is reported exactly once.

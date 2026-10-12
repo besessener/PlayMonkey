@@ -5,3 +5,4 @@ states/*.json
 *.tsbuildinfo
 .env
 lcov.info
+.claude/worktrees/

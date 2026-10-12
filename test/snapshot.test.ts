@@ -214,7 +214,7 @@ describe("serializeSnapshot", () => {
     hash: "0".repeat(16),
   };
 
-  for (const maxChars of [500, 2000, 8000, 20000]) {
+  for (const maxChars of [500, 2000, 8000, 20_000]) {
     it(`stays within ${maxChars} characters on a large page and says what it left out`, () => {
       const out = serializeSnapshot(large, { maxChars });
       assert.ok(out.length <= maxChars, `${out.length} > ${maxChars}`);

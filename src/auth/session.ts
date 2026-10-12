@@ -196,7 +196,7 @@ async function findField(page: Page, key: string) {
   for (const candidate of candidates) {
     if ((await candidate.count()) === 1) return candidate;
   }
-  return undefined;
+  return;
 }
 
 async function readStorageState(

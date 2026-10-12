@@ -215,7 +215,7 @@ async function isSameOrigin(page: Page, iframeRef: string, origin: string): Prom
 
 function hashTree(roots: (AriaNode | string)[]): string {
   const canonical = JSON.stringify(roots, (key, value: unknown) => {
-    if (VOLATILE_KEYS.has(key)) return undefined;
+    if (VOLATILE_KEYS.has(key)) return;
     return typeof value === "string" ? value.replace(/\s+/g, " ").trim() : value;
   });
   return createHash("sha256").update(canonical).digest("hex").slice(0, 16);
