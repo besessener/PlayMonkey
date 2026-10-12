@@ -158,9 +158,12 @@ async function actOnElement(context: ActionContext, action: ElementAction): Prom
     case "select":
       await (await element(context, action.ref)).selectOption({ label: action.value }, { timeout: timeoutMs });
       break;
-    default:
-      // check or uncheck
+    case "check":
+    case "uncheck":
       await (await element(context, action.ref)).setChecked(action.type === "check", { timeout: timeoutMs });
+      break;
+    default:
+      unhandled(action);
   }
 }
 
@@ -180,10 +183,17 @@ async function actOnPage({ page, timeoutMs, state }: ActionContext, action: Page
       state.loading = true;
       await page.goto(action.url, { timeout: timeoutMs });
       break;
-    default:
-      // setViewport
+    case "setViewport":
       await page.setViewportSize({ width: action.width, height: action.height });
+      break;
+    default:
+      unhandled(action);
   }
+}
+
+// Biome cannot narrow Extract/Exclude unions, so the switches above end in a default that tsc proves unreachable.
+function unhandled(action: never): never {
+  throw new Error(`unhandled action ${JSON.stringify(action)}`);
 }
 
 function delay(ms: number): Promise<void> {
