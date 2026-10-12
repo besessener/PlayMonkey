@@ -36,4 +36,5 @@ are blocked in this mode because they bypass request routing; routing also disab
 ## Trace and video
 
 Each role records a Playwright trace with screenshots and DOM snapshots and a video of the page. Closing the session
-writes `trace.zip` (open it with `npx playwright show-trace trace.zip`) and the video under `video/`.
+writes `trace.zip` (open it with `npx playwright show-trace trace.zip`) and the video under `video/`. Both are
+linked from the [report](../reference/report.md) and are not masked; see its section on secrets.

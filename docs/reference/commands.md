@@ -12,7 +12,7 @@ monkey --version | -v
 
 | Command | Today |
 | --- | --- |
-| `run` | Validates the config, prints the seed, then runs the random monkey with the [oracles](../explanation/oracles.md) for every role. Prints a summary per role, one line per finding, the trace path and the total number of findings; screenshots go to `<report.dir>/<role>/screenshots/`, the [action log](action-log.md) to `<report.dir>/<role>/actions.json`. The full report (`report.json`, `report.html`) follows with #10. |
+| `run` | Validates the config, prints the seed, then runs the random monkey with the [oracles](../explanation/oracles.md) for every role. Prints a summary per role, one line per finding, the trace path and the total number of findings; screenshots go to `<report.dir>/<role>/screenshots/`, the [action log](action-log.md) to `<report.dir>/<role>/actions.json`. Writes the [report](report.md) (`report.json`, self-contained `report.html`) and ends with the counts per severity, the report path and the reason for the exit code. |
 | `replay` | Executes an action log again in a fresh context for its role, without an LLM, runs the oracles and prints for each recorded finding whether it was `reproduced`, plus `new` findings. `--config` (`-c`) supplies login, browser and oracle settings and is required for roles that log in; `--strict` aborts at the first element that cannot be found instead of skipping it. Output goes to `replay/` next to the log. See [replay](../explanation/replay.md). |
 
 ### Exit codes
