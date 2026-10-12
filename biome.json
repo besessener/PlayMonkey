@@ -18,11 +18,92 @@
     "enabled": true,
     "rules": {
       "preset": "recommended",
+      "correctness": {
+        "noUndeclaredDependencies": "error",
+        "noUnusedFunctionParameters": "error",
+        "noUnusedImports": "error",
+        "noUnusedPrivateClassMembers": "error",
+        "noUnusedVariables": "error",
+        "useImportExtensions": "error"
+      },
+      "nursery": {
+        "noFloatingPromises": "error",
+        "noMisusedPromises": "error",
+        "noPlaywrightElementHandle": "error",
+        "noPlaywrightForceOption": "error",
+        "noPlaywrightMissingAwait": "error",
+        "noPlaywrightNetworkidle": "error",
+        "noPlaywrightWaitForTimeout": "error",
+        "noReturnInFinally": "error",
+        "useAwaitThenable": "error",
+        "useExhaustiveSwitchCases": "error"
+      },
+      "style": {
+        "noNonNullAssertion": "error",
+        "noParameterAssign": "error",
+        "useNodeAssertStrict": "error",
+        "useNodejsImportProtocol": "error",
+        "useThrowOnlyError": "error"
+      },
       "suspicious": {
+        "noConsole": "error",
+        "noEvolvingTypes": "error",
+        "noFocusedTests": "error",
+        "noImportCycles": "error",
+        "noSkippedTests": "error",
         "noTemplateCurlyInString": "off"
       }
     }
   },
+  "overrides": [
+    {
+      "includes": ["src/**", "!src/llm/**", "!src/cli/**", "!src/config/**", "!src/snapshot/**"],
+      "linter": {
+        "rules": {
+          "style": {
+            "noRestrictedImports": {
+              "level": "error",
+              "options": {
+                "paths": {
+                  "@anthropic-ai/sdk": "LLM SDKs are imported only in src/llm/, behind the provider interface.",
+                  "@anthropic-ai/foundry-sdk": "LLM SDKs are imported only in src/llm/, behind the provider interface.",
+                  "openai": "LLM SDKs are imported only in src/llm/, behind the provider interface."
+                },
+                "patterns": [
+                  { "group": ["./cli/**", "../cli/**"], "message": "Only the CLI entry point imports src/cli/." }
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "includes": ["src/config/**", "src/snapshot/**"],
+      "linter": {
+        "rules": {
+          "style": {
+            "noRestrictedImports": {
+              "level": "error",
+              "options": {
+                "paths": {
+                  "@anthropic-ai/sdk": "LLM SDKs are imported only in src/llm/, behind the provider interface.",
+                  "@anthropic-ai/foundry-sdk": "LLM SDKs are imported only in src/llm/, behind the provider interface.",
+                  "openai": "LLM SDKs are imported only in src/llm/, behind the provider interface."
+                },
+                "patterns": [
+                  {
+                    "group": ["../**"],
+                    "message": "config/ and snapshot/ are leaves: they import no other src/ module."
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
+    }
+  ],
   "assist": {
     "enabled": true,
     "actions": {

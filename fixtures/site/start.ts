@@ -10,6 +10,6 @@ process.stdout.write(
 );
 for (const signal of ["SIGINT", "SIGTERM"] as const) {
   process.once(signal, () => {
-    fixture.close().then(() => process.exit(0));
+    void fixture.close().then(() => process.exit(0));
   });
 }

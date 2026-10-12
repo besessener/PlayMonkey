@@ -6,6 +6,16 @@
 - **Lint and format: Biome.** One dependency and one config file instead of ESLint, Prettier and plugins. It also
   checks the website's HTML, CSS and SVG. The rule `noTemplateCurlyInString` is off because `${VAR}` is the config's
   placeholder syntax.
+- **Stricter lint and import boundaries in Biome, not ESLint or dependency-cruiser.** Biome covers unused code,
+  floating promises, import cycles and restricted imports itself. TypeScript 7 has no JavaScript compiler API, which
+  dependency-cruiser's TypeScript parsing relies on. The rules and boundaries are listed in
+  [quality gates](../reference/quality.md).
+- **Coverage: Node's built-in.** `--experimental-test-coverage` with `--test-coverage-*` thresholds needs no
+  dependency; c8 or Vitest's coverage would add one for the same numbers.
+- **Dead code: Knip.** It finds unused files, exports and dependencies, which neither Biome nor `tsc` reports.
+- **Hygiene: prek hooks.** gitleaks, zizmor and the standard pre-commit hooks, pinned to commit SHAs.
+- **No mutation testing yet.** Stryker has no `node:test` runner; its command runner would rerun whole test files,
+  most of which start a browser, for every mutant.
 - **TypeScript:** strict, plus `noUncheckedIndexedAccess` and `exactOptionalPropertyTypes`. `erasableSyntaxOnly`
   forbids enums and namespaces so Node can strip the types, and `rewriteRelativeImportExtensions` lets sources import
   `./x.ts` while the build emits `./x.js`.

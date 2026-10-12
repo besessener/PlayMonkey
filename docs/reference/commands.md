@@ -37,8 +37,11 @@ that outlines each element before acting and prints one line per step; it never 
 | --- | --- |
 | `npm run build` | `tsc` from `src/` to `dist/`. |
 | `npm test` | Builds, then `node --test "test/**/*.test.ts"`. |
+| `npm run test:coverage` | Builds, runs the tests with coverage of `src/`, fails below the [thresholds](quality.md#coverage-thresholds), writes `lcov.info`. |
 | `npm run lint` | `biome ci .` and typechecks `src` and `test`. |
 | `npm run typecheck` | Typechecks only. |
+| `npm run knip` | Unused files, exports and dependencies. |
+| `npm run check` | `lint`, `knip` and `test:coverage`: every local [quality gate](quality.md). |
 | `npm run format` | `biome check --write .`: formatting and safe fixes. |
 | `npm run fixture` | Starts the fixture site until interrupted. |
 

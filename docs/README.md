@@ -21,6 +21,7 @@ Organised by [Diátaxis](https://diataxis.fr/).
 - [Report](reference/report.md) – the report directory, `report.html`, `report.json`, what traces contain.
 - [Action log](reference/action-log.md) – the `actions.json` format, placeholders for secrets.
 - [Commands](reference/commands.md) – the `monkey` CLI, exit codes, npm scripts and environment variables.
+- [Quality gates](reference/quality.md) – lint rules, import boundaries, coverage thresholds, hooks, CodeQL.
 - [Fixture site](../fixtures/README.md) – pages, seeded bugs and the findings they must produce.
 
 ## Explanation
@@ -33,5 +34,5 @@ Organised by [Diátaxis](https://diataxis.fr/).
 - [Oracles and findings](explanation/oracles.md) – what counts as a bug, the finding model, deduplication, ignore rules.
 - [The LLM](explanation/llm.md) – when the monkey hands over, fallback and circuit breaker, secrets, adding a backend.
 - [Replay](explanation/replay.md) – how a run is repeated without randomness or LLM, drift, the result.
-- [Tooling choices](explanation/tooling.md) – why `node:test`, Biome, these TypeScript settings and so few dependencies.
+- [Tooling choices](explanation/tooling.md) – why `node:test`, Biome, Knip, these TypeScript settings and so few dependencies.
 - [Roadmap](explanation/roadmap.md) – milestones and status.

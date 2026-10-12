@@ -1,0 +1,6 @@
+# Configuration for the workflow linter zizmor (runs via .pre-commit-config.yaml).
+rules:
+  unpinned-uses:
+    config:
+      policies:
+        '*': hash-pin

@@ -30,13 +30,25 @@ CHROMIUM_EXECUTABLE_PATH=/path/to/chrome npm test
 
 Video recording still needs the matching ffmpeg; without it the video test fails.
 
+## Git hooks
+
+The hooks in `.pre-commit-config.yaml` (gitleaks, zizmor, file hygiene) run with [prek](https://github.com/j178/prek) or
+`pre-commit`:
+
+```sh
+prek install           # run them on every commit
+prek run --all-files   # run them once over the whole tree
+```
+
 ## Before you push
 
 ```sh
-npm run format   # apply Biome formatting and safe fixes
-npm run lint
-npm test
+npm run format         # apply Biome formatting and safe fixes
+npm run check          # lint, types, dead code, tests with coverage thresholds
+prek run --all-files
 ```
 
-CI (`.github/workflows/ci.yml`) runs `npm ci`, installs Chromium with `--with-deps`, then build, lint and test on
-Node 22. See [commands](../reference/commands.md) for every script.
+CI (`.github/workflows/ci.yml`) runs the same: a hygiene job with gitleaks over the whole history and the hooks, and
+a build-test job that installs Chromium with `--with-deps`, then build, lint, Knip and the tests with coverage on
+Node 22. Every gate and threshold is listed in [quality gates](../reference/quality.md); every script in
+[commands](../reference/commands.md).

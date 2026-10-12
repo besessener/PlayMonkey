@@ -22,8 +22,11 @@
     "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p test/tsconfig.json --noEmit",
     "pretest": "npm run build",
     "test": "node --test \"test/**/*.test.ts\"",
+    "test:coverage": "npm run build && node --test --experimental-test-coverage --test-coverage-include=\"src/**\" --test-coverage-lines=97 --test-coverage-branches=88 --test-coverage-functions=93 --test-reporter=spec --test-reporter-destination=stdout --test-reporter=lcov --test-reporter-destination=lcov.info \"test/**/*.test.ts\"",
     "lint": "biome ci . && npm run typecheck",
+    "knip": "knip",
     "format": "biome check --write .",
+    "check": "npm run lint && npm run knip && npm run test:coverage",
     "fixture": "node fixtures/site/start.ts"
   },
   "dependencies": {
@@ -36,6 +39,7 @@
   "devDependencies": {
     "@biomejs/biome": "^2.5.15",
     "@types/node": "^22.20.5",
+    "knip": "^6.41.0",
     "typescript": "^7.0.2"
   }
 }

@@ -5,16 +5,51 @@ on:
     branches: [main]
   pull_request:
 
-permissions:
-  contents: read
+permissions: {}
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
+  hygiene:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - name: Install Gitleaks (checksum verified)
+        env:
+          GITLEAKS_VERSION: 8.30.1
+          GITLEAKS_SHA256: 551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb
+        run: |
+          curl -sSfL -o gitleaks.tar.gz "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
+          echo "${GITLEAKS_SHA256}  gitleaks.tar.gz" | sha256sum -c -
+          tar -xzf gitleaks.tar.gz gitleaks
+          sudo install gitleaks /usr/local/bin/gitleaks
+          rm gitleaks gitleaks.tar.gz
+      - name: Scan entire history for secrets
+        run: gitleaks git --redact --verbose --no-banner .
+      - uses: j178/prek-action@1382ad72dea72f9d53832f2bcb65b3e87a947204 # v3.0.1
+        env:
+          # gitleaks runs over the whole history above; the hook itself only checks staged changes
+          SKIP: gitleaks
+          GH_TOKEN: ${{ github.token }}
+
   build-test:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
+    permissions:
+      contents: read
     steps:
-      - uses: actions/checkout@v6
-      - uses: actions/setup-node@v6
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: 22
           cache: npm
@@ -24,7 +59,22 @@ jobs:
         run: npx playwright install --with-deps chromium
       - name: Build
         run: npm run build
-      - name: Lint
+      - name: Lint and typecheck
         run: npm run lint
-      - name: Test
-        run: npm test
+      - name: Dead code and unused dependencies (Knip)
+        run: npm run knip
+      - name: Test with coverage thresholds
+        run: npm run test:coverage
+      - name: Coverage in the job summary
+        if: ${{ !cancelled() && hashFiles('lcov.info') != '' }}
+        run: |
+          node -e '
+            const totals = { lines: [0, 0], branches: [0, 0], functions: [0, 0] };
+            const keys = { LF: ["lines", 0], LH: ["lines", 1], BRF: ["branches", 0], BRH: ["branches", 1], FNF: ["functions", 0], FNH: ["functions", 1] };
+            for (const line of require("node:fs").readFileSync("lcov.info", "utf8").split("\n")) {
+              const [key, value] = line.split(":");
+              if (keys[key]) totals[keys[key][0]][keys[key][1]] += Number(value);
+            }
+            const row = ([name, [found, hit]]) => `| ${name} | ${((100 * hit) / found).toFixed(2)} % | ${hit}/${found} |`;
+            console.log(["## Test coverage", "", "| Metric | Coverage | Covered |", "|---|---|---|", ...Object.entries(totals).map(row)].join("\n"));
+          ' >> "$GITHUB_STEP_SUMMARY"

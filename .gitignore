@@ -4,3 +4,4 @@ monkey-report/
 states/*.json
 *.tsbuildinfo
 .env
+lcov.info
