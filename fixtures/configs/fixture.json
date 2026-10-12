@@ -1,0 +1,14 @@
+{
+  "baseUrl": "${FIXTURE_URL}",
+  "seed": 42,
+  "limits": { "maxSteps": 300, "maxMinutes": 5 },
+  "auth": [
+    {
+      "name": "user",
+      "loginUrl": "/login",
+      "fields": { "username": "${FIXTURE_USER}", "password": "${FIXTURE_PASS}" },
+      "submit": "button[type=submit]"
+    }
+  ],
+  "testData": { "email": "monkey@test.local", "name": "Monkey" }
+}
