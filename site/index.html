@@ -32,11 +32,11 @@
         </p>
         <p class="status">
           Status: early development. Config, login and the test fixture work; the monkey loop, oracles and report are being built, see the
-          <a href="https://github.com/besessener/PlayMonkey/issues/1">roadmap</a>.
+          <a href="https://github.com/besessener/PlayMonkey/blob/main/docs/explanation/roadmap.md">roadmap</a>.
         </p>
         <p class="actions">
           <a class="button primary" href="https://github.com/besessener/PlayMonkey">View on GitHub</a>
-          <a class="button" href="#start">Get started</a>
+          <a class="button" href="https://github.com/besessener/PlayMonkey/blob/main/docs/tutorials/getting-started.md">Getting started</a>
         </p>
         <pre class="terminal"><code>$ monkey --help
 Usage: monkey &lt;command&gt; [options]
@@ -88,7 +88,7 @@ Exit codes:
           <li><strong>Each role is isolated.</strong> Every login runs in its own browser context; cookies never leak between roles.</li>
         </ul>
         <p>
-          <a href="https://github.com/besessener/PlayMonkey/issues/1">Read the design and roadmap</a>
+          <a href="https://github.com/besessener/PlayMonkey/blob/main/docs/explanation/ground-rules.md">More about the ground rules</a>
         </p>
       </section>
 
@@ -112,30 +112,31 @@ Exit codes:
           <li><strong>Run.</strong> <code>npx monkey run config.json</code> validates the config today; logging in and exploring arrive with the run loop.</li>
         </ol>
         <p>
-          The <a href="https://github.com/besessener/PlayMonkey#configuration">configuration rules</a> list every default; the
-          <a href="https://github.com/besessener/PlayMonkey/blob/main/fixtures/README.md">fixture site</a> shows the kind of bugs it is built to find.
+          The <a href="https://github.com/besessener/PlayMonkey/blob/main/docs/tutorials/getting-started.md">getting started</a> tutorial walks you
+          through it against the bundled fixture site; the
+          <a href="https://github.com/besessener/PlayMonkey/blob/main/docs/reference/configuration.md">configuration reference</a> lists every key.
         </p>
       </section>
 
       <section id="docs">
         <h2>Documentation</h2>
-        <p class="section-lead">Everything lives in the repository while the tool takes shape.</p>
+        <p class="section-lead">Organised by what you need right now (<a href="https://diataxis.fr/">Diátaxis</a>).</p>
         <div class="cards">
-          <a class="card-link" href="https://github.com/besessener/PlayMonkey#configuration">
-            <strong>Configuration</strong>
-            <span>Keys, defaults and secrets</span>
+          <a class="card-link" href="https://github.com/besessener/PlayMonkey/tree/main/docs/tutorials">
+            <strong>Tutorials</strong>
+            <span>Step by step to a first success</span>
           </a>
-          <a class="card-link" href="https://github.com/besessener/PlayMonkey#browser-sessions-and-login">
-            <strong>Sessions and login</strong>
-            <span>Roles, storageState and stayOnDomain</span>
+          <a class="card-link" href="https://github.com/besessener/PlayMonkey/tree/main/docs/how-to">
+            <strong>How-to guides</strong>
+            <span>Reach one concrete goal</span>
           </a>
-          <a class="card-link" href="https://github.com/besessener/PlayMonkey/blob/main/fixtures/README.md">
-            <strong>Fixture site</strong>
-            <span>Seeded bugs and expected findings</span>
+          <a class="card-link" href="https://github.com/besessener/PlayMonkey/tree/main/docs/reference">
+            <strong>Reference</strong>
+            <span>Look up exactly how it is</span>
           </a>
-          <a class="card-link" href="https://github.com/besessener/PlayMonkey/issues/1">
-            <strong>Roadmap</strong>
-            <span>Milestones M1 to M4</span>
+          <a class="card-link" href="https://github.com/besessener/PlayMonkey/tree/main/docs/explanation">
+            <strong>Explanation</strong>
+            <span>Understand why it is so</span>
           </a>
         </div>
       </section>
