@@ -20,9 +20,9 @@ see [development setup](../tutorials/development-setup.md).
 
 | Metric | Threshold | Measured (2026-10) |
 | --- | --- | --- |
-| Lines | 97 % | 98.1 % |
-| Branches | 88 % | 89.3 % |
-| Functions | 93 % | 94.9 % |
+| Lines | 97 % | 98.2 % |
+| Branches | 88 % | 90.1 % |
+| Functions | 93 % | 96.4 % |
 
 The thresholds sit just below the measured values and are only ever raised, never lowered. The run also writes
 `lcov.info`; CI puts its totals in the job summary.
