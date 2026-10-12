@@ -73,7 +73,11 @@ npm run build                     # tsc -> dist/
 npm test                          # builds, then runs node:test on test/**/*.test.ts
 npm run lint                      # biome ci + typecheck of src and tests
 npm run format                    # biome format + safe fixes
+npm run fixture                   # start the local fixture site (see fixtures/README.md)
 ```
+
+Browser tests launch the Chromium that matches the installed Playwright version. Where that cannot be installed,
+point them at another Chromium with `CHROMIUM_EXECUTABLE_PATH=/path/to/chrome npm test`.
 
 ### Tooling choices
 
@@ -93,6 +97,7 @@ src/cli/           CLI entry (bin) and argument parsing
 src/config/        config schema, ${VAR} resolution, validation, secret masking
 src/exit-codes.ts  exit code constants
 src/{auth,snapshot,monkey,oracles,report,llm}/   added by the follow-up issues
-fixtures/site/     local fixture site for end-to-end tests (follow-up issue)
+fixtures/site/     local fixture site with seeded bugs for end-to-end tests
+fixtures/configs/  example config for the fixture site
 test/              node:test suites (*.test.ts)
 ```

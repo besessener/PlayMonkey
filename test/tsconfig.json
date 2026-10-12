@@ -3,7 +3,8 @@
   "compilerOptions": {
     "rootDir": "..",
     "noEmit": true,
-    "allowImportingTsExtensions": true
+    "allowImportingTsExtensions": true,
+    "lib": ["es2023", "dom"]
   },
-  "include": ["../src", "."]
+  "include": ["../src", "../fixtures", "."]
 }
