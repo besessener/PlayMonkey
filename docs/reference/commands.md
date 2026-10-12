@@ -39,7 +39,7 @@ complete`.
 
 | Script | Does |
 | --- | --- |
-| `npm run build` | `tsc` from `src/` to `dist/`. |
+| `npm run build` | `tsc` from `src/` to `dist/`, and makes the `monkey` bin executable. |
 | `npm test` | Builds, then `node --test "test/**/*.test.ts"`. |
 | `npm run lint` | `biome ci .` and typechecks `src` and `test`. |
 | `npm run typecheck` | Typechecks only. |
