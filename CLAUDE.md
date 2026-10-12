@@ -67,9 +67,9 @@ quietly. Reasoning lives in `docs/explanation/`, not here.
 - **Tests:** assert behaviour, not implementation. A new kind of bug gets a fixture page first, then the code, then a
   test that it is reported exactly once.
 - **Docs sync:** a change to behaviour, configuration or a design decision updates the matching `docs/` file in the
-  same change. A new config key goes into `src/config/schema.ts` and
-  [configuration.md](docs/reference/configuration.md); `test/docs.test.ts` fails otherwise. The root `README.md`
-  stays short.
+  same change. A new config key goes into `src/config/schema.ts` (`llm.*` keys into `src/config/llm-schema.ts`, defaults
+  into `src/config/defaults.ts`) and [configuration.md](docs/reference/configuration.md); `test/docs.test.ts` fails
+  otherwise. The root `README.md` stays short.
 
 ## Definition of done
 

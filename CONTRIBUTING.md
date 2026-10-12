@@ -41,7 +41,8 @@ prek run --all-files   # gitleaks, zizmor, file hygiene
 
 - Keep changes focused; one topic per pull request, its milestone in the title when it belongs to one
   ([roadmap](docs/explanation/roadmap.md)).
-- Update the docs with the code. A new config key goes into `src/config/schema.ts` **and**
+- Update the docs with the code. A new config key goes into `src/config/schema.ts` (`llm.*` keys into
+  `src/config/llm-schema.ts`, defaults into `src/config/defaults.ts`) **and**
   [configuration](docs/reference/configuration.md); `test/docs.test.ts` fails otherwise. It also checks relative
   links and anchors, that every sample config parses, and that the [CI example](docs/how-to/run-in-ci.md) matches
   `.github/workflows/monkey.yml`.
