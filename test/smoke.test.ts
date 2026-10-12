@@ -31,8 +31,8 @@ describe("built monkey CLI", () => {
     assert.equal(monkey().code, 2);
   });
 
-  it("stubbed run and replay exit 2", () => {
-    assert.equal(monkey("run", "config.json").code, 2);
+  it("run with a missing config and the stubbed replay exit 2", () => {
+    assert.equal(monkey("run", "missing-config.json").code, 2);
     assert.equal(monkey("replay", "actions.json").code, 2);
   });
 });

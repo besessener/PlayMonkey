@@ -5,6 +5,8 @@ import { Ajv, type ErrorObject } from "ajv";
 import { formatPath, type PathSegment, pointerToSegments } from "./path.ts";
 import { resolvePlaceholders } from "./placeholders.ts";
 import {
+  ACTION_TYPES,
+  type ActionType,
   configSchema,
   DEFAULTS,
   type Engine,
@@ -29,6 +31,7 @@ export interface Config {
   llm?: LlmConfig;
   oracles: Record<OracleName, boolean>;
   report: { dir: string };
+  monkey: { actionTimeoutMs: number; weights: Record<ActionType, number> };
 }
 
 export type AuthRole = FieldsLoginRole | StorageStateRole;
@@ -167,6 +170,12 @@ function normalize(raw: RawConfig, seed: number, baseDir: string): Config {
       boolean
     >,
     report: { dir: resolve(baseDir, raw.report?.dir ?? DEFAULTS.report.dir) },
+    monkey: {
+      actionTimeoutMs: raw.monkey?.actionTimeoutMs ?? DEFAULTS.monkey.actionTimeoutMs,
+      weights: Object.fromEntries(
+        ACTION_TYPES.map((type) => [type, raw.monkey?.weights?.[type] ?? DEFAULTS.monkey.weights[type]]),
+      ) as Record<ActionType, number>,
+    },
   };
   if (raw.llm !== undefined) config.llm = { ...raw.llm };
   return config;

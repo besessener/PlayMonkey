@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import { parseArgs } from "node:util";
 import { ConfigError, loadConfig } from "../config/config.ts";
 import { ExitCode } from "../exit-codes.ts";
+import { runAllRoles } from "../run.ts";
 
 export interface CliIo {
   stdout: (text: string) => void;
@@ -94,9 +95,27 @@ async function run(configFile: string, io: CliIo): Promise<ExitCode> {
   const { config, seedGenerated } = loaded;
   io.stdout(`seed: ${config.seed}${seedGenerated ? ' (generated; set "seed" in the config to reuse it)' : ""}\n`);
 
-  // Stub until the run loop (#7) lands.
-  io.stderr("monkey run: run loop not implemented yet\n");
-  return ExitCode.Error;
+  const abort = new AbortController();
+  const onSignal = () => {
+    io.stderr("monkey run: stopping after the current step\n");
+    abort.abort();
+  };
+  process.once("SIGINT", onSignal);
+  try {
+    const outcomes = await runAllRoles(loaded, {
+      log: (line) => io.stdout(`${line}\n`),
+      signal: abort.signal,
+    });
+    // Oracles (#8) are not implemented yet, so a completed run has no findings to report.
+    io.stdout("findings: not detected yet (oracles are not implemented)\n");
+    const failed = outcomes.some((outcome) => outcome.result === undefined || outcome.result.stopReason === "error");
+    return failed ? ExitCode.Error : ExitCode.NoFindings;
+  } catch (error) {
+    io.stderr(`monkey run: ${loaded.secrets.mask(error instanceof Error ? error.message : String(error))}\n`);
+    return ExitCode.Error;
+  } finally {
+    process.off("SIGINT", onSignal);
+  }
 }
 
 function parse(argv: string[]) {

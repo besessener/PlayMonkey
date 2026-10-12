@@ -8,10 +8,15 @@ export interface LaunchOptions {
   executablePath?: string;
 }
 
-/** Launches the configured engine. One browser serves all roles; each role gets its own context. */
+/**
+ * Launches the configured engine. One browser serves all roles; each role gets its own context. For Chromium,
+ * `CHROMIUM_EXECUTABLE_PATH` selects another binary when the one installed for Playwright is not available.
+ */
 export function launchBrowser(browser: Config["browser"], options: LaunchOptions = {}): Promise<Browser> {
+  const executablePath =
+    options.executablePath ?? (browser.engine === "chromium" ? process.env.CHROMIUM_EXECUTABLE_PATH : undefined);
   return ENGINES[browser.engine].launch({
     headless: browser.headless,
-    ...(options.executablePath === undefined ? {} : { executablePath: options.executablePath }),
+    ...(executablePath === undefined || executablePath === "" ? {} : { executablePath }),
   });
 }

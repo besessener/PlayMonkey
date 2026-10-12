@@ -15,6 +15,20 @@ export const ORACLES = [
 ] as const;
 export type OracleName = (typeof ORACLES)[number];
 
+export const ACTION_TYPES = [
+  "click",
+  "fill",
+  "select",
+  "check",
+  "press",
+  "scroll",
+  "back",
+  "navigate",
+  "setViewport",
+  "switchTab",
+] as const;
+export type ActionType = (typeof ACTION_TYPES)[number];
+
 export const LLM_PROVIDERS = ["anthropic-foundry", "openai"] as const;
 export type LlmProvider = (typeof LLM_PROVIDERS)[number];
 
@@ -25,6 +39,21 @@ export const DEFAULTS = {
   stayOnDomain: true,
   oracle: true,
   report: { dir: "./monkey-report" },
+  monkey: {
+    actionTimeoutMs: 5000,
+    weights: {
+      click: 10,
+      fill: 6,
+      select: 3,
+      check: 3,
+      press: 1,
+      scroll: 1,
+      back: 1.5,
+      navigate: 1,
+      setViewport: 0.2,
+      switchTab: 1,
+    } satisfies Record<ActionType, number>,
+  },
 } as const;
 
 export const MAX_SEED = 2 ** 32 - 1;
@@ -45,6 +74,7 @@ export interface RawConfig {
   llm?: RawLlm;
   oracles?: Partial<Record<OracleName, boolean>>;
   report?: { dir?: string };
+  monkey?: { actionTimeoutMs?: number; weights?: Partial<Record<ActionType, number>> };
 }
 
 export interface RawAuth {
@@ -189,6 +219,35 @@ export const configSchema: JSONSchemaType<RawConfig> = {
       properties: Object.fromEntries(
         ORACLES.map((name) => [name, { type: "boolean", nullable: true, default: DEFAULTS.oracle }]),
       ) as JSONSchemaType<RawConfig>["properties"]["oracles"]["properties"],
+    },
+    monkey: {
+      type: "object",
+      nullable: true,
+      additionalProperties: false,
+      required: [],
+      description: "Tuning of the random monkey.",
+      properties: {
+        actionTimeoutMs: {
+          type: "integer",
+          minimum: 100,
+          nullable: true,
+          default: DEFAULTS.monkey.actionTimeoutMs,
+          description: "Timeout of a single action in milliseconds; a slower action fails and the run continues.",
+        },
+        weights: {
+          type: "object",
+          nullable: true,
+          additionalProperties: false,
+          required: [],
+          description: "Relative weight of each action type; 0 disables it.",
+          properties: Object.fromEntries(
+            ACTION_TYPES.map((type) => [
+              type,
+              { type: "number", minimum: 0, nullable: true, default: DEFAULTS.monkey.weights[type] },
+            ]),
+          ) as JSONSchemaType<RawConfig>["properties"]["monkey"]["properties"]["weights"]["properties"],
+        },
+      },
     },
     report: {
       type: "object",
