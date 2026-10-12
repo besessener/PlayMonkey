@@ -353,7 +353,10 @@ describe("oracles in the browser", () => {
         config: cfg,
         onStep: async (rec: StepRecord) => {
           const page = context.pages()[rec.result.tab] ?? context.pages()[0];
-          if (rec.step === 2) await page?.goto("chrome://crash").catch(() => undefined);
+          if (rec.step === 2 && page !== undefined) {
+            // The crash event can arrive after goto settles (headless shell), so wait for it explicitly.
+            await Promise.all([page.waitForEvent("crash"), page.goto("chrome://crash").catch(() => undefined)]);
+          }
           await oracles.check(rec, page);
         },
       });
