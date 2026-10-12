@@ -11,6 +11,7 @@ Organised by [Diátaxis](https://diataxis.fr/).
 
 - [Configure login](how-to/configure-login.md) – form login, saved sessions, several roles, secrets.
 - [Configure the LLM](how-to/configure-llm.md) – Claude on Microsoft Foundry, preflight, budget, troubleshooting.
+- [Watch a run](how-to/watch-a-run.md) – spectator mode for watching and demos: visible, slowed down, outlined.
 - [Use the fixture site](how-to/use-the-fixture-site.md) – start it, point a config at it, add a page.
 - [Maintain the website](how-to/maintain-the-website.md) – `site/` and the Pages workflow.
 

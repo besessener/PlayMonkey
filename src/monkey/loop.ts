@@ -6,6 +6,7 @@ import { type Action, isElementAction } from "./actions.ts";
 import { chooseAction, Exploration } from "./chooser.ts";
 import { type ActionResult, executeAction, type Tabs } from "./executor.ts";
 import { Random } from "./random.ts";
+import type { Spectator } from "./spectator.ts";
 
 /** One executed step, handed to the action log. */
 export interface StepRecord {
@@ -66,6 +67,8 @@ export interface RunOptions {
   replay?: ReplayPlan;
   /** Takes over steps when the monkey is stuck (the LLM); ignored with `replay`. */
   advisor?: StepAdvisor;
+  /** Spectator mode: outline each element before acting on it. */
+  spectator?: Spectator;
 }
 
 /** Something that may choose a step instead of the random monkey; see `LlmDriver`. */
@@ -186,7 +189,11 @@ export async function runMonkey(context: BrowserContext, options: RunOptions): P
         skippedActions++;
         result = { ok: false, error: target, navigated: false, url: page.url(), tab: tabs.current };
       } else {
-        result = await executeAction(tabs, action, config.monkey.actionTimeoutMs, target);
+        const spectator =
+          options.spectator === undefined
+            ? undefined
+            : { ...options.spectator, ...(locator === undefined ? {} : { locator }) };
+        result = await executeAction(tabs, action, config.monkey.actionTimeoutMs, target, spectator);
         if (!result.ok) failedActions++;
       }
       tabs.current = result.tab;

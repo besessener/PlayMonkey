@@ -11,7 +11,9 @@ import { PromptPlaceholders } from "./llm/placeholders.ts";
 import type { LlmProvider } from "./llm/provider.ts";
 import { StuckDetector } from "./llm/stuck.ts";
 import { describeUsage, type LlmStats } from "./llm/usage.ts";
+import { type Action, describeAction } from "./monkey/actions.ts";
 import { type ReplayPlan, type RunResult, runMonkey, type StepRecord } from "./monkey/loop.ts";
+import type { Spectator } from "./monkey/spectator.ts";
 import type { Finding } from "./oracles/finding.ts";
 import { Oracles } from "./oracles/oracles.ts";
 import { ActionLogWriter } from "./replay/log.ts";
@@ -39,6 +41,8 @@ export interface RunAllOptions {
   signal?: AbortSignal;
   /** The LLM for stuck situations; shared by all roles, like its budget. Requires `config.llm`. */
   llm?: RunLlm;
+  /** Spectator mode (`--watch`): visible, slowed-down browser and one console line per step. */
+  spectator?: Spectator;
 }
 
 export interface RunLlm {
@@ -59,7 +63,10 @@ export async function runAllRoles(loaded: LoadedConfig, options: RunAllOptions):
     await rm(file, { force: true });
     llm = { ...llm, debugLog: new DebugLog(file, loaded.secrets) };
   }
-  const browser = await launchBrowser(config.browser);
+  const browser = await launchBrowser(
+    config.browser,
+    options.spectator === undefined ? {} : { spectator: options.spectator },
+  );
   const outcomes: RoleOutcome[] = [];
   try {
     const roles = config.auth.length > 0 ? config.auth : [undefined];
@@ -74,6 +81,7 @@ export async function runAllRoles(loaded: LoadedConfig, options: RunAllOptions):
           ...(options.signal === undefined ? {} : { signal: options.signal }),
           ...(options.onStep === undefined ? {} : { onStep: (record) => options.onStep?.(name, record) }),
           ...(llm === undefined ? {} : { llm }),
+          ...(options.spectator === undefined ? {} : { spectator: options.spectator }),
         }),
       );
     }
@@ -95,6 +103,8 @@ export interface RoleOptions {
   signal?: AbortSignal;
   /** Ignored with `replay`, which never asks an LLM. */
   llm?: RunLlm;
+  /** Outline elements before acting and log every step; the browser must have been launched for it. */
+  spectator?: Spectator;
 }
 
 /** Logs in as one role (or anonymously), runs the monkey or a replay with the oracles, and closes the session. */
@@ -155,10 +165,12 @@ export async function runRole(
       ...(options.signal === undefined ? {} : { signal: options.signal }),
       ...(options.replay === undefined ? {} : { replay: options.replay }),
       ...(advisor === undefined ? {} : { advisor }),
+      ...(options.spectator === undefined ? {} : { spectator: options.spectator }),
       onStep: async (record) => {
         const pages = session.context.pages();
         await oracles.check(record, pages[record.result.tab] ?? pages[0]);
         if (record.skipped === true) log(`step ${record.step} skipped: ${secrets.mask(record.result.error ?? "")}`);
+        else if (options.spectator !== undefined) log(secrets.mask(describeStep(record)));
         await writer?.append(record);
         await options.onStep?.(record);
       },
@@ -186,6 +198,17 @@ export async function runRole(
     }
   }
   return outcome;
+}
+
+/** One line per step in spectator mode, e.g. `step 12 llm: click getByRole('link', { name: 'Home' }) -> failed: …`. */
+export function describeStep(record: StepRecord): string {
+  const { action, locator } = record;
+  // The durable locator says more than the short-lived ref.
+  const text = describeAction(
+    locator === undefined || !("ref" in action) ? action : ({ ...action, ref: locator } as Action),
+  );
+  const outcome = record.result.ok ? "" : ` -> failed: ${record.result.error ?? "unknown error"}`;
+  return `step ${record.step} ${record.source}: ${text}${outcome}`;
 }
 
 /** A directory name for a role: safe characters only. */

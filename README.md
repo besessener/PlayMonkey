@@ -23,9 +23,11 @@ with the steps to reproduce it. An LLM steps in only when the random monkey gets
 monkey run config.json         # explore the site and report findings
 monkey replay actions.json     # re-execute a recorded run, without an LLM
 monkey preflight config.json   # check the configured LLM endpoint
+monkey run config.json --watch # spectator mode: watch it live, e.g. for a demo
 ```
 
-Exit codes: `0` no findings, `1` findings, `2` tool or config error.
+`--watch` opens a visible, slowed-down browser that outlines each element before acting and prints every step; see
+[watch a run](docs/how-to/watch-a-run.md). Exit codes: `0` no findings, `1` findings, `2` tool or config error.
 
 ```json
 {

@@ -5,6 +5,7 @@ import { createProvider, UnsupportedProviderError } from "../llm/factory.ts";
 import { runPreflight } from "../llm/preflight.ts";
 import type { LlmProvider } from "../llm/provider.ts";
 import { describeUsage, LlmStats } from "../llm/usage.ts";
+import { DEFAULT_SPECTATOR, type Spectator } from "../monkey/spectator.ts";
 import { SEVERITIES } from "../oracles/finding.ts";
 import { ActionLogError } from "../replay/log.ts";
 import { ReplayError, replayActionLog } from "../replay/replay.ts";
@@ -32,6 +33,11 @@ Options:
                          (needed when the log was recorded as a role that logs in).
   --strict               replay: abort when a recorded element is not found,
                          instead of skipping that action.
+  -w, --watch            run, replay: spectator mode for watching or demos. Opens a
+                         visible browser, slows it down, outlines each element
+                         before acting on it and prints every step.
+  --slow-mo <ms>         run, replay: delay per browser operation in spectator mode
+                         (default ${DEFAULT_SPECTATOR.slowMoMs}; 0 for full speed). Implies --watch.
   -h, --help             Show this help.
   -v, --version          Show the version.
 
@@ -82,14 +88,40 @@ export async function runCli(argv: string[], io: CliIo): Promise<ExitCode> {
   }
 
   const [file] = rest as [string];
+  const spectator = spectatorOf(values);
+  if (typeof spectator === "string") {
+    io.stderr(`monkey ${command}: ${spectator}\n\n${USAGE}`);
+    return ExitCode.Error;
+  }
+  if (command === "preflight" && spectator !== undefined) {
+    io.stderr(`monkey preflight: --watch and --slow-mo belong to run and replay\n\n${USAGE}`);
+    return ExitCode.Error;
+  }
   if (command === "run" || command === "preflight") {
     if (values.config !== undefined || values.strict === true) {
       io.stderr(`monkey ${command}: --config and --strict belong to replay\n\n${USAGE}`);
       return ExitCode.Error;
     }
-    return command === "run" ? run(file, io) : preflight(file, io);
+    return command === "run" ? run(file, io, spectator) : preflight(file, io);
   }
-  return replay(file, values.config, values.strict === true, io);
+  return replay(file, values.config, values.strict === true, io, spectator);
+}
+
+/** The spectator settings from `--watch` and `--slow-mo`, undefined without them, or a usage error. */
+function spectatorOf(values: { watch?: boolean; "slow-mo"?: string }): Spectator | string | undefined {
+  const raw = values["slow-mo"];
+  if (raw === undefined) return values.watch === true ? { ...DEFAULT_SPECTATOR } : undefined;
+  if (!/^\d{1,5}$/.test(raw)) return `--slow-mo expects milliseconds (0 … 99999), got ${JSON.stringify(raw)}`;
+  const slowMoMs = Number(raw);
+  // The outline lasts two operations, but at least a glance; none at full speed.
+  return { slowMoMs, highlightMs: slowMoMs === 0 ? 0 : Math.max(300, 2 * slowMoMs) };
+}
+
+/** Adds a hint when a visible browser could not be opened. */
+function launchHint(message: string, spectator: Spectator | undefined): string {
+  if (spectator === undefined || !/x ?server|display|headed/i.test(message)) return message;
+  // Playwright appends pages of browser logs; the first line says enough.
+  return `${message.split("\n")[0]}\n  hint: --watch opens a visible browser and needs a display; without one (CI, containers) run it under xvfb-run`;
 }
 
 async function load(command: string, configFile: string, io: CliIo): Promise<LoadedConfig | undefined> {
@@ -154,7 +186,7 @@ async function preflight(configFile: string, io: CliIo): Promise<ExitCode> {
   return typeof started === "object" ? ExitCode.NoFindings : ExitCode.Error;
 }
 
-async function run(configFile: string, io: CliIo): Promise<ExitCode> {
+async function run(configFile: string, io: CliIo, spectator?: Spectator): Promise<ExitCode> {
   const loaded = await load("run", configFile, io);
   if (loaded === undefined) return ExitCode.Error;
   const { config, seedGenerated } = loaded;
@@ -175,6 +207,7 @@ async function run(configFile: string, io: CliIo): Promise<ExitCode> {
       log: (line) => io.stdout(`${line}\n`),
       signal: abort.signal,
       ...(llm === undefined ? {} : { llm }),
+      ...(spectator === undefined ? {} : { spectator }),
     });
     const report = buildReport({
       loaded,
@@ -209,14 +242,21 @@ async function run(configFile: string, io: CliIo): Promise<ExitCode> {
     io.stdout(total > 0 ? "exit 1: findings present\n" : "exit 0: no findings\n");
     return total > 0 ? ExitCode.Findings : ExitCode.NoFindings;
   } catch (error) {
-    io.stderr(`monkey run: ${loaded.secrets.mask(error instanceof Error ? error.message : String(error))}\n`);
+    const message = loaded.secrets.mask(error instanceof Error ? error.message : String(error));
+    io.stderr(`monkey run: ${launchHint(message, spectator)}\n`);
     return ExitCode.Error;
   } finally {
     process.off("SIGINT", onSignal);
   }
 }
 
-async function replay(logFile: string, configFile: string | undefined, strict: boolean, io: CliIo): Promise<ExitCode> {
+async function replay(
+  logFile: string,
+  configFile: string | undefined,
+  strict: boolean,
+  io: CliIo,
+  spectator?: Spectator,
+): Promise<ExitCode> {
   const abort = new AbortController();
   const onSignal = () => {
     io.stderr("monkey replay: stopping after the current step\n");
@@ -230,6 +270,7 @@ async function replay(logFile: string, configFile: string | undefined, strict: b
       env: io.env ?? process.env,
       log: (line) => io.stdout(`${line}\n`),
       signal: abort.signal,
+      ...(spectator === undefined ? {} : { spectator }),
     });
     if (outcome.result === undefined || outcome.result.stopReason === "error") return ExitCode.Error;
     for (const finding of original) {
@@ -243,6 +284,11 @@ async function replay(logFile: string, configFile: string | undefined, strict: b
   } catch (error) {
     if (error instanceof ConfigError || error instanceof ActionLogError || error instanceof ReplayError) {
       io.stderr(`monkey replay: ${error.message}\n`);
+      return ExitCode.Error;
+    }
+    const message = error instanceof Error ? error.message : String(error);
+    if (launchHint(message, spectator) !== message) {
+      io.stderr(`monkey replay: ${launchHint(message, spectator)}\n`);
       return ExitCode.Error;
     }
     throw error;
@@ -261,6 +307,8 @@ function parse(argv: string[]) {
       version: { type: "boolean", short: "v" },
       config: { type: "string", short: "c" },
       strict: { type: "boolean" },
+      watch: { type: "boolean", short: "w" },
+      "slow-mo": { type: "string" },
     },
   });
 }

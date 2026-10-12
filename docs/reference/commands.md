@@ -3,8 +3,9 @@
 ## `monkey`
 
 ```text
-monkey run <config.json>      Explore the site described by the config and report findings.
-monkey replay <actions.json> [--config <config.json>] [--strict]
+monkey run <config.json> [--watch] [--slow-mo <ms>]
+                              Explore the site described by the config and report findings.
+monkey replay <actions.json> [--config <config.json>] [--strict] [--watch] [--slow-mo <ms>]
                               Re-execute a recorded action log and check which findings recur.
 monkey preflight <config.json>
                               Check that the configured LLM endpoint works, without a browser.
@@ -18,13 +19,17 @@ monkey --version | -v
 | `replay` | Executes an action log again in a fresh context for its role, without an LLM, runs the oracles and prints for each recorded finding whether it was `reproduced`, plus `new` findings. `--config` (`-c`) supplies login, browser and oracle settings and is required for roles that log in; `--strict` aborts at the first element that cannot be found instead of skipping it. Output goes to `replay/` next to the log. See [replay](../explanation/replay.md). |
 | `preflight` | Validates the config and sends one probe request to the configured LLM that must come back as a tool call. Prints `llm preflight ok: …` and exits `0`, or the provider, sanitized URL, HTTP status, cause and a hint, and exits `2`, also with `llm.required: false`. A config without `llm` exits `2`. |
 
+`--watch` (`-w`) on `run` and `replay` is [spectator mode](../how-to/watch-a-run.md): a visible, slowed-down browser
+that outlines each element before acting and prints one line per step; it never changes which actions are taken.
+`--slow-mo <ms>` (0 … 99999, default 250) sets the delay per browser operation and implies `--watch`.
+
 ### Exit codes
 
 | Code | Meaning |
 | --- | --- |
 | `0` | No findings (also `--help`, `--version`). Replay: none of the recorded findings recurred. |
 | `1` | Findings present. Replay: at least one recorded finding recurred. |
-| `2` | Tool or config error: bad usage, unknown command or option, invalid config, a role that failed to log in (the other roles still run), a run that lost its browser, a failed LLM preflight (unless `llm.required` is `false`), an unavailable `llm.provider`. Replay: also an unreadable action log, an unsupported log version, an unset variable the log needs, a role missing from `--config`, or a `--strict` replay that could not find an element. |
+| `2` | Tool or config error: bad usage, unknown command or option, invalid config, a role that failed to log in (the other roles still run), a run that lost its browser, a failed LLM preflight (unless `llm.required` is `false`), an unavailable `llm.provider`, `--watch` without a display. Replay: also an unreadable action log, an unsupported log version, an unset variable the log needs, a role missing from `--config`, or a `--strict` replay that could not find an element. |
 
 ## npm scripts
 
