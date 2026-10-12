@@ -174,6 +174,12 @@ export async function runMonkey(context: BrowserContext, options: RunOptions): P
       } catch (error) {
         // The page crashed while being read: start over on a fresh one.
         if (crashed.has(page)) continue;
+        // It closed itself (`window.close()` in a popup) while being read: go on in another tab. Without any page
+        // left, the next round ends the run.
+        if (page.isClosed()) {
+          tabs.current = 0;
+          continue;
+        }
         throw error;
       }
       const isNewState = exploration.visit(snap.url, snap.hash);
