@@ -21,6 +21,9 @@ export interface RoleOutcome {
   blockedNavigations: number;
   /** The role's `actions.json`, when one was written. */
   actionLog?: string;
+  /** Playwright trace and videos of the role's context; absent when the role could not start. */
+  tracePath?: string;
+  videoPaths?: string[];
 }
 
 export interface RunAllOptions {
@@ -96,6 +99,7 @@ export async function runRole(
     screenshotDir: join(options.outputDir, "screenshots"),
   });
   let writer: ActionLogWriter | undefined;
+  let outcome: RoleOutcome | undefined;
   if (options.actionLog) {
     await mkdir(options.outputDir, { recursive: true });
     writer = new ActionLogWriter(
@@ -123,7 +127,7 @@ export async function runRole(
     log(`${secrets.mask(summarize(result))}, ${plural(findings.length, "finding")}`);
     for (const finding of findings) log(`  ${describeFinding(finding)}`);
     if (writer !== undefined) log(`actions: ${writer.file}`);
-    return {
+    outcome = {
       role: name,
       result,
       findings,
@@ -133,7 +137,12 @@ export async function runRole(
   } finally {
     const artifacts = await session.close();
     if (artifacts.tracePath !== undefined) log(`trace: ${artifacts.tracePath}`);
+    if (outcome !== undefined) {
+      if (artifacts.tracePath !== undefined) outcome.tracePath = artifacts.tracePath;
+      outcome.videoPaths = artifacts.videoPaths;
+    }
   }
+  return outcome;
 }
 
 /** A directory name for a role: safe characters only. */

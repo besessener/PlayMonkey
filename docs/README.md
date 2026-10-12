@@ -16,6 +16,7 @@ Organised by [Diátaxis](https://diataxis.fr/).
 ## Reference
 
 - [Configuration](reference/configuration.md) – every key with type, default and meaning.
+- [Report](reference/report.md) – the report directory, `report.html`, `report.json`, what traces contain.
 - [Action log](reference/action-log.md) – the `actions.json` format, placeholders for secrets.
 - [Commands](reference/commands.md) – the `monkey` CLI, exit codes, npm scripts and environment variables.
 - [Fixture site](../fixtures/README.md) – pages, seeded bugs and the findings they must produce.

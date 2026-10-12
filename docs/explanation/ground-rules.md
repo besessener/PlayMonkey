@@ -18,9 +18,10 @@ Credentials and keys are written as `${VAR}` placeholders and resolved from envi
 read from files. Every substituted value is masked as `***` in console output, error messages and reports. Error
 messages name the config path and the variable, never a value.
 
-Two places hold session data rather than config secrets: a login's typed values never reach traces or videos
-(the login runs in a separate, unrecorded browser context), but the trace of the run records requests including
-their cookies. Treat `trace.zip` like the test environment's session data.
+Traces and videos are the exception: Playwright cannot redact them, and they contain the base URL, the session
+cookie, request headers and every value the monkey typed. A login's typed values never reach them (the login runs in
+a separate, unrecorded browser context). Treat `trace.zip` and the videos like the test environment's session data;
+see [report](../reference/report.md#secrets) for exactly what they hold.
 
 ## Roles are isolated
 

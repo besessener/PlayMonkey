@@ -3,8 +3,8 @@
 This walks you from a fresh clone to a first `monkey run` against the local fixture site. You need
 Node.js 22 (22.18 or newer if you also want to run the tests) and git.
 
-> PlayMonkey is in early development: `monkey run` logs in, explores, reports findings on the console and records
-> an action log you can replay; the HTML report arrives next, see the [roadmap](../explanation/roadmap.md).
+> PlayMonkey is at v0.1: the random monkey, oracles, report and replay work without an LLM; the LLM backend arrives
+> next, see the [roadmap](../explanation/roadmap.md).
 
 ## 1. Install
 
@@ -56,11 +56,14 @@ seed: 42
 [user]   F5 high http5xx: POST /form responded 500 Internal Server Error (step 99, 2×)
 [user] actions: …/fixtures/configs/monkey-report/user/actions.json
 [user] trace: …/fixtures/configs/monkey-report/user/trace.zip
-findings: 5
+findings: 5 (2 high, 2 medium, 1 low)
+report: …/fixtures/configs/monkey-report/report.html
+exit 1: findings present
 ```
 
-The exit code is `1` because there are findings. A screenshot of each one is in
-`fixtures/configs/monkey-report/user/screenshots/`, named after the step it was found at.
+Open `fixtures/configs/monkey-report/report.html` in a browser: each finding with its steps to reproduce, a
+screenshot and links to the trace and video. The same data is in `report.json`; see the
+[report reference](../reference/report.md).
 
 Watch what it did with `npx playwright show-trace fixtures/configs/monkey-report/user/trace.zip`, or look at the video
 next to it. Run it again: with the same seed it takes the same steps.

@@ -1,10 +1,12 @@
-import { readFileSync } from "node:fs";
 import { parseArgs } from "node:util";
 import { ConfigError, loadConfig } from "../config/config.ts";
 import { ExitCode } from "../exit-codes.ts";
+import { SEVERITIES } from "../oracles/finding.ts";
 import { ActionLogError } from "../replay/log.ts";
 import { ReplayError, replayActionLog } from "../replay/replay.ts";
+import { buildReport, writeReport } from "../report/report.ts";
 import { describeFinding, runAllRoles } from "../run.ts";
+import { readVersion } from "../version.ts";
 
 export interface CliIo {
   stdout: (text: string) => void;
@@ -36,14 +38,6 @@ const COMMANDS: Record<string, { argName: string }> = {
   run: { argName: "config.json" },
   replay: { argName: "actions.json" },
 };
-
-function readVersion(): string {
-  // Resolves to the package root both from src/cli (tests) and dist/cli (built).
-  const pkg = JSON.parse(readFileSync(new URL("../../package.json", import.meta.url), "utf8")) as {
-    version: string;
-  };
-  return pkg.version;
-}
 
 /** Parses `argv` (without the node and script paths), runs the command and returns the exit code. */
 export async function runCli(argv: string[], io: CliIo): Promise<ExitCode> {
@@ -111,15 +105,28 @@ async function run(configFile: string, io: CliIo): Promise<ExitCode> {
   };
   process.once("SIGINT", onSignal);
   try {
+    const startedAt = new Date();
     const outcomes = await runAllRoles(loaded, {
       log: (line) => io.stdout(`${line}\n`),
       signal: abort.signal,
     });
-    const findings = outcomes.reduce((sum, outcome) => sum + outcome.findings.length, 0);
-    io.stdout(`findings: ${findings}\n`);
-    const failed = outcomes.some((outcome) => outcome.result === undefined || outcome.result.stopReason === "error");
-    if (failed) return ExitCode.Error;
-    return findings > 0 ? ExitCode.Findings : ExitCode.NoFindings;
+    const report = buildReport({ loaded, outcomes, version: readVersion(), startedAt, finishedAt: new Date() });
+    const paths = await writeReport(report, config.report.dir);
+
+    const total = report.findings.length;
+    const counts = SEVERITIES.filter((severity) => report.counts[severity] > 0)
+      .map((severity) => `${report.counts[severity]} ${severity}`)
+      .join(", ");
+    io.stdout(`findings: ${total}${total === 0 ? "" : ` (${counts})`}\n`);
+    io.stdout(`report: ${paths.html}\n`);
+    const failed = outcomes.filter((outcome) => outcome.result === undefined || outcome.result.stopReason === "error");
+    if (failed.length > 0) {
+      const roles = failed.map((outcome) => loaded.secrets.mask(outcome.role)).join(", ");
+      io.stdout(`exit 2: ${failed.length === 1 ? "role" : "roles"} ${roles} did not complete\n`);
+      return ExitCode.Error;
+    }
+    io.stdout(total > 0 ? "exit 1: findings present\n" : "exit 0: no findings\n");
+    return total > 0 ? ExitCode.Findings : ExitCode.NoFindings;
   } catch (error) {
     io.stderr(`monkey run: ${loaded.secrets.mask(error instanceof Error ? error.message : String(error))}\n`);
     return ExitCode.Error;
