@@ -1,7 +1,7 @@
 import type { Page } from "playwright";
 import type { Config } from "../config/config.ts";
 import { type Snapshot, snapshot } from "../snapshot/snapshot.ts";
-import type { Tabs } from "./executor.ts";
+import { installPopupProbe, type Tabs } from "./executor.ts";
 
 /** What the run loop's page handling needs: which page it acts in, and where it goes back to. */
 export interface RunPages {
@@ -13,8 +13,9 @@ export interface RunPages {
   readonly crashed: WeakSet<Page>;
 }
 
-/** Opens `baseUrl` in the first page, unless that already shows a page. */
+/** Installs the popup probe, then opens `baseUrl` in the first page unless that already shows a page. */
 export async function openStartPage({ config, tabs }: RunPages): Promise<void> {
+  await installPopupProbe(tabs.context);
   const first = tabs.context.pages()[0] ?? (await tabs.context.newPage());
   if (first.url() === "about:blank") await first.goto(config.baseUrl, { timeout: config.monkey.actionTimeoutMs * 4 });
 }

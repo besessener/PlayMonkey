@@ -6,7 +6,7 @@ import { type Config, parseConfig } from "../src/config/config.ts";
 import { ACTION_TYPES, type ActionType } from "../src/config/values.ts";
 import { describeAction } from "../src/monkey/actions.ts";
 import { chooseAction, Exploration } from "../src/monkey/chooser.ts";
-import { executeAction } from "../src/monkey/executor.ts";
+import { executeAction, installPopupProbe } from "../src/monkey/executor.ts";
 import { runMonkey, type StepRecord } from "../src/monkey/loop.ts";
 import { Random } from "../src/monkey/random.ts";
 import { chooseFillValue, matchingTestData, NASTY_VALUES } from "../src/monkey/values.ts";
@@ -306,6 +306,41 @@ describe("the monkey against the fixture site", () => {
       assert.equal(reads, 2);
       assert.equal(result.stopReason, "maxSteps", result.error);
       assert.equal(result.steps, 4);
+    });
+  });
+
+  it("knows when a click asked for a popup, so it waits for the tab however slow the browser is", async () => {
+    await withContext(async (context) => {
+      await context.route(`${site.url}/popups`, (route) =>
+        route.fulfill({
+          contentType: "text/html",
+          body: `<a href="/clean" target="_blank">New tab</a>
+<button onclick="window.open('/clean')">Open</button>
+<a href="/clean" target="_blank" onclick="event.preventDefault()">Prevented</a>
+<a href="#here">Same tab</a>`,
+        }),
+      );
+      await installPopupProbe(context);
+      const page = await context.newPage();
+      await page.goto(`${site.url}/popups`);
+      const count = () => page.evaluate("globalThis.__monkeyPopups");
+      const click = async (name: string) => {
+        const result = await executeAction({ context, current: 0 }, { type: "click", ref: "x" }, 5000, {
+          targets: { element: page.getByText(name, { exact: true }) },
+        });
+        assert.equal(result.ok, true, result.error);
+        return result;
+      };
+      assert.equal((await click("New tab")).tab, 1);
+      assert.equal(await count(), 1);
+      assert.equal((await click("Open")).tab, 2);
+      assert.equal(await count(), 2);
+      const started = Date.now();
+      assert.equal((await click("Prevented")).tab, 0);
+      assert.equal((await click("Same tab")).tab, 0);
+      assert.equal(await count(), 2);
+      // Neither waited for a popup that was never asked for.
+      assert.ok(Date.now() - started < 2500, `${Date.now() - started} ms`);
     });
   });
 

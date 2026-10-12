@@ -53,6 +53,7 @@ function documentationFiles(): string[] {
   return [
     join(root, "README.md"),
     join(root, "CONTRIBUTING.md"),
+    join(root, "CHANGELOG.md"),
     ...markdownFiles(join(root, "docs")),
     join(root, "fixtures/README.md"),
   ];
@@ -136,6 +137,12 @@ describe("documentation", () => {
     const samples = sampleConfigs();
     assert.ok(samples.length >= 5, `only ${samples.length} samples found`);
     assert.deepEqual(samples.flatMap(validationErrors), []);
+  });
+
+  it("has a changelog section for the package version, as the release workflow needs", () => {
+    const { version } = JSON.parse(readFileSync(join(root, "package.json"), "utf8")) as { version: string };
+    const changelog = readFileSync(join(root, "CHANGELOG.md"), "utf8");
+    assert.ok(changelog.includes(`\n## ${version} – `), `CHANGELOG.md has no "## ${version} – <date>" section`);
   });
 
   it("shows the CI example workflow exactly as it runs in this repository", () => {

@@ -37,10 +37,50 @@ export interface Targets {
 export const LONG_PRESS_MS = 800;
 
 /**
- * How long a click-like action waits for a popup it may have opened. The browser reports a new page a few
- * milliseconds after the click itself has returned.
+ * How long a click-like action waits for a popup when the page did not say it asked for one (see `POPUP_PROBE`). The
+ * browser reports a new page some milliseconds after the click itself has returned.
  */
 const POPUP_GRACE_MS = 50;
+
+/**
+ * Counts the popups a page asks for, in `__monkeyPopups`: `window.open` calls that returned a window, and clicks on
+ * links with a target other than the page itself that no handler prevented. With it, a click that opens a tab waits
+ * for that tab however long the browser takes, instead of a fixed grace that a busy machine can miss. Installed by
+ * `installPopupProbe`; idempotent.
+ */
+const POPUP_PROBE = `(() => {
+  if ("__monkeyPopups" in globalThis) return;
+  let count = 0;
+  Object.defineProperty(globalThis, "__monkeyPopups", { get: () => count });
+  const open = globalThis.open;
+  if (typeof open === "function") {
+    globalThis.open = function (...args) {
+      const opened = open.apply(this, args);
+      if (opened) count++;
+      return opened;
+    };
+  }
+  globalThis.addEventListener("click", (event) => {
+    if (event.defaultPrevented || !(event.target instanceof Element)) return;
+    const link = event.target.closest("a[href], area[href]");
+    const target = (link?.getAttribute("target") ?? "").toLowerCase();
+    if (target !== "" && !["_self", "_parent", "_top"].includes(target)) count++;
+  });
+})();`;
+
+/** Makes every page of the context, also later ones, report the popups it asks for (`POPUP_PROBE`). */
+export async function installPopupProbe(context: BrowserContext): Promise<void> {
+  await context.addInitScript({ content: POPUP_PROBE });
+  for (const page of context.pages()) await page.evaluate(POPUP_PROBE).catch(() => undefined);
+}
+
+/** The page's popup count, or 0 without the probe (or when it cannot be read). */
+function popupRequests(page: Page): Promise<number> {
+  return page
+    .evaluate("globalThis.__monkeyPopups ?? 0")
+    .then(Number)
+    .catch(() => 0);
+}
 const CLICK_LIKE = new Set<Action["type"]>(["click", "dblclick", "longPress", "press"]);
 
 export interface ExecuteOptions {
@@ -89,6 +129,7 @@ export async function executeAction(
   };
   page.on("framenavigated", onNavigated);
   try {
+    const popupsBefore = CLICK_LIKE.has(action.type) ? await popupRequests(page) : 0;
     if (action.type === "switchTab") {
       tab = action.index;
       page.off("framenavigated", onNavigated);
@@ -103,7 +144,7 @@ export async function executeAction(
       state.loading = true;
       await page.waitForLoadState("load", { timeout: timeoutMs });
     }
-    if (CLICK_LIKE.has(action.type)) await settle(page, tabs.context, opened);
+    if (CLICK_LIKE.has(action.type)) await settle(page, { context: tabs.context, opened, popupsBefore, timeoutMs });
     return (await popupResult(tabs.context, opened, timeoutMs)) ?? { ok: true, navigated, url: page.url(), tab };
   } catch (error) {
     const hang = state.loading && error instanceof errors.TimeoutError;
@@ -200,14 +241,24 @@ function delay(ms: number): Promise<void> {
   return new Promise<void>((done) => setTimeout(done, ms));
 }
 
+interface SettleOptions {
+  context: BrowserContext;
+  /** Pages the action has opened so far. */
+  opened: Page[];
+  /** The page's popup count (`popupRequests`) before the action. */
+  popupsBefore: number;
+  timeoutMs: number;
+}
+
 /**
  * Lets events the action caused arrive: one round trip to the page (file choosers and dialogs come before its
- * answer), then up to `POPUP_GRACE_MS` for a new page, unless one has opened already.
+ * answer), then, unless a new page has opened already, up to `timeoutMs` for it when the page asked for a popup,
+ * else up to `POPUP_GRACE_MS`.
  */
-async function settle(page: Page, context: BrowserContext, opened: Page[]): Promise<void> {
-  await page.evaluate("0").catch(() => undefined);
+async function settle(page: Page, { context, opened, popupsBefore, timeoutMs }: SettleOptions): Promise<void> {
+  const requested = (await popupRequests(page)) > popupsBefore;
   if (opened.length > 0) return;
-  await context.waitForEvent("page", { timeout: POPUP_GRACE_MS }).catch(() => undefined);
+  await context.waitForEvent("page", { timeout: requested ? timeoutMs : POPUP_GRACE_MS }).catch(() => undefined);
 }
 
 /** The result of continuing in the last popup the action opened, if one is still open. */
