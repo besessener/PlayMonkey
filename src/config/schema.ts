@@ -39,6 +39,7 @@ export const DEFAULTS = {
   stayOnDomain: true,
   oracle: true,
   report: { dir: "./monkey-report" },
+  findings: { lastActions: 10, ignoreStatus: [] as number[] },
   monkey: {
     actionTimeoutMs: 5000,
     weights: {
@@ -73,6 +74,7 @@ export interface RawConfig {
   testData?: Record<string, string>;
   llm?: RawLlm;
   oracles?: Partial<Record<OracleName, boolean>>;
+  findings?: { lastActions?: number; ignoreStatus?: number[]; ignore?: RawIgnoreRule[] };
   report?: { dir?: string };
   monkey?: { actionTimeoutMs?: number; weights?: Partial<Record<ActionType, number>> };
 }
@@ -83,6 +85,13 @@ export interface RawAuth {
   fields?: Record<string, string>;
   submit?: string;
   storageState?: string;
+}
+
+/** Drops matching signals before they become findings. Patterns are JavaScript regular expressions. */
+export interface RawIgnoreRule {
+  oracle?: OracleName;
+  url?: string;
+  message?: string;
 }
 
 export interface RawLlm {
@@ -219,6 +228,53 @@ export const configSchema: JSONSchemaType<RawConfig> = {
       properties: Object.fromEntries(
         ORACLES.map((name) => [name, { type: "boolean", nullable: true, default: DEFAULTS.oracle }]),
       ) as JSONSchemaType<RawConfig>["properties"]["oracles"]["properties"],
+    },
+    findings: {
+      type: "object",
+      nullable: true,
+      additionalProperties: false,
+      required: [],
+      description: "What becomes a finding and how much context it keeps.",
+      properties: {
+        lastActions: {
+          type: "integer",
+          minimum: 0,
+          nullable: true,
+          default: DEFAULTS.findings.lastActions,
+          description: "Number of actions before a finding that it records, for reproduction.",
+        },
+        ignoreStatus: {
+          type: "array",
+          items: { type: "integer", minimum: 400, maximum: 599 },
+          uniqueItems: true,
+          nullable: true,
+          default: DEFAULTS.findings.ignoreStatus,
+          description: "HTTP statuses that are never findings, e.g. [401, 403].",
+        },
+        ignore: {
+          type: "array",
+          nullable: true,
+          description: "Rules that drop known noise. A signal matching every given part of a rule is ignored.",
+          items: {
+            type: "object",
+            additionalProperties: false,
+            required: [],
+            properties: {
+              oracle: { type: "string", enum: ORACLES, nullable: true, description: "Only signals of this oracle." },
+              url: {
+                ...nonEmptyString,
+                nullable: true,
+                description: "Regular expression matched against the URL (the request URL for HTTP findings).",
+              },
+              message: {
+                ...nonEmptyString,
+                nullable: true,
+                description: "Regular expression matched against the finding message.",
+              },
+            },
+          },
+        },
+      },
     },
     monkey: {
       type: "object",

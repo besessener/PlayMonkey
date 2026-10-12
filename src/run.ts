@@ -2,7 +2,10 @@ import { join } from "node:path";
 import { launchBrowser } from "./auth/browser.ts";
 import { ANONYMOUS_ROLE, LoginError, openRoleSession } from "./auth/session.ts";
 import type { LoadedConfig } from "./config/config.ts";
+import { maskSecrets, type Secrets } from "./config/secrets.ts";
 import { type RunResult, runMonkey, type StepRecord } from "./monkey/loop.ts";
+import type { Finding } from "./oracles/finding.ts";
+import { Oracles } from "./oracles/oracles.ts";
 
 export interface RoleOutcome {
   role: string;
@@ -10,6 +13,8 @@ export interface RoleOutcome {
   result?: RunResult;
   /** Why the role could not start; masked. */
   error?: string;
+  /** Deduplicated, in order of discovery; masked. Empty when the role could not start. */
+  findings: Finding[];
   blockedNavigations: number;
 }
 
@@ -44,17 +49,29 @@ export async function runAllRoles(loaded: LoadedConfig, options: RunAllOptions):
       } catch (error) {
         if (!(error instanceof LoginError)) throw error;
         options.log(`[${secrets.mask(name)}] ${error.message}`);
-        outcomes.push({ role: name, error: error.message, blockedNavigations: 0 });
+        outcomes.push({ role: name, error: error.message, findings: [], blockedNavigations: 0 });
         continue;
       }
+      const roleDir = join(config.report.dir, roleDirectory(name));
+      const oracles = new Oracles(session.context, {
+        config,
+        role: name,
+        screenshotDir: join(roleDir, "screenshots"),
+      });
       try {
         const result = await runMonkey(session.context, {
           config,
           ...(options.signal === undefined ? {} : { signal: options.signal }),
-          ...(options.onStep === undefined ? {} : { onStep: (record) => options.onStep?.(name, record) }),
+          onStep: async (record) => {
+            const pages = session.context.pages();
+            await oracles.check(record, pages[record.result.tab] ?? pages[0]);
+            await options.onStep?.(name, record);
+          },
         });
-        outcomes.push({ role: name, result, blockedNavigations: session.events.length });
-        options.log(`[${secrets.mask(name)}] ${summarize(result)}`);
+        const findings = (await oracles.finish()).map((finding) => maskFinding(finding, secrets));
+        outcomes.push({ role: name, result, findings, blockedNavigations: session.events.length });
+        options.log(`[${secrets.mask(name)}] ${summarize(result)}, ${plural(findings.length, "finding")}`);
+        for (const finding of findings) options.log(`[${secrets.mask(name)}]   ${describeFinding(finding)}`);
       } finally {
         const artifacts = await session.close();
         if (artifacts.tracePath !== undefined) options.log(`[${secrets.mask(name)}] trace: ${artifacts.tracePath}`);
@@ -75,4 +92,20 @@ function summarize(result: RunResult): string {
   const seconds = (result.durationMs / 1000).toFixed(1);
   const stop = result.stopReason === "error" ? `error: ${result.error}` : result.stopReason;
   return `${result.steps} steps in ${seconds}s, ${result.states} states, ${result.failedActions} failed actions, stopped: ${stop}`;
+}
+
+/** Masks everything a page could have echoed; the screenshot path is a local file path, like the trace path. */
+function maskFinding(finding: Finding, secrets: Secrets): Finding {
+  const { screenshotPath, ...rest } = finding;
+  return { ...maskSecrets(rest, secrets), ...(screenshotPath === undefined ? {} : { screenshotPath }) };
+}
+
+/** One line per finding, e.g. `F1 high pageerror: Error: boom (step 12, 3×)`. */
+export function describeFinding(finding: Finding): string {
+  const times = finding.occurrences > 1 ? `, ${finding.occurrences}×` : "";
+  return `${finding.id} ${finding.severity} ${finding.oracle}: ${finding.message} (step ${finding.step}${times})`;
+}
+
+function plural(count: number, noun: string): string {
+  return `${count} ${noun}${count === 1 ? "" : "s"}`;
 }

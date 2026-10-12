@@ -106,10 +106,11 @@ async function run(configFile: string, io: CliIo): Promise<ExitCode> {
       log: (line) => io.stdout(`${line}\n`),
       signal: abort.signal,
     });
-    // Oracles (#8) are not implemented yet, so a completed run has no findings to report.
-    io.stdout("findings: not detected yet (oracles are not implemented)\n");
+    const findings = outcomes.reduce((sum, outcome) => sum + outcome.findings.length, 0);
+    io.stdout(`findings: ${findings}\n`);
     const failed = outcomes.some((outcome) => outcome.result === undefined || outcome.result.stopReason === "error");
-    return failed ? ExitCode.Error : ExitCode.NoFindings;
+    if (failed) return ExitCode.Error;
+    return findings > 0 ? ExitCode.Findings : ExitCode.NoFindings;
   } catch (error) {
     io.stderr(`monkey run: ${loaded.secrets.mask(error instanceof Error ? error.message : String(error))}\n`);
     return ExitCode.Error;

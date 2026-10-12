@@ -46,9 +46,12 @@ describe("monkey run against the fixture site", () => {
 
   it("logs in, runs the monkey for the role and writes its trace", async () => {
     const { code, stdout } = await run({ auth: [role("user", "${FIXTURE_PASS}")], report: { dir: "out-ok" } });
-    assert.equal(code, 0, stdout);
+    // Seed 7 follows the broken link within 8 steps.
+    assert.equal(code, 1, stdout);
     assert.match(stdout, /^seed: 7\n/);
-    assert.match(stdout, /\[user\] 8 steps in [\d.]+s, \d+ states, \d+ failed actions, stopped: maxSteps/);
+    assert.match(stdout, /\[user\] 8 steps in [\d.]+s, \d+ states, \d+ failed actions, stopped: maxSteps, 1 finding\n/);
+    assert.match(stdout, /\[user\] {3}F1 medium http4xx: GET \/missing-page responded 404 Not Found \(step \d\)\n/);
+    assert.match(stdout, /\nfindings: 1\n$/);
     assert.ok((await stat(join(dir, "out-ok", "user", "trace.zip"))).size > 0);
   });
 
@@ -65,8 +68,15 @@ describe("monkey run against the fixture site", () => {
 
   it("runs one anonymous role without auth", async () => {
     const { code, stdout } = await run({ report: { dir: "out-anon" } });
-    assert.equal(code, 0);
+    assert.equal(code, 1);
     assert.match(stdout, /\[anonymous\] 8 steps/);
+  });
+
+  it("exits 0 when nothing is found", async () => {
+    const { code, stdout } = await run({ limits: { maxSteps: 2 }, report: { dir: "out-clean" } });
+    assert.equal(code, 0, stdout);
+    assert.match(stdout, /\[anonymous\] 2 steps .*, 0 findings\n/);
+    assert.match(stdout, /\nfindings: 0\n$/);
   });
 
   it("uses safe directory names for roles", () => {

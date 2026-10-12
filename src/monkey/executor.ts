@@ -1,4 +1,4 @@
-import type { BrowserContext, Page } from "playwright";
+import { type BrowserContext, errors, type Page } from "playwright";
 import { resolve } from "../snapshot/snapshot.ts";
 import type { Action } from "./actions.ts";
 
@@ -6,6 +6,11 @@ export interface ActionResult {
   ok: boolean;
   /** Why the action failed; a failed action is not a finding. */
   error?: string;
+  /**
+   * A navigation or page load exceeded the timeout, as opposed to an element that never became actionable. Only set
+   * on failed actions; the `hang` oracle reports it.
+   */
+  hang?: boolean;
   /** The top-level document changed (navigation or reload). */
   navigated: boolean;
   url: string;
@@ -27,6 +32,8 @@ export async function executeAction(tabs: Tabs, action: Action, timeoutMs: numbe
   let tab = tabs.current;
   let page = currentPage(tabs.context, tab);
   let navigated = false;
+  // True while waiting for a navigation or load, where a timeout means the page hangs.
+  let loading = false;
   const onNavigated = (frame: { parentFrame(): unknown }) => {
     if (frame.parentFrame() === null) navigated = true;
   };
@@ -53,9 +60,11 @@ export async function executeAction(tabs: Tabs, action: Action, timeoutMs: numbe
         await page.mouse.wheel(0, action.deltaY);
         break;
       case "back":
+        loading = true;
         await page.goBack({ timeout: timeoutMs });
         break;
       case "navigate":
+        loading = true;
         await page.goto(action.url, { timeout: timeoutMs });
         break;
       case "setViewport":
@@ -68,10 +77,14 @@ export async function executeAction(tabs: Tabs, action: Action, timeoutMs: numbe
         await page.bringToFront();
         break;
     }
-    if (navigated) await page.waitForLoadState("load", { timeout: timeoutMs });
+    if (navigated) {
+      loading = true;
+      await page.waitForLoadState("load", { timeout: timeoutMs });
+    }
     return { ok: true, navigated, url: page.url(), tab };
   } catch (error) {
-    return { ok: false, error: firstLine(error), navigated, url: safeUrl(page), tab };
+    const hang = loading && error instanceof errors.TimeoutError;
+    return { ok: false, error: firstLine(error), ...(hang ? { hang } : {}), navigated, url: safeUrl(page), tab };
   } finally {
     page.off("framenavigated", onNavigated);
   }

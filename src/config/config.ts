@@ -30,6 +30,7 @@ export interface Config {
   testData: Record<string, string>;
   llm?: LlmConfig;
   oracles: Record<OracleName, boolean>;
+  findings: { lastActions: number; ignoreStatus: number[]; ignore: IgnoreRule[] };
   report: { dir: string };
   monkey: { actionTimeoutMs: number; weights: Record<ActionType, number> };
 }
@@ -49,6 +50,13 @@ export interface StorageStateRole {
   name: string;
   /** Absolute path. */
   storageState: string;
+}
+
+/** At least one of `url` and `message` is set; both are valid regular expressions. */
+export interface IgnoreRule {
+  oracle?: OracleName;
+  url?: string;
+  message?: string;
 }
 
 export interface LlmConfig {
@@ -169,6 +177,11 @@ function normalize(raw: RawConfig, seed: number, baseDir: string): Config {
       OracleName,
       boolean
     >,
+    findings: {
+      lastActions: raw.findings?.lastActions ?? DEFAULTS.findings.lastActions,
+      ignoreStatus: [...(raw.findings?.ignoreStatus ?? DEFAULTS.findings.ignoreStatus)],
+      ignore: (raw.findings?.ignore ?? []).map((rule) => ({ ...rule })),
+    },
     report: { dir: resolve(baseDir, raw.report?.dir ?? DEFAULTS.report.dir) },
     monkey: {
       actionTimeoutMs: raw.monkey?.actionTimeoutMs ?? DEFAULTS.monkey.actionTimeoutMs,
@@ -205,6 +218,25 @@ function semanticIssues(raw: unknown): { path: PathSegment[]; message: string }[
   }
   if (isObject(raw.llm) && typeof raw.llm.baseUrl === "string" && !isHttpUrl(raw.llm.baseUrl)) {
     issues.push({ path: ["llm", "baseUrl"], message: "must be an absolute http(s) URL" });
+  }
+
+  if (isObject(raw.findings) && Array.isArray(raw.findings.ignore)) {
+    raw.findings.ignore.forEach((rule: unknown, index) => {
+      if (!isObject(rule)) return;
+      const path = ["findings", "ignore", index];
+      if (rule.url === undefined && rule.message === undefined) {
+        issues.push({ path, message: "needs url or message; use oracles.<name>: false to switch an oracle off" });
+      }
+      for (const key of ["url", "message"]) {
+        const pattern = rule[key];
+        if (typeof pattern !== "string") continue;
+        try {
+          new RegExp(pattern);
+        } catch {
+          issues.push({ path: [...path, key], message: "is not a valid regular expression" });
+        }
+      }
+    });
   }
 
   if (Array.isArray(raw.auth)) {

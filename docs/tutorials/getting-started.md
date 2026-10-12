@@ -3,8 +3,8 @@
 This walks you from a fresh clone to a first `monkey run` against the local fixture site. You need
 Node.js 22 (22.18 or newer if you also want to run the tests) and git.
 
-> PlayMonkey is in early development: `monkey run` logs in and explores, but does not detect findings yet; the
-> oracles, action log and report arrive next, see the [roadmap](../explanation/roadmap.md).
+> PlayMonkey is in early development: `monkey run` logs in, explores and reports findings on the console; the action
+> log, replay and HTML report arrive next, see the [roadmap](../explanation/roadmap.md).
 
 ## 1. Install
 
@@ -42,15 +42,24 @@ Copy the `export` line into your first terminal, then:
 npx monkey run fixtures/configs/fixture.json
 ```
 
-The monkey logs in as the role `user`, takes 300 random steps (the config's `limits.maxSteps`) and prints a summary:
+The monkey logs in as the role `user`, takes 300 random steps (the config's `limits.maxSteps`) and prints a summary
+with the five seeded bugs, each reported once however often the monkey ran into it:
 
 ```text
 seed: 42
 [user] starting
-[user] 300 steps in 31.0s, 47 states, 0 failed actions, stopped: maxSteps
+[user] 300 steps in 37.1s, 47 states, 0 failed actions, stopped: maxSteps, 5 findings
+[user]   F1 medium console: Seeded bug: console error on load (step 1, 14×)
+[user]   F2 high pageerror: Error: Seeded bug: click handler crashed (step 18, 12×)
+[user]   F3 medium http4xx: GET /missing-page responded 404 Not Found (step 20, 10×)
+[user]   F4 low overflow: horizontal overflow on /overflow: div makes the page 1664px wide in a 1280px viewport (step 26, 12×)
+[user]   F5 high http5xx: POST /form responded 500 Internal Server Error (step 99, 2×)
 [user] trace: …/fixtures/configs/monkey-report/user/trace.zip
-findings: not detected yet (oracles are not implemented)
+findings: 5
 ```
+
+The exit code is `1` because there are findings. A screenshot of each one is in
+`fixtures/configs/monkey-report/user/screenshots/`, named after the step it was found at.
 
 Watch what it did with `npx playwright show-trace fixtures/configs/monkey-report/user/trace.zip`, or look at the video
 next to it. Run it again: with the same seed it takes the same steps.

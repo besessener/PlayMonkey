@@ -43,17 +43,20 @@ Each bug must be reported **exactly once** (deduplicated), with these oracles:
 
 | # | Bug                   | Click path                                         | Oracle      | Severity | Dedup key                       |
 | - | --------------------- | -------------------------------------------------- | ----------- | -------- | ------------------------------- |
-| 1 | Broken internal link  | Home → "Broken link"                               | `http4xx`   | low/medium | `GET /missing-page 404`       |
+| 1 | Broken internal link  | Home → "Broken link"                               | `http4xx`   | medium   | `GET /missing-page 404`         |
 | 2 | Uncaught JS exception | Home → "JS error" → "Do not press"                 | `pageerror` | high     | `Seeded bug: click handler crashed` + first stack frame |
 | 3 | HTTP 500 on submit    | Home → "Contact form" → "Send" with an empty name, or any field longer than 1000 characters | `http5xx` | high | `POST /form 500` |
 | 4 | Console error         | Home → "Console error"                             | `console`   | medium   | `Seeded bug: console error on load` |
-| 5 | Horizontal overflow   | Home → "Overflow" (any viewport narrower than ~1650px) | `overflow` | low  | `/overflow` + viewport bucket   |
+| 5 | Horizontal overflow   | Home → "Overflow" (any viewport narrower than ~1650px) | `overflow` | low  | `/overflow` + culprit `div`     |
 
-The broken link may additionally surface as an `errorPage` signal (404 page titled "Not found"); oracle dedup
-decides whether that is the same finding (see the oracle issue).
+The 404 and the 500 pages are not also reported as `errorPage` (the HTTP oracles already cover their status), and
+Chromium's console echo of them ("Failed to load resource …") is not a `console` finding; see
+[oracles and findings](../docs/explanation/oracles.md). The overflow is keyed by its culprit element, not the
+viewport, so resizing does not split it into several findings.
 
 `/clean`, `/login`, `/account` and a valid `/form` submission are controls and must yield **no** findings.
-`test/fixture-site.test.ts` walks every click path above in a real browser and checks the control pages stay silent.
+`test/fixture-site.test.ts` walks every click path above in a real browser and checks the control pages stay silent;
+`test/oracles.test.ts` runs `configs/fixture.json` end to end and expects exactly these five findings.
 
 ## Adding a page
 
