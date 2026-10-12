@@ -23,6 +23,44 @@ monkey --help | --version
 | `1`  | findings present     |
 | `2`  | tool or config error |
 
+## Configuration
+
+`monkey run` takes one JSON file. Minimal example:
+
+```json
+{
+  "baseUrl": "https://test.example.org",
+  "auth": [
+    {
+      "name": "admin",
+      "loginUrl": "/login",
+      "fields": { "username": "${ADMIN_USER}", "password": "${ADMIN_PASS}" },
+      "submit": "button[type=submit]"
+    },
+    { "name": "user", "storageState": "./states/user.json" }
+  ]
+}
+```
+
+The schema with every key, type, default and description is `src/config/schema.ts`. Rules:
+
+- **Defaults:** random `seed` (printed at startup; set it to reproduce a run), `limits.maxSteps` 500,
+  `limits.maxMinutes` 20, `browser.engine` `chromium`, `browser.viewport` `[1280, 800]`, `browser.headless` `true`,
+  `stayOnDomain` `true`, all `oracles` on, `report.dir` `./monkey-report`. `auth` may be omitted (anonymous run);
+  `llm` may be omitted (pure random monkey).
+- **Unknown keys are rejected**, not warned about: a typo such as `maxStep` would otherwise silently fall back to a
+  default. Only `testData` and `auth[].fields` take arbitrary keys. A top-level `$schema` key is allowed for editors.
+- **`null` is rejected**; omit a key to get its default.
+- **Each `auth` role** uses either `fields` + `loginUrl` + `submit`, or `storageState`, never both. Role names must be
+  unique.
+- **Relative paths** (`storageState`, `report.dir`) are resolved against the directory of the config file.
+- **Secrets:** `${VAR}` in any string value is replaced with the environment variable `VAR`, also inside longer
+  strings (`"https://${HOST}/app"`). Substituted values are not expanded again. An unset variable is an error naming
+  the config path and the variable, never a value. Everything that came from a placeholder is shown as `***` in logs,
+  reports and error messages.
+- **Errors:** all problems are listed at once, each with its path (e.g. `auth[0].fields.password`), and the exit code
+  is `2`.
+
 ## Development
 
 Requirements: Node.js 22.18 or newer for development (the tests run TypeScript directly via Node's built-in type
@@ -52,8 +90,9 @@ npm run format                    # biome format + safe fixes
 
 ```
 src/cli/           CLI entry (bin) and argument parsing
+src/config/        config schema, ${VAR} resolution, validation, secret masking
 src/exit-codes.ts  exit code constants
-src/{config,auth,snapshot,monkey,oracles,report,llm}/   added by the follow-up issues
+src/{auth,snapshot,monkey,oracles,report,llm}/   added by the follow-up issues
 fixtures/site/     local fixture site for end-to-end tests (follow-up issue)
 test/              node:test suites (*.test.ts)
 ```
