@@ -1,10 +1,7 @@
-import { type Browser, chromium } from "playwright";
+import type { Browser } from "playwright";
+import { launchBrowser } from "../../src/auth/browser.ts";
 
-/**
- * Launches Chromium for tests. Set CHROMIUM_EXECUTABLE_PATH to use a preinstalled browser whose revision differs
- * from the one bundled with the installed Playwright version (e.g. in sandboxes that cannot run `playwright install`).
- */
+/** Launches headless Chromium; `CHROMIUM_EXECUTABLE_PATH` selects another binary (see launchBrowser). */
 export function launchChromium(): Promise<Browser> {
-  const executablePath = process.env.CHROMIUM_EXECUTABLE_PATH;
-  return chromium.launch(executablePath ? { executablePath } : {});
+  return launchBrowser({ engine: "chromium", viewport: [1280, 800], headless: true });
 }

@@ -1,11 +1,10 @@
 # Getting started
 
-This walks you from a fresh clone to `monkey run` validating a config against the local fixture site. You need
+This walks you from a fresh clone to a first `monkey run` against the local fixture site. You need
 Node.js 22 (22.18 or newer if you also want to run the tests) and git.
 
-> PlayMonkey is in early development: `monkey run` validates the config and prints the seed, then stops with
-> "run loop not implemented yet" (exit code 2). Logging in and exploring arrive with the run loop, see the
-> [roadmap](../explanation/roadmap.md).
+> PlayMonkey is in early development: `monkey run` logs in and explores, but does not detect findings yet; the
+> oracles, action log and report arrive next, see the [roadmap](../explanation/roadmap.md).
 
 ## 1. Install
 
@@ -35,7 +34,7 @@ For fixtures/configs/fixture.json:
   export FIXTURE_URL=http://127.0.0.1:41234 FIXTURE_USER=monkey FIXTURE_PASS=banana-split
 ```
 
-## 3. Validate the config
+## 3. Run the monkey
 
 Copy the `export` line into your first terminal, then:
 
@@ -43,7 +42,22 @@ Copy the `export` line into your first terminal, then:
 npx monkey run fixtures/configs/fixture.json
 ```
 
-You see `seed: 42`. Now unset a variable and run it again:
+The monkey logs in as the role `user`, takes 300 random steps (the config's `limits.maxSteps`) and prints a summary:
+
+```text
+seed: 42
+[user] starting
+[user] 300 steps in 31.0s, 47 states, 0 failed actions, stopped: maxSteps
+[user] trace: …/fixtures/configs/monkey-report/user/trace.zip
+findings: not detected yet (oracles are not implemented)
+```
+
+Watch what it did with `npx playwright show-trace fixtures/configs/monkey-report/user/trace.zip`, or look at the video
+next to it. Run it again: with the same seed it takes the same steps.
+
+## 4. See a config error
+
+Unset a variable and run again:
 
 ```sh
 unset FIXTURE_PASS

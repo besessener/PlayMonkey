@@ -67,6 +67,17 @@
 | `oracles.errorPage` | boolean | `true` | Report navigations that land on an error page. |
 | `oracles.overflow` | boolean | `true` | Report horizontal overflow. |
 | `report.dir` | string | `./monkey-report` | Report output directory, relative to the config file. |
+| `monkey.actionTimeoutMs` | integer ≥ 100 | `5000` | Timeout of one action in milliseconds; a slower action fails and the run continues. |
+| `monkey.weights.click` | number ≥ 0 | `10` | Relative weight of clicking links, buttons and other clickable elements. |
+| `monkey.weights.fill` | number ≥ 0 | `6` | Relative weight of typing into text fields. |
+| `monkey.weights.select` | number ≥ 0 | `3` | Relative weight of choosing a dropdown option. |
+| `monkey.weights.check` | number ≥ 0 | `3` | Relative weight of toggling checkboxes, radios and switches. |
+| `monkey.weights.press` | number ≥ 0 | `1` | Relative weight of pressing a key (Tab, Enter, Escape, arrows). |
+| `monkey.weights.scroll` | number ≥ 0 | `1` | Relative weight of scrolling. |
+| `monkey.weights.back` | number ≥ 0 | `1.5` | Relative weight of going back in the history. |
+| `monkey.weights.navigate` | number ≥ 0 | `1` | Relative weight of opening a URL seen earlier in the run. |
+| `monkey.weights.setViewport` | number ≥ 0 | `0.2` | Relative weight of resizing the viewport. |
+| `monkey.weights.switchTab` | number ≥ 0 | `1` | Relative weight of switching to another open tab. |
 
 `llm` and the oracles are validated now; they take effect when their milestones land (see the
 [roadmap](../explanation/roadmap.md)).

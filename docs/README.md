@@ -25,5 +25,6 @@ Organised by [Diátaxis](https://diataxis.fr/).
 - [Ground rules](explanation/ground-rules.md) – test environments only, stop conditions, secrets, role isolation.
 - [Sessions and login](explanation/sessions.md) – contexts, the login heuristic, stayOnDomain, trace and video.
 - [Page snapshots](explanation/snapshot.md) – elements and refs, frames, the snapshot hash, the LLM serializer.
+- [The random monkey](explanation/monkey.md) – seeding, how actions and values are chosen, limits.
 - [Tooling choices](explanation/tooling.md) – why `node:test`, Biome, these TypeScript settings and so few dependencies.
 - [Roadmap](explanation/roadmap.md) – milestones and status.

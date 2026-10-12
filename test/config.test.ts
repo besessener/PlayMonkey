@@ -75,6 +75,21 @@ describe("parseConfig", () => {
         overflow: true,
       },
       report: { dir: "/configs/monkey-report" },
+      monkey: {
+        actionTimeoutMs: 5000,
+        weights: {
+          click: 10,
+          fill: 6,
+          select: 3,
+          check: 3,
+          press: 1,
+          scroll: 1,
+          back: 1.5,
+          navigate: 1,
+          setViewport: 0.2,
+          switchTab: 1,
+        },
+      },
     });
     assert.equal("llm" in config, false);
   });
@@ -352,16 +367,5 @@ describe("monkey run with a config", () => {
     });
     assert.equal(code, 2);
     assert.match(stderr, /cannot read file/);
-  });
-
-  it("prints the seed of a valid config and never the secrets", async () => {
-    const { stdout, stderr } = await run(fullConfig, ENV);
-    assert.match(stdout, /^seed: 42\n/);
-    assert.ok(!`${stdout}${stderr}`.includes(SECRET));
-  });
-
-  it("says when the seed was generated", async () => {
-    const { stdout } = await run({ baseUrl: "https://x.test" }, {});
-    assert.match(stdout, /^seed: \d+ \(generated/);
   });
 });

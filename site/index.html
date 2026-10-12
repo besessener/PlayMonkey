@@ -31,7 +31,7 @@
           reports what breaks: uncaught errors, failing requests, broken pages. Every finding comes with the steps to reproduce it.
         </p>
         <p class="status">
-          Status: early development. Config, login and the test fixture work; the monkey loop, oracles and report are being built, see the
+          Status: early development. Config, login and the seeded random monkey work; oracles, action log and report are being built, see the
           <a href="https://github.com/besessener/PlayMonkey/blob/main/docs/explanation/roadmap.md">roadmap</a>.
         </p>
         <p class="actions">
@@ -109,7 +109,7 @@ Exit codes:
         <ol class="steps">
           <li><strong>Install.</strong> Clone the repository, run <code>npm ci</code>, <code>npx playwright install chromium</code> and <code>npm run build</code>.</li>
           <li><strong>Configure.</strong> Write a config like the one above and export the variables it references.</li>
-          <li><strong>Run.</strong> <code>npx monkey run config.json</code> validates the config today; logging in and exploring arrive with the run loop.</li>
+          <li><strong>Run.</strong> <code>npx monkey run config.json</code> logs in and explores every role; finding detection arrives with the oracles.</li>
         </ol>
         <p>
           The <a href="https://github.com/besessener/PlayMonkey/blob/main/docs/tutorials/getting-started.md">getting started</a> tutorial walks you
