@@ -16,6 +16,7 @@ Organised by [Diátaxis](https://diataxis.fr/).
 ## Reference
 
 - [Configuration](reference/configuration.md) – every key with type, default and meaning.
+- [Action log](reference/action-log.md) – the `actions.json` format, placeholders for secrets.
 - [Commands](reference/commands.md) – the `monkey` CLI, exit codes, npm scripts and environment variables.
 - [Fixture site](../fixtures/README.md) – pages, seeded bugs and the findings they must produce.
 
@@ -27,5 +28,6 @@ Organised by [Diátaxis](https://diataxis.fr/).
 - [Page snapshots](explanation/snapshot.md) – elements and refs, frames, the snapshot hash, the LLM serializer.
 - [The random monkey](explanation/monkey.md) – seeding, how actions and values are chosen, limits.
 - [Oracles and findings](explanation/oracles.md) – what counts as a bug, the finding model, deduplication, ignore rules.
+- [Replay](explanation/replay.md) – how a run is repeated without randomness or LLM, drift, the result.
 - [Tooling choices](explanation/tooling.md) – why `node:test`, Biome, these TypeScript settings and so few dependencies.
 - [Roadmap](explanation/roadmap.md) – milestones and status.

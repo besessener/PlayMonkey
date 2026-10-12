@@ -1,4 +1,4 @@
-import { type BrowserContext, errors, type Page } from "playwright";
+import { type BrowserContext, errors, type Locator, type Page } from "playwright";
 import { resolve } from "../snapshot/snapshot.ts";
 import type { Action } from "./actions.ts";
 
@@ -26,9 +26,15 @@ export interface Tabs {
 
 /**
  * Executes one action with a timeout and waits for the page to settle: if the main document changed, until it has
- * loaded. Never throws for problems of the page under test; they come back as `{ ok: false, error }`.
+ * loaded. Never throws for problems of the page under test; they come back as `{ ok: false, error }`. Element
+ * actions act on `target` when given (replay), else on the element their ref points to.
  */
-export async function executeAction(tabs: Tabs, action: Action, timeoutMs: number): Promise<ActionResult> {
+export async function executeAction(
+  tabs: Tabs,
+  action: Action,
+  timeoutMs: number,
+  target?: Locator,
+): Promise<ActionResult> {
   let tab = tabs.current;
   let page = currentPage(tabs.context, tab);
   let navigated = false;
@@ -38,20 +44,21 @@ export async function executeAction(tabs: Tabs, action: Action, timeoutMs: numbe
     if (frame.parentFrame() === null) navigated = true;
   };
   page.on("framenavigated", onNavigated);
+  const element = async (ref: string) => target ?? (await resolve(page, ref));
   try {
     switch (action.type) {
       case "click":
-        await (await resolve(page, action.ref)).click({ timeout: timeoutMs });
+        await (await element(action.ref)).click({ timeout: timeoutMs });
         break;
       case "fill":
-        await (await resolve(page, action.ref)).fill(action.value, { timeout: timeoutMs });
+        await (await element(action.ref)).fill(action.value, { timeout: timeoutMs });
         break;
       case "select":
-        await (await resolve(page, action.ref)).selectOption({ label: action.value }, { timeout: timeoutMs });
+        await (await element(action.ref)).selectOption({ label: action.value }, { timeout: timeoutMs });
         break;
       case "check":
       case "uncheck":
-        await (await resolve(page, action.ref)).setChecked(action.type === "check", { timeout: timeoutMs });
+        await (await element(action.ref)).setChecked(action.type === "check", { timeout: timeoutMs });
         break;
       case "press":
         await page.keyboard.press(action.key);

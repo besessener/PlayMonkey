@@ -7,30 +7,42 @@ export interface MissingVariable {
   name: string;
 }
 
+/** A value substituted from the environment, with the variable it came from. */
+export interface SecretValue {
+  name: string;
+  value: string;
+}
+
 export interface ResolveResult {
   value: unknown;
   /** Values substituted from the environment. */
-  secrets: string[];
+  secrets: SecretValue[];
   missing: MissingVariable[];
 }
 
 /**
  * Replaces `${VAR}` in every string value (not in keys) with `env[VAR]`. Unset variables are reported and left
- * in place. Substituted values are not scanned again, so a secret containing `${...}` stays literal.
+ * in place. Substituted values are not scanned again, so a secret containing `${...}` stays literal. With `names`,
+ * only those variables are replaced; other `${...}` text is left alone.
  */
-export function resolvePlaceholders(value: unknown, env: NodeJS.ProcessEnv): ResolveResult {
-  const secrets: string[] = [];
+export function resolvePlaceholders(
+  value: unknown,
+  env: NodeJS.ProcessEnv,
+  names?: ReadonlySet<string>,
+): ResolveResult {
+  const secrets: SecretValue[] = [];
   const missing: MissingVariable[] = [];
 
   const visit = (node: unknown, path: PathSegment[]): unknown => {
     if (typeof node === "string") {
       return node.replace(PLACEHOLDER, (match, name: string) => {
+        if (names !== undefined && !names.has(name)) return match;
         const resolved = env[name];
         if (resolved === undefined) {
           missing.push({ path, name });
           return match;
         }
-        secrets.push(resolved);
+        secrets.push({ name, value: resolved });
         return resolved;
       });
     }

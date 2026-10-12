@@ -2,7 +2,9 @@ import { readFileSync } from "node:fs";
 import { parseArgs } from "node:util";
 import { ConfigError, loadConfig } from "../config/config.ts";
 import { ExitCode } from "../exit-codes.ts";
-import { runAllRoles } from "../run.ts";
+import { ActionLogError } from "../replay/log.ts";
+import { ReplayError, replayActionLog } from "../replay/replay.ts";
+import { describeFinding, runAllRoles } from "../run.ts";
 
 export interface CliIo {
   stdout: (text: string) => void;
@@ -17,12 +19,16 @@ Commands:
   replay <actions.json>  Re-execute a recorded action log and check which findings recur.
 
 Options:
+  -c, --config <file>    replay: config for login, browser and oracle settings
+                         (needed when the log was recorded as a role that logs in).
+  --strict               replay: abort when a recorded element is not found,
+                         instead of skipping that action.
   -h, --help             Show this help.
   -v, --version          Show the version.
 
 Exit codes:
-  0  no findings
-  1  findings present
+  0  no findings (replay: none of the recorded findings recurred)
+  1  findings present (replay: at least one recorded finding recurred)
   2  tool or config error
 `;
 
@@ -74,11 +80,14 @@ export async function runCli(argv: string[], io: CliIo): Promise<ExitCode> {
   }
 
   const [file] = rest as [string];
-  if (command === "run") return run(file, io);
-
-  // Stub until replay (#9) lands.
-  io.stderr(`monkey ${command}: not implemented yet\n`);
-  return ExitCode.Error;
+  if (command === "run") {
+    if (values.config !== undefined || values.strict === true) {
+      io.stderr(`monkey run: --config and --strict belong to replay\n\n${USAGE}`);
+      return ExitCode.Error;
+    }
+    return run(file, io);
+  }
+  return replay(file, values.config, values.strict === true, io);
 }
 
 async function run(configFile: string, io: CliIo): Promise<ExitCode> {
@@ -119,6 +128,41 @@ async function run(configFile: string, io: CliIo): Promise<ExitCode> {
   }
 }
 
+async function replay(logFile: string, configFile: string | undefined, strict: boolean, io: CliIo): Promise<ExitCode> {
+  const abort = new AbortController();
+  const onSignal = () => {
+    io.stderr("monkey replay: stopping after the current step\n");
+    abort.abort();
+  };
+  process.once("SIGINT", onSignal);
+  try {
+    const { outcome, original, added } = await replayActionLog(logFile, {
+      ...(configFile === undefined ? {} : { config: configFile }),
+      strict,
+      env: io.env ?? process.env,
+      log: (line) => io.stdout(`${line}\n`),
+      signal: abort.signal,
+    });
+    if (outcome.result === undefined || outcome.result.stopReason === "error") return ExitCode.Error;
+    for (const finding of original) {
+      const verdict = finding.reproduced ? "reproduced    " : "not reproduced";
+      io.stdout(`${verdict}  ${finding.id} ${finding.severity} ${finding.oracle}: ${finding.message}\n`);
+    }
+    for (const finding of added) io.stdout(`new             ${describeFinding(finding)}\n`);
+    const reproduced = original.filter((finding) => finding.reproduced).length;
+    io.stdout(`reproduced: ${reproduced} of ${original.length}\n`);
+    return reproduced > 0 ? ExitCode.Findings : ExitCode.NoFindings;
+  } catch (error) {
+    if (error instanceof ConfigError || error instanceof ActionLogError || error instanceof ReplayError) {
+      io.stderr(`monkey replay: ${error.message}\n`);
+      return ExitCode.Error;
+    }
+    throw error;
+  } finally {
+    process.off("SIGINT", onSignal);
+  }
+}
+
 function parse(argv: string[]) {
   return parseArgs({
     args: argv,
@@ -127,6 +171,8 @@ function parse(argv: string[]) {
     options: {
       help: { type: "boolean", short: "h" },
       version: { type: "boolean", short: "v" },
+      config: { type: "string", short: "c" },
+      strict: { type: "boolean" },
     },
   });
 }
