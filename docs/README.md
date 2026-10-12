@@ -24,5 +24,6 @@ Organised by [Diátaxis](https://diataxis.fr/).
 - [Architecture](explanation/architecture.md) – the run pipeline, modules and what exists today.
 - [Ground rules](explanation/ground-rules.md) – test environments only, stop conditions, secrets, role isolation.
 - [Sessions and login](explanation/sessions.md) – contexts, the login heuristic, stayOnDomain, trace and video.
+- [Page snapshots](explanation/snapshot.md) – elements and refs, frames, the snapshot hash, the LLM serializer.
 - [Tooling choices](explanation/tooling.md) – why `node:test`, Biome, these TypeScript settings and so few dependencies.
 - [Roadmap](explanation/roadmap.md) – milestones and status.
