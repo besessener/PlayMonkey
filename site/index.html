@@ -1,0 +1,152 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>PlayMonkey – monkey testing for websites, built on Playwright</title>
+    <meta
+      name="description"
+      content="PlayMonkey is a command line tool that drives a real browser against a website in a test environment, clicks around with seeded randomness and reports reproducible bugs. An LLM steps in only when the monkey is stuck."
+    />
+    <link rel="icon" href="favicon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <header class="site-header">
+      <a class="brand" href="#top"><img src="favicon.svg" alt="" width="28" height="28" /> PlayMonkey</a>
+      <nav aria-label="Site navigation">
+        <a href="#features">Features</a>
+        <a href="#rules">Ground rules</a>
+        <a href="#start">Get started</a>
+        <a href="#docs">Documentation</a>
+        <a href="https://github.com/besessener/PlayMonkey">GitHub</a>
+      </nav>
+    </header>
+
+    <main id="top">
+      <section class="hero">
+        <h1>Let a monkey loose on your test environment</h1>
+        <p class="lead">
+          A command line tool that drives a real browser with Playwright, clicks, types and submits its way through your site with seeded randomness and
+          reports what breaks: uncaught errors, failing requests, broken pages. Every finding comes with the steps to reproduce it.
+        </p>
+        <p class="status">
+          Status: early development. Config, login and the test fixture work; the monkey loop, oracles and report are being built, see the
+          <a href="https://github.com/besessener/PlayMonkey/issues/1">roadmap</a>.
+        </p>
+        <p class="actions">
+          <a class="button primary" href="https://github.com/besessener/PlayMonkey">View on GitHub</a>
+          <a class="button" href="#start">Get started</a>
+        </p>
+        <pre class="terminal"><code>$ monkey --help
+Usage: monkey &lt;command&gt; [options]
+
+Commands:
+  run &lt;config.json&gt;      Explore the site described by the config and report findings.
+  replay &lt;actions.json&gt;  Re-execute a recorded action log and check which findings recur.
+
+Options:
+  -h, --help             Show this help.
+  -v, --version          Show the version.
+
+Exit codes:
+  0  no findings
+  1  findings present
+  2  tool or config error</code></pre>
+      </section>
+
+      <section id="features">
+        <h2>What PlayMonkey does for you</h2>
+        <div class="cards">
+          <article>
+            <h3>Seeded random monkey</h3>
+            <p>Clicks links and buttons, fills forms with valid and nasty values and explores unvisited states. The same seed gives the same run.</p>
+          </article>
+          <article>
+            <h3>An LLM only when stuck</h3>
+            <p>Cookie banners, dialogs, forms that need valid data or a login wall: a model takes over for a few steps, then the monkey continues.</p>
+          </article>
+          <article>
+            <h3>Findings, not noise</h3>
+            <p>Oracles watch for uncaught exceptions, console errors, HTTP 4xx and 5xx, crashes, hangs, error pages and layout overflow, deduplicated.</p>
+          </article>
+          <article>
+            <h3>Reproducible by design</h3>
+            <p>Every action is logged with a durable locator. <code>monkey replay</code> runs the log again without an LLM; traces and videos show what happened.</p>
+          </article>
+        </div>
+      </section>
+
+      <section id="rules">
+        <h2>Built for test environments</h2>
+        <p class="section-lead">PlayMonkey clicks, deletes and submits anything it finds. Point it only at environments you can reset.</p>
+        <ul class="checks">
+          <li><strong>No guardrails, on purpose.</strong> There is no read-only mode and no confirmation; that is how it finds the bugs.</li>
+          <li><strong>Runs always end.</strong> <code>maxSteps</code> and <code>maxMinutes</code> stop every run.</li>
+          <li><strong>It stays on your site.</strong> With <code>stayOnDomain</code> (on by default) links to other origins are not followed.</li>
+          <li><strong>Secrets come from the environment.</strong> <code>${VAR}</code> placeholders are resolved at start and masked as <code>***</code> in all output.</li>
+          <li><strong>Each role is isolated.</strong> Every login runs in its own browser context; cookies never leak between roles.</li>
+        </ul>
+        <p>
+          <a href="https://github.com/besessener/PlayMonkey/issues/1">Read the design and roadmap</a>
+        </p>
+      </section>
+
+      <section id="start">
+        <h2>Get started</h2>
+        <p class="section-lead">Requires Node.js 22 and a Playwright browser. Describe the site in a JSON config; secrets stay in environment variables.</p>
+        <pre><code>{
+  "baseUrl": "https://test.example.org",
+  "auth": [
+    {
+      "name": "admin",
+      "loginUrl": "/login",
+      "fields": { "username": "${ADMIN_USER}", "password": "${ADMIN_PASS}" },
+      "submit": "button[type=submit]"
+    }
+  ]
+}</code></pre>
+        <ol class="steps">
+          <li><strong>Install.</strong> Clone the repository, run <code>npm ci</code>, <code>npx playwright install chromium</code> and <code>npm run build</code>.</li>
+          <li><strong>Configure.</strong> Write a config like the one above and export the variables it references.</li>
+          <li><strong>Run.</strong> <code>npx monkey run config.json</code> validates the config today; logging in and exploring arrive with the run loop.</li>
+        </ol>
+        <p>
+          The <a href="https://github.com/besessener/PlayMonkey#configuration">configuration rules</a> list every default; the
+          <a href="https://github.com/besessener/PlayMonkey/blob/main/fixtures/README.md">fixture site</a> shows the kind of bugs it is built to find.
+        </p>
+      </section>
+
+      <section id="docs">
+        <h2>Documentation</h2>
+        <p class="section-lead">Everything lives in the repository while the tool takes shape.</p>
+        <div class="cards">
+          <a class="card-link" href="https://github.com/besessener/PlayMonkey#configuration">
+            <strong>Configuration</strong>
+            <span>Keys, defaults and secrets</span>
+          </a>
+          <a class="card-link" href="https://github.com/besessener/PlayMonkey#browser-sessions-and-login">
+            <strong>Sessions and login</strong>
+            <span>Roles, storageState and stayOnDomain</span>
+          </a>
+          <a class="card-link" href="https://github.com/besessener/PlayMonkey/blob/main/fixtures/README.md">
+            <strong>Fixture site</strong>
+            <span>Seeded bugs and expected findings</span>
+          </a>
+          <a class="card-link" href="https://github.com/besessener/PlayMonkey/issues/1">
+            <strong>Roadmap</strong>
+            <span>Milestones M1 to M4</span>
+          </a>
+        </div>
+      </section>
+    </main>
+
+    <footer class="site-footer">
+      <p>
+        PlayMonkey is released under the <a href="https://github.com/besessener/PlayMonkey/blob/main/LICENSE">MIT License</a>.
+        <a href="https://github.com/besessener/PlayMonkey">Source on GitHub</a> ·
+        <a href="https://github.com/besessener/PlayMonkey/issues">Issues</a>
+      </p>
+    </footer>
+  </body>
+</html>
