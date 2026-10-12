@@ -73,13 +73,20 @@ describe("parseConfig", () => {
         hang: true,
         errorPage: true,
         overflow: true,
+        download: true,
       },
       findings: { lastActions: 10, ignoreStatus: [], ignore: [] },
-      report: { dir: "/configs/monkey-report" },
+      report: { dir: "/configs/monkey-report", keepDownloads: false },
       monkey: {
         actionTimeoutMs: 5000,
+        maxTabs: 5,
         weights: {
           click: 10,
+          dblclick: 0.5,
+          rightclick: 0.5,
+          hover: 1,
+          longPress: 0.3,
+          drag: 0.3,
           fill: 6,
           select: 3,
           check: 3,
@@ -253,7 +260,7 @@ describe("parseConfig", () => {
       "findings.ignoreStatus[0]: must be >= 400",
       "findings.ignore[0]: needs url or message; use oracles.<name>: false to switch an oracle off",
       "findings.ignore[1].url: is not a valid regular expression",
-      "findings.ignore[2].oracle: must be one of: pageerror, console, http5xx, http4xx, crash, hang, errorPage, overflow",
+      "findings.ignore[2].oracle: must be one of: pageerror, console, http5xx, http4xx, crash, hang, errorPage, overflow, download",
       "findings.lastActions: must be >= 0",
     ]);
   });

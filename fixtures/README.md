@@ -58,6 +58,34 @@ viewport, so resizing does not split it into several findings.
 `test/fixture-site.test.ts` walks every click path above in a real browser and checks the control pages stay silent;
 `test/oracles.test.ts` runs `configs/fixture.json` end to end and expects exactly these five findings.
 
+## The lab
+
+`/lab` holds pages for the hard parts of real sites. The home page does **not** link there, so a run from `/` never
+reaches it and the five bugs above stay exactly five; start a run at `/lab` to include it (`/lab` links to `/`).
+
+| Path | Content |
+| --- | --- |
+| `/lab` | Links to every lab page and back to the main site. |
+| `/lab/consent` | A full-screen cookie banner (`role="dialog"`, "Accept all", "Reject all") over the page until answered; the answer is kept in a cookie. |
+| `/lab/dialogs` | Buttons that open `alert`, `confirm` and `prompt`; a checkbox that adds a `beforeunload` warning. |
+| `/lab/alert-on-load` | An `alert` while the page loads: it blocks the load event until answered. |
+| `/lab/frames` | A same-origin iframe, a `srcdoc` iframe and an iframe from another origin (`localhost` instead of `127.0.0.1`). |
+| `/lab/popups` | A `target="_blank"` link, `window.open`, a popup that closes itself, and a `target="_blank"` link to an external site. |
+| `/lab/upload` | A file input, a multiple one, and a button that opens a hidden file input; lists the chosen files. |
+| `/lab/download` | A working download (`report.csv`, 29 bytes) and a broken one. |
+| `/lab/widgets` | A hover menu, double-click to edit, a context menu, drag and drop, press and hold. |
+
+Seeded bugs in the lab:
+
+| # | Bug | Click path | Oracle | Severity | Dedup key |
+| - | --- | --- | --- | --- | --- |
+| L1 | Uncaught exception inside an iframe | Lab → "Frames" → "Crash in frame" (in the inner frame) | `pageerror` | high | `Seeded bug: frame handler crashed` + first stack frame |
+| L2 | Uncaught exception while a popup loads | Lab → "Popups" → "Details in a new tab" or "Open a window" | `pageerror` | high | `Seeded bug: popup failed to initialise` + first stack frame |
+| L3 | Download breaks off mid-file | Lab → "Download" → "Download the export" | `download` | medium | `/lab/files/export.zip` |
+
+`test/lab.test.ts` walks every lab page with scripted actions through the real run loop; `test/chaos.test.ts` lets
+20 seeds loose on the lab and the main site and checks that no run crashes, hangs or exceeds its time limit.
+
 ## Adding a page
 
 Add a route to `createRoutes` in `site/pages.ts` (set `link` to list it on the home page), add its seeded bug to

@@ -1,4 +1,5 @@
 import type { ActionType } from "../config/schema.ts";
+import { unblockingElements } from "../snapshot/blocking.ts";
 import type { Snapshot, SnapshotElement } from "../snapshot/snapshot.ts";
 import type { Action } from "./actions.ts";
 import type { Random } from "./random.ts";
@@ -19,6 +20,12 @@ const VIEWPORTS: readonly [number, number][] = [
 
 /** Bonus factor for links to a URL the run has not visited yet. */
 const UNVISITED_LINK_BONUS = 3;
+/** Bonus factor for elements that answer an open dialog or consent banner, which usually covers everything else. */
+const UNBLOCKING_BONUS = 10;
+/** Action types that act on any clickable element, besides `click` itself. */
+const POINTER_TYPES = ["dblclick", "rightclick", "hover", "drag"] as const;
+/** Viewports narrower than this are phones and tablets, where a long press is a common gesture. */
+const TOUCH_WIDTH = 1024;
 
 /** What the chooser remembers across steps. Owned by the run loop. */
 export class Exploration {
@@ -87,6 +94,8 @@ export function chooseAction(
       // Buttons, links and anything the page marks clickable.
       if (element.role === "link" && !staysOnOrigin(element, snapshot.url, options.origin)) continue;
       add({ type: "click", element });
+      for (const type of POINTER_TYPES) add({ type, element });
+      if (options.viewport.width < TOUCH_WIDTH) add({ type: "longPress", element });
     }
   }
   for (const type of ["press", "scroll", "back", "setViewport"] as const) add({ type });
@@ -100,10 +109,21 @@ export function chooseAction(
 
   const withElement = candidates.filter((candidate) => candidate.element !== undefined);
   if (withElement.length > 0) {
-    const chosen = random.weighted(withElement, (candidate) =>
-      elementWeight(candidate.element as SnapshotElement, keys, stateKey, exploration, snapshot.url),
-    );
+    const unblocking = unblockingElements(snapshot);
+    const chosen = random.weighted(withElement, (candidate) => {
+      const element = candidate.element as SnapshotElement;
+      const weight = elementWeight(element, keys, stateKey, exploration, snapshot.url);
+      return unblocking.has(element) ? weight * UNBLOCKING_BONUS : weight;
+    });
     const element = chosen.element as SnapshotElement;
+    if (type === "drag") {
+      // Best effort: drop onto another element; real drop zones are often not actionable themselves.
+      const others = snapshot.elements.filter((other) => other !== element && other.enabled);
+      if (others.length === 0)
+        return { action: { type: "hover", ref: element.ref }, elementKey: keys.get(element) as string };
+      const to = random.pick(others);
+      return { action: { type: "drag", ref: element.ref, toRef: to.ref }, elementKey: keys.get(element) as string };
+    }
     return { action: elementAction(type, element, random, options), elementKey: keys.get(element) as string };
   }
   return { action: globalAction(type, exploration, random, options) };
@@ -132,6 +152,11 @@ function elementAction(type: ActionType, element: SnapshotElement, random: Rando
       return { type: "select", ref: element.ref, value: random.pick(element.options ?? []) };
     case "check":
       return element.checked === true ? { type: "uncheck", ref: element.ref } : { type: "check", ref: element.ref };
+    case "dblclick":
+    case "rightclick":
+    case "hover":
+    case "longPress":
+      return { type, ref: element.ref };
     default:
       return { type: "click", ref: element.ref };
   }

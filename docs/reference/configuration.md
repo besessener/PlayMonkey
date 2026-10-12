@@ -96,6 +96,7 @@
 | `oracles.hang` | boolean | `true` | Report actions or navigations that exceed their timeout. |
 | `oracles.errorPage` | boolean | `true` | Report navigations that land on an error page. |
 | `oracles.overflow` | boolean | `true` | Report horizontal overflow. |
+| `oracles.download` | boolean | `true` | Report downloads that fail (e.g. the connection drops). |
 | `findings.lastActions` | integer ≥ 0 | `10` | Number of actions before a finding that it records, for reproduction. |
 | `findings.ignoreStatus` | array of integers 400 … 599 | `[]` | HTTP statuses that are never findings, e.g. `[401, 403]`. |
 | `findings.ignore` | array | `[]` | Rules that drop known noise; see [ignore rules](../explanation/oracles.md#ignore-rules). |
@@ -103,8 +104,15 @@
 | `findings.ignore[].url` | regular expression | – | Matched against the request URL (HTTP findings) or the page URL. |
 | `findings.ignore[].message` | regular expression | – | Matched against the finding message. Each rule needs `url` or `message`. |
 | `report.dir` | string | `./monkey-report` | Report output directory, relative to the config file. |
-| `monkey.actionTimeoutMs` | integer ≥ 100 | `5000` | Timeout of one action in milliseconds; a slower action fails and the run continues. |
+| `report.keepDownloads` | boolean | `false` | Keep the files the site downloaded, in `<role>/downloads/` of the report directory. Off: they are measured (name, size) and deleted when the role ends. |
+| `monkey.actionTimeoutMs` | integer ≥ 100 | `5000` | Timeout of one action in milliseconds; a slower action fails and the run continues. Also how long a step waits for dialogs, uploads and downloads to finish. |
+| `monkey.maxTabs` | integer ≥ 1 | `5` | Open tabs per role. When popups open more, the oldest ones the monkey left behind are closed (never the first tab or the current one). |
 | `monkey.weights.click` | number ≥ 0 | `10` | Relative weight of clicking links, buttons and other clickable elements. |
+| `monkey.weights.dblclick` | number ≥ 0 | `0.5` | Relative weight of double-clicking a clickable element. |
+| `monkey.weights.rightclick` | number ≥ 0 | `0.5` | Relative weight of right-clicking a clickable element (context menus). |
+| `monkey.weights.hover` | number ≥ 0 | `1` | Relative weight of moving the mouse over a clickable element (hover menus, tooltips). |
+| `monkey.weights.longPress` | number ≥ 0 | `0.3` | Relative weight of pressing and holding a clickable element; only in viewports narrower than 1024 px. |
+| `monkey.weights.drag` | number ≥ 0 | `0.3` | Relative weight of dragging a clickable element onto another element (best effort). |
 | `monkey.weights.fill` | number ≥ 0 | `6` | Relative weight of typing into text fields. |
 | `monkey.weights.select` | number ≥ 0 | `3` | Relative weight of choosing a dropdown option. |
 | `monkey.weights.check` | number ≥ 0 | `3` | Relative weight of toggling checkboxes, radios and switches. |

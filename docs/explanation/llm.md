@@ -18,8 +18,9 @@ execute -> oracles -> action log (source "monkey" or "llm")
 
 The LLM sees a [serialized snapshot](snapshot.md#serializing-for-the-llm) within `llm.snapshotChars`, the last
 `llm.historyActions` actions with their outcomes, the findings so far, why it was called, the role, and the
-placeholders it may use. It answers with exactly one tool call; each action is one tool (`click`, `fill`, `select`,
-`check`, `uncheck`, `press`, `scroll`, `back`, `navigate`) plus `done` to give control back early.
+placeholders it may use. It answers with exactly one tool call; each action is one tool (`click`, `dblclick`, `hover`,
+`fill`, `select`, `check`, `uncheck`, `press`, `scroll`, `back`, `navigate`) plus `done` to give control back
+early. Native dialogs and file choosers are answered automatically, also during the LLM's steps; the prompt says so.
 
 Nothing it returns is trusted. The tool input is validated against the tool's JSON schema, element tools must name a
 ref of the current snapshot, and `navigate` must stay on the site when `stayOnDomain` is on. A violation counts as an

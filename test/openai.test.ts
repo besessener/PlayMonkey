@@ -150,7 +150,7 @@ describe("openai provider", () => {
     assert.equal("reasoning" in request.body, false);
     assert.match(String(request.body.instructions), /^You are an exploratory tester/);
     const tools = request.body.tools as { type: string; name: string; strict: boolean; parameters: unknown }[];
-    assert.equal(tools.length, 10);
+    assert.equal(tools.length, 12);
     assert.ok(tools.every((tool) => tool.type === "function" && tool.strict === false));
     assert.deepEqual(tools[0]?.parameters, {
       type: "object",
@@ -193,7 +193,20 @@ describe("openai provider", () => {
     const tools = request.body.tools as { type: string; function: { name: string; strict: boolean } }[];
     assert.deepEqual(
       tools.map((tool) => tool.function.name),
-      ["click", "fill", "select", "check", "uncheck", "press", "scroll", "back", "navigate", "done"],
+      [
+        "click",
+        "dblclick",
+        "hover",
+        "fill",
+        "select",
+        "check",
+        "uncheck",
+        "press",
+        "scroll",
+        "back",
+        "navigate",
+        "done",
+      ],
     );
   });
 

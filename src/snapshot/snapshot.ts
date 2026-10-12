@@ -62,6 +62,8 @@ export interface SnapshotElement {
   inViewport: boolean;
   /** Inside a same-origin iframe rather than the top-level document. */
   inFrame: boolean;
+  /** Inside an open dialog (`dialog`, `alertdialog`); absent otherwise. */
+  inDialog?: true;
 }
 
 export interface Snapshot {
@@ -103,7 +105,7 @@ export async function snapshot(page: Page): Promise<Snapshot> {
   const dialogs: string[] = [];
   let crossOriginFrames = 0;
 
-  const visit = async (node: AriaNode | string, inFrame: boolean): Promise<void> => {
+  const visit = async (node: AriaNode | string, inFrame: boolean, inDialog: boolean): Promise<void> => {
     if (typeof node === "string") {
       texts.push(node);
       return;
@@ -113,19 +115,20 @@ export async function snapshot(page: Page): Promise<Snapshot> {
         crossOriginFrames++;
         return;
       }
-      for (const child of node.children ?? []) await visit(child, true);
+      for (const child of node.children ?? []) await visit(child, true, inDialog);
       return;
     }
-    if (DIALOG_ROLES.has(node.role)) dialogs.push(node.name ?? "");
+    const isDialog = DIALOG_ROLES.has(node.role);
+    if (isDialog) dialogs.push(node.name ?? "");
     const actionable = node.ref !== undefined && isActionable(node);
-    if (actionable) elements.push(toElement(node, node.ref as string, viewport, inFrame));
+    if (actionable) elements.push(toElement(node, node.ref as string, viewport, inFrame, inDialog));
     // Headings and other named landmarks carry their text as the name.
     else if (node.name !== undefined && node.role !== "option") texts.push(node.name);
     if (node.text !== undefined && node.role !== "option") texts.push(node.text);
     if (node.role === "combobox" || node.role === "listbox") return; // options belong to the element
-    for (const child of node.children ?? []) await visit(child, inFrame);
+    for (const child of node.children ?? []) await visit(child, inFrame, inDialog || isDialog);
   };
-  for (const root of roots) await visit(root, false);
+  for (const root of roots) await visit(root, false, false);
 
   return {
     url: page.url(),
@@ -169,6 +172,7 @@ function toElement(
   ref: string,
   viewport: { width: number; height: number },
   inFrame: boolean,
+  inDialog: boolean,
 ): SnapshotElement {
   const element: SnapshotElement = {
     ref,
@@ -178,6 +182,7 @@ function toElement(
     inViewport: intersects(node.box, viewport),
     inFrame,
   };
+  if (inDialog) element.inDialog = true;
   if (node.url !== undefined) element.url = node.url;
   if (node.placeholder !== undefined) element.placeholder = node.placeholder;
   if (node.checked !== undefined) element.checked = node.checked;

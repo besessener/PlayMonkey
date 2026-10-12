@@ -71,6 +71,7 @@ function describe(element: SnapshotElement, maxName: number): string {
   if (element.expanded !== undefined) parts.push(`expanded=${element.expanded}`);
   if (!element.enabled) parts.push("disabled");
   if (element.inFrame) parts.push("(in frame)");
+  if (element.inDialog === true) parts.push("(in dialog)");
   return parts.join(" ");
 }
 

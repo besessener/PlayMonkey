@@ -10,6 +10,8 @@ export interface ActionContext {
   step: number;
   action: Action;
   locator?: string;
+  /** Durable locator of the drop target of a `drag`. */
+  toLocator?: string;
   /** URL the action was chosen on. */
   url: string;
 }

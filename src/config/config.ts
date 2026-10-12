@@ -36,8 +36,8 @@ export interface Config {
   llm?: LlmConfig;
   oracles: Record<OracleName, boolean>;
   findings: { lastActions: number; ignoreStatus: number[]; ignore: IgnoreRule[] };
-  report: { dir: string };
-  monkey: { actionTimeoutMs: number; weights: Record<ActionType, number> };
+  report: { dir: string; keepDownloads: boolean };
+  monkey: { actionTimeoutMs: number; maxTabs: number; weights: Record<ActionType, number> };
 }
 
 export type AuthRole = FieldsLoginRole | StorageStateRole;
@@ -208,9 +208,13 @@ function normalize(raw: RawConfig, seed: number, baseDir: string): Config {
       ignoreStatus: [...(raw.findings?.ignoreStatus ?? DEFAULTS.findings.ignoreStatus)],
       ignore: (raw.findings?.ignore ?? []).map((rule) => ({ ...rule })),
     },
-    report: { dir: resolve(baseDir, raw.report?.dir ?? DEFAULTS.report.dir) },
+    report: {
+      dir: resolve(baseDir, raw.report?.dir ?? DEFAULTS.report.dir),
+      keepDownloads: raw.report?.keepDownloads ?? DEFAULTS.report.keepDownloads,
+    },
     monkey: {
       actionTimeoutMs: raw.monkey?.actionTimeoutMs ?? DEFAULTS.monkey.actionTimeoutMs,
+      maxTabs: raw.monkey?.maxTabs ?? DEFAULTS.monkey.maxTabs,
       weights: Object.fromEntries(
         ACTION_TYPES.map((type) => [type, raw.monkey?.weights?.[type] ?? DEFAULTS.monkey.weights[type]]),
       ) as Record<ActionType, number>,

@@ -12,11 +12,17 @@ export const ORACLES = [
   "hang",
   "errorPage",
   "overflow",
+  "download",
 ] as const;
 export type OracleName = (typeof ORACLES)[number];
 
 export const ACTION_TYPES = [
   "click",
+  "dblclick",
+  "rightclick",
+  "hover",
+  "longPress",
+  "drag",
   "fill",
   "select",
   "check",
@@ -38,7 +44,7 @@ export const DEFAULTS = {
   browser: { engine: "chromium" as Engine, viewport: [1280, 800] as [number, number], headless: true },
   stayOnDomain: true,
   oracle: true,
-  report: { dir: "./monkey-report" },
+  report: { dir: "./monkey-report", keepDownloads: false },
   findings: { lastActions: 10, ignoreStatus: [] as number[] },
   llm: {
     required: true,
@@ -62,8 +68,14 @@ export const DEFAULTS = {
   },
   monkey: {
     actionTimeoutMs: 5000,
+    maxTabs: 5,
     weights: {
       click: 10,
+      dblclick: 0.5,
+      rightclick: 0.5,
+      hover: 1,
+      longPress: 0.3,
+      drag: 0.3,
       fill: 6,
       select: 3,
       check: 3,
@@ -95,8 +107,8 @@ export interface RawConfig {
   llm?: RawLlm;
   oracles?: Partial<Record<OracleName, boolean>>;
   findings?: { lastActions?: number; ignoreStatus?: number[]; ignore?: RawIgnoreRule[] };
-  report?: { dir?: string };
-  monkey?: { actionTimeoutMs?: number; weights?: Partial<Record<ActionType, number>> };
+  report?: { dir?: string; keepDownloads?: boolean };
+  monkey?: { actionTimeoutMs?: number; maxTabs?: number; weights?: Partial<Record<ActionType, number>> };
 }
 
 export interface RawAuth {
@@ -538,6 +550,13 @@ export const configSchema: JSONSchemaType<RawConfig> = {
           default: DEFAULTS.monkey.actionTimeoutMs,
           description: "Timeout of a single action in milliseconds; a slower action fails and the run continues.",
         },
+        maxTabs: {
+          type: "integer",
+          minimum: 1,
+          nullable: true,
+          default: DEFAULTS.monkey.maxTabs,
+          description: "Open tabs per role; when popups open more, the oldest ones the monkey left are closed.",
+        },
         weights: {
           type: "object",
           nullable: true,
@@ -564,6 +583,12 @@ export const configSchema: JSONSchemaType<RawConfig> = {
           nullable: true,
           default: DEFAULTS.report.dir,
           description: "Report output directory, relative to the config file.",
+        },
+        keepDownloads: {
+          type: "boolean",
+          nullable: true,
+          default: DEFAULTS.report.keepDownloads,
+          description: "Keep the files the site under test downloaded, in <role>/downloads of the report directory.",
         },
       },
     },

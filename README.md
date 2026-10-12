@@ -13,8 +13,9 @@
 environment**. It clicks, types and submits its way through the site with seeded randomness and reports what breaks,
 with the steps to reproduce it. An LLM steps in only when the random monkey gets stuck.
 
-> **Status:** milestone M2: the seeded random monkey with oracles, reports and replay, plus Claude on Microsoft
-> Foundry as the LLM for stuck situations. Next: an OpenAI-compatible backend and hardening, see the
+> **Status:** milestone M3: the seeded random monkey with oracles, reports and replay; Claude on Microsoft Foundry
+> or any OpenAI-compatible endpoint as the LLM for stuck situations; cookie banners, native dialogs, iframes,
+> popups, file uploads and downloads handled. Next: parallel runs and a CI example, see the
 > [roadmap](docs/explanation/roadmap.md).
 
 ## Usage

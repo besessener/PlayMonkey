@@ -32,6 +32,12 @@ export async function startFixture(options: FixtureOptions = {}): Promise<Fixtur
       .catch(() => serverError())
       .then((response: Response) => {
         res.writeHead(response.status, response.headers);
+        if (response.abort === true) {
+          res.write(response.body ?? "");
+          // Let the first bytes arrive, then drop the connection mid-body.
+          setTimeout(() => res.destroy(), 50);
+          return;
+        }
         res.end(response.body);
       });
   });
@@ -62,7 +68,13 @@ async function toRequest(req: IncomingMessage): Promise<Request> {
       if (body.length > MAX_BODY_BYTES) throw new Error("body too large");
     }
   }
-  return { method, url, cookies: parseCookies(req.headers.cookie), form: new URLSearchParams(body) };
+  return {
+    method,
+    url,
+    host: req.headers.host ?? "",
+    cookies: parseCookies(req.headers.cookie),
+    form: new URLSearchParams(body),
+  };
 }
 
 function parseCookies(header: string | undefined): Record<string, string> {

@@ -26,21 +26,44 @@ export interface Tabs {
   current: number;
 }
 
+/** Replay: the recorded elements, found by their durable locators, instead of the action's refs. */
+export interface Targets {
+  element?: Locator;
+  /** The drop target of a `drag`. */
+  to?: Locator;
+}
+
+/** How long a long press holds the mouse button. */
+export const LONG_PRESS_MS = 800;
+
+/**
+ * How long a click-like action waits for a popup it may have opened. The browser reports a new page a few
+ * milliseconds after the click itself has returned.
+ */
+const POPUP_GRACE_MS = 50;
+const CLICK_LIKE = new Set<Action["type"]>(["click", "dblclick", "longPress", "press"]);
+
 /**
  * Executes one action with a timeout and waits for the page to settle: if the main document changed, until it has
  * loaded. Never throws for problems of the page under test; they come back as `{ ok: false, error }`. Element
- * actions act on `target` when given (replay), else on the element their ref points to. With a `spectator`, the
+ * actions act on `targets` when given (replay), else on the element their ref points to. With a `spectator`, the
  * element is outlined for a moment first; `locator` (its durable locator) only makes the outline's label readable.
+ *
+ * When the action opens a popup or new tab, the monkey continues there, like a user would: the result's `tab` is
+ * the new page once it has loaded its document.
  */
 export async function executeAction(
   tabs: Tabs,
   action: Action,
   timeoutMs: number,
-  target?: Locator,
+  targets: Targets = {},
   spectator?: Spectator & { locator?: string },
 ): Promise<ActionResult> {
   let tab = tabs.current;
   let page = currentPage(tabs.context, tab);
+  const opened: Page[] = [];
+  const onPage = (popup: Page) => opened.push(popup);
+  tabs.context.on("page", onPage);
   let navigated = false;
   // True while waiting for a navigation or load, where a timeout means the page hangs.
   let loading = false;
@@ -48,7 +71,7 @@ export async function executeAction(
     if (frame.parentFrame() === null) navigated = true;
   };
   page.on("framenavigated", onNavigated);
-  const element = async (ref: string) => {
+  const element = async (ref: string, target = targets.element) => {
     const locator = target ?? (await resolve(page, ref));
     if (spectator !== undefined && spectator.highlightMs > 0) {
       await show(page, readable(page, spectator.locator) ?? locator, spectator.highlightMs);
@@ -60,6 +83,28 @@ export async function executeAction(
       case "click":
         await (await element(action.ref)).click({ timeout: timeoutMs });
         break;
+      case "dblclick":
+        await (await element(action.ref)).dblclick({ timeout: timeoutMs });
+        break;
+      case "rightclick":
+        await (await element(action.ref)).click({ button: "right", timeout: timeoutMs });
+        break;
+      case "hover":
+        await (await element(action.ref)).hover({ timeout: timeoutMs });
+        break;
+      case "longPress":
+        // Touch-style long press with the mouse: down, hold, up.
+        await (await element(action.ref)).hover({ timeout: timeoutMs });
+        await page.mouse.down();
+        await new Promise((resolve) => setTimeout(resolve, LONG_PRESS_MS));
+        await page.mouse.up();
+        break;
+      case "drag": {
+        const source = await element(action.ref);
+        const target = targets.to ?? (await resolve(page, action.toRef));
+        await source.dragTo(target, { timeout: timeoutMs });
+        break;
+      }
       case "fill":
         await (await element(action.ref)).fill(action.value, { timeout: timeoutMs });
         break;
@@ -98,13 +143,40 @@ export async function executeAction(
       loading = true;
       await page.waitForLoadState("load", { timeout: timeoutMs });
     }
+    if (CLICK_LIKE.has(action.type)) await settle(page, tabs.context, opened);
+    const popup = await openedPopup(opened, timeoutMs);
+    if (popup !== undefined) {
+      const index = tabs.context.pages().indexOf(popup);
+      if (index >= 0) return { ok: true, navigated: true, url: popup.url(), tab: index };
+    }
     return { ok: true, navigated, url: page.url(), tab };
   } catch (error) {
     const hang = loading && error instanceof errors.TimeoutError;
     return { ok: false, error: firstLine(error), ...(hang ? { hang } : {}), navigated, url: safeUrl(page), tab };
   } finally {
     page.off("framenavigated", onNavigated);
+    tabs.context.off("page", onPage);
   }
+}
+
+/**
+ * Lets events the action caused arrive: one round trip to the page (file choosers and dialogs come before its
+ * answer), then up to `POPUP_GRACE_MS` for a new page, unless one has opened already.
+ */
+async function settle(page: Page, context: BrowserContext, opened: Page[]): Promise<void> {
+  await page.evaluate("0").catch(() => undefined);
+  if (opened.length > 0) return;
+  await context.waitForEvent("page", { timeout: POPUP_GRACE_MS }).catch(() => undefined);
+}
+
+/** The last page the action opened that is still open, once its document has loaded. */
+async function openedPopup(opened: Page[], timeoutMs: number): Promise<Page | undefined> {
+  for (const popup of opened.toReversed()) {
+    if (popup.isClosed()) continue;
+    await popup.waitForLoadState("domcontentloaded", { timeout: timeoutMs }).catch(() => undefined);
+    if (!popup.isClosed()) return popup;
+  }
+  return undefined;
 }
 
 /** Outlines the element, waits, and removes the outline again so the next snapshot never contains it. */

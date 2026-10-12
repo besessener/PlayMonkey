@@ -159,6 +159,18 @@ export function describeStep(entry: ActionContext): string {
   switch (action.type) {
     case "click":
       return `Click${target}${where}`;
+    case "dblclick":
+      return `Double-click${target}${where}`;
+    case "rightclick":
+      return `Right-click${target}${where}`;
+    case "hover":
+      return `Hover over${target}${where}`;
+    case "longPress":
+      return `Press and hold${target}${where}`;
+    case "drag": {
+      const to = entry.toLocator === undefined ? "" : ` onto <code>${e(entry.toLocator)}</code>`;
+      return `Drag${target}${to}${where}`;
+    }
     case "fill":
       return `Fill${target} with ${quote(action.value)}${where}`;
     case "select":

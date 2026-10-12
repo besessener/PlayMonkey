@@ -17,6 +17,8 @@ Guidelines:
 - Elements are addressed by their ref (e.g. e12) from the current snapshot only; refs change after every action.
 - Never type secrets yourself. Use the listed placeholders, e.g. {{testData.email}} or {{role.password}}; they are
   replaced with the real values after your answer. {{env.NAME}} in the page stands for a hidden value.
+- Native browser dialogs (alert, confirm, prompt) and file choosers are answered automatically; you only see the
+  page. A click on a file input uploads a generated file. Downloads are saved automatically.
 - Call done when the obstacle is gone or nothing sensible is left to do on this page.
 
 Respond with exactly one tool call and no other text.`;

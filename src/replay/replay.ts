@@ -83,6 +83,8 @@ export async function replayActionLog(file: string, options: ReplayOptions): Pro
             action: toAction(entry),
             source: entry.source,
             ...(entry.locator === undefined ? {} : { locator: entry.locator }),
+            ...(entry.toLocator === undefined ? {} : { toLocator: entry.toLocator }),
+            ...(entry.events === undefined ? {} : { events: entry.events }),
           })),
         },
         ...(options.signal === undefined ? {} : { signal: options.signal }),
