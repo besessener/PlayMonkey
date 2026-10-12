@@ -1,4 +1,4 @@
-import type { ActionType } from "../config/schema.ts";
+import type { ActionType } from "../config/values.ts";
 import { unblockingElements } from "../snapshot/blocking.ts";
 import type { Snapshot, SnapshotElement } from "../snapshot/snapshot.ts";
 import type { Action } from "./actions.ts";

@@ -11,7 +11,7 @@ import type {
   ResponseFunctionToolCall,
 } from "openai/resources/responses/responses";
 import type { LlmConfig } from "../config/config.ts";
-import type { OpenAiApi } from "../config/schema.ts";
+import type { OpenAiApi } from "../config/values.ts";
 import { buildUserMessage, pingMessage, SYSTEM_PROMPT } from "./prompt.ts";
 import {
   type DecideInput,

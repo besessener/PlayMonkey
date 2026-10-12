@@ -1,4 +1,4 @@
-import type { RawHandoff } from "../config/schema.ts";
+import type { RawHandoff } from "../config/llm-schema.ts";
 import type { StepRecord } from "../monkey/loop.ts";
 import { blockingUi } from "../snapshot/blocking.ts";
 import type { Snapshot } from "../snapshot/snapshot.ts";

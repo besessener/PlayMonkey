@@ -3,7 +3,7 @@ import { after, before, describe, it } from "node:test";
 import type { Browser, BrowserContext } from "playwright";
 import { type Fixture, startFixture } from "../fixtures/site/server.ts";
 import { type Config, parseConfig } from "../src/config/config.ts";
-import { ACTION_TYPES, type ActionType } from "../src/config/schema.ts";
+import { ACTION_TYPES, type ActionType } from "../src/config/values.ts";
 import { describeAction } from "../src/monkey/actions.ts";
 import { chooseAction, Exploration } from "../src/monkey/chooser.ts";
 import { executeAction } from "../src/monkey/executor.ts";

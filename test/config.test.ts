@@ -5,8 +5,8 @@ import { join } from "node:path";
 import { describe, it } from "node:test";
 import { runCli } from "../src/cli/cli.ts";
 import { ConfigError, type LoadedConfig, loadConfig, parseConfig } from "../src/config/config.ts";
-import { MAX_SEED } from "../src/config/schema.ts";
 import { maskSecrets } from "../src/config/secrets.ts";
+import { MAX_SEED } from "../src/config/values.ts";
 
 const SECRET = "s3cr3t-Pa55word!";
 const ENV = { ADMIN_USER: "admin", ADMIN_PASS: SECRET, FOUNDRY_API_KEY: "key-1234567890" };

@@ -8,7 +8,7 @@ import { BROKEN_DOWNLOAD_BYTES } from "../fixtures/site/lab.ts";
 import { type Fixture, startFixture } from "../fixtures/site/server.ts";
 import { openRoleSession } from "../src/auth/session.ts";
 import { parseConfig } from "../src/config/config.ts";
-import { ACTION_TYPES, type ActionType } from "../src/config/schema.ts";
+import { ACTION_TYPES, type ActionType } from "../src/config/values.ts";
 import type { Action } from "../src/monkey/actions.ts";
 import { chooseAction, Exploration } from "../src/monkey/chooser.ts";
 import type { StepEvent } from "../src/monkey/events.ts";

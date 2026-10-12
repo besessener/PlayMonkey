@@ -102,7 +102,7 @@ interface LlmProvider {
 - Map failures to an `LlmError` with a kind (`auth`, `notFound`, `rateLimited`, `invalid`, …; see
   `LlmErrorKind`) and keep the usage of failed calls; the preflight hints and the report are keyed by kind.
 - Report `usage` (input, output, cache read and write tokens) and how many requests were retried.
-- Add the name to `LLM_PROVIDERS` in `src/config/schema.ts` and to `createProvider` in `src/llm/factory.ts`.
+- Add the name to `LLM_PROVIDERS` in `src/config/values.ts` and to `createProvider` in `src/llm/factory.ts`.
 
 `test/helpers/fake-provider.ts` is a scripted provider for tests; `test/foundry.test.ts` and `test/openai.test.ts`
 show how to test a backend with its HTTP layer mocked. Add the new backend to `test/provider-conformance.test.ts`:

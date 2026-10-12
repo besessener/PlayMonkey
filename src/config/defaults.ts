@@ -1,0 +1,53 @@
+import type { ActionType, Engine } from "./values.ts";
+
+/** Default values; referenced by the schema (`default`) and by normalization so they cannot drift apart. */
+export const DEFAULTS = {
+  limits: { maxSteps: 500, maxMinutes: 20 },
+  browser: { engine: "chromium" as Engine, viewport: [1280, 800] as [number, number], headless: true },
+  stayOnDomain: true,
+  parallel: 1,
+  oracle: true,
+  report: { dir: "./monkey-report", keepDownloads: false },
+  findings: { lastActions: 10, ignoreStatus: [] as number[] },
+  llm: {
+    required: true,
+    timeoutMs: 60_000,
+    maxRetries: 2,
+    debugLog: false,
+    historyActions: 10,
+    snapshotChars: 8000,
+    handoff: {
+      noStateChange: 5,
+      noProgress: 25,
+      failedActions: 5,
+      invalidForm: 3,
+      blockingUi: true,
+      loginWall: true,
+      maxDecisions: 3,
+      cooldownSteps: 5,
+    },
+    breaker: { failures: 3, pauseSteps: 20 },
+    options: { maxOutputTokens: 4096 },
+  },
+  monkey: {
+    actionTimeoutMs: 5000,
+    maxTabs: 5,
+    weights: {
+      click: 10,
+      dblclick: 0.5,
+      rightclick: 0.5,
+      hover: 1,
+      longPress: 0.3,
+      drag: 0.3,
+      fill: 6,
+      select: 3,
+      check: 3,
+      press: 1,
+      scroll: 1,
+      back: 1.5,
+      navigate: 1,
+      setViewport: 0.2,
+      switchTab: 1,
+    } satisfies Record<ActionType, number>,
+  },
+} as const;

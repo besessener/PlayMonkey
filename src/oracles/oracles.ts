@@ -2,7 +2,7 @@ import { mkdir } from "node:fs/promises";
 import { join } from "node:path";
 import type { BrowserContext, ConsoleMessage, Page, Response } from "playwright";
 import type { Config } from "../config/config.ts";
-import type { OracleName } from "../config/schema.ts";
+import type { OracleName } from "../config/values.ts";
 import type { StepRecord } from "../monkey/loop.ts";
 import { type ActionContext, type Finding, IgnoreRules, type Signal } from "./finding.ts";
 import { firstStackFrame, normalizeMessage, normalizeUrl } from "./keys.ts";

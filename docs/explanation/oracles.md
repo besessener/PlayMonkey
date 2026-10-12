@@ -114,7 +114,7 @@ A crashed page throws on every call. The monkey closes it and continues in anoth
 Oracles live in `src/oracles/oracles.ts`; each produces signals through `#add(oracle, signal)`, which applies the
 ignore rules and deduplicates by key.
 
-1. Add the name to `ORACLES` in `src/config/schema.ts`. That makes `oracles.<name>` a config key (default on);
+1. Add the name to `ORACLES` in `src/config/values.ts`. That makes `oracles.<name>` a config key (default on);
    document it in [configuration](../reference/configuration.md), which `test/docs.test.ts` enforces.
 2. Detect the problem in the `Oracles` class: an **event oracle** registers a listener in `#watch(page)`, which runs
    for every page of the context, popups included; a **state oracle** checks the page after each step in
@@ -129,4 +129,3 @@ ignore rules and deduplicates by key.
 
 Everything else follows: the finding gets an id, the last actions and a screenshot, goes into the action log for
 replay, into both reports, and is aggregated across [parallel runs](../how-to/run-in-parallel.md).
-
