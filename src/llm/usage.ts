@@ -95,8 +95,9 @@ class Counters {
 }
 
 /**
- * LLM usage of a run, per role and in total, and the run's budget (`llm.maxCalls`, `llm.maxTokens`). One instance
- * is shared by all roles, so the budget covers the whole run. The preflight probe is not counted.
+ * LLM usage of a run, per run (role, or role/seed with `seeds`) and in total, and the run's budget (`llm.maxCalls`,
+ * `llm.maxTokens`). One instance is shared by all runs, also parallel ones, so the budget covers the whole
+ * invocation. The preflight probe is not counted.
  */
 export class LlmStats {
   readonly #config: LlmConfig;
@@ -106,6 +107,8 @@ export class LlmStats {
   #disabled: string | undefined;
   #preflight: LlmReport["preflight"];
   #exhausted: { role: string; step: number; reason: string } | undefined;
+  /** Calls started (`begin`) but not yet recorded (`call`); parallel runs count them against `llm.maxCalls`. */
+  #pending = 0;
 
   constructor(config: LlmConfig, provider: string) {
     this.#config = config;
@@ -131,7 +134,8 @@ export class LlmStats {
   /** Why the budget does not allow another call, or undefined. */
   budgetProblem(): string | undefined {
     const { maxCalls, maxTokens } = this.#config;
-    if (maxCalls !== undefined && this.#total.calls >= maxCalls) return `llm.maxCalls (${maxCalls}) reached`;
+    if (maxCalls !== undefined && this.#total.calls + this.#pending >= maxCalls)
+      return `llm.maxCalls (${maxCalls}) reached`;
     if (maxTokens !== undefined && this.#total.tokens >= maxTokens) return `llm.maxTokens (${maxTokens}) reached`;
     return undefined;
   }
@@ -141,7 +145,13 @@ export class LlmStats {
     this.#exhausted ??= { role, step, reason };
   }
 
+  /** Reserves a call against the budget until `call` records it; check `budgetProblem` first. */
+  begin(): void {
+    this.#pending++;
+  }
+
   call(role: string, record: CallRecord): void {
+    if (this.#pending > 0) this.#pending--;
     for (const counters of this.#both(role)) {
       counters.calls++;
       counters.retries += record.retries;

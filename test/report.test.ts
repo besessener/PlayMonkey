@@ -41,6 +41,7 @@ function finding(
 function outcome(findings: Finding[]): RoleOutcome {
   return {
     role: "user",
+    seed: 5,
     result: { steps: 10, stopReason: "maxSteps", durationMs: 1200, states: 4, failedActions: 0, skippedActions: 0 },
     findings,
     blockedNavigations: 0,
@@ -78,6 +79,7 @@ describe("report", () => {
     assert.equal(report.seed, 5);
     assert.deepEqual(report.roles[0], {
       role: "user",
+      seed: 5,
       steps: 10,
       durationMs: 1200,
       stopReason: "maxSteps",
@@ -87,6 +89,48 @@ describe("report", () => {
       blockedNavigations: 0,
       videos: [],
     });
+  });
+
+  it("aggregates findings across runs by key, in run order", () => {
+    const run = (role: string, seed: number, findings: Finding[]): RoleOutcome => ({
+      ...outcome(findings.map((f) => ({ ...f, role }))),
+      role,
+      seed,
+    });
+    const report = buildReport({
+      loaded,
+      outcomes: [
+        run("admin", 1, [finding("F1", "medium", 2), finding("F2", "low", 1)]),
+        run("user", 1, [
+          finding("F1", "low", 1, { key: "console|F2" }),
+          finding("F2", "medium", 3, { key: "console|F1" }),
+        ]),
+        run("user", 2, [finding("F1", "high", 1, { key: "console|X" })]),
+      ],
+      version: "1.2.3",
+      startedAt: new Date(0),
+      finishedAt: new Date(1000),
+    });
+    assert.deepEqual(
+      report.aggregated.map((f) => [
+        f.key,
+        f.severity,
+        f.occurrences,
+        f.roles,
+        f.runs.map((r) => `${r.role}/${r.seed}/${r.id}`),
+      ]),
+      [
+        ["console|X", "high", 1, ["user"], ["user/2/F1"]],
+        ["console|F1", "medium", 5, ["admin", "user"], ["admin/1/F1", "user/1/F2"]],
+        ["console|F2", "low", 2, ["admin", "user"], ["admin/1/F2", "user/1/F1"]],
+      ],
+    );
+    assert.deepEqual(report.counts, { critical: 0, high: 1, medium: 1, low: 1 });
+    assert.equal(report.findings.length, 5);
+    assert.deepEqual(
+      report.findings.map((f) => f.seed),
+      [2, 1, 1, 1, 1],
+    );
   });
 
   it("masks the config", () => {

@@ -13,7 +13,12 @@ monkey-report/
     video/*.webm           video of each page of the role
     screenshots/step-NNNN.png
                            one screenshot per step that produced a new finding
+    downloads/             only with report.keepDownloads
 ```
+
+With `seeds` in the config every run gets its own directory, `<role>/<seed>/`, with the same content
+(`admin/42/actions.json`, `admin/42/trace.zip`, …); `report.json` and `report.html` stay one combined report at the
+top.
 
 At the end of a run the console says how many findings of which severity there are, where the report is, and why
 the exit code is what it is:
@@ -31,11 +36,14 @@ A single file with inline CSS and the screenshots embedded as images; it has no 
 network. It shows:
 
 - the run (base URL, seed, start time, tool version) and the number of findings per severity;
-- one row per role: steps, duration, why it stopped, findings, and links to its action log, trace and video;
+- one row per run (role and seed): steps, duration, why it stopped, findings, and links to its action log, trace
+  and video;
 - with `llm`: an **LLM usage** table (total and per role) and notes when the LLM was disabled or its budget ran out;
-- the findings, by severity and then by how often they occurred. Each has its oracle, message, page, role and step,
-  the **steps to reproduce** (the last `findings.lastActions` actions, written out with their durable locators), the
-  screenshot and the details the oracle recorded.
+- the findings, aggregated across runs: one card per problem, by severity, then the number of runs that found it,
+  then how often it occurred. Each has its oracle, message and page, **found in** (the roles, e.g. "admin, user"),
+  the runs with their per-run finding ids, and, from the first run that found it, the **steps to reproduce** (the last
+  `findings.lastActions` actions, written out with their durable locators), the screenshot and the details the
+  oracle recorded.
 
 Everything shown comes from the page under test or the config, so all of it is HTML-escaped. Links to traces and
 videos are relative, so keep the directory together when you move it.
@@ -47,11 +55,13 @@ videos are relative, so keep the directory together when you move it.
 | `version` | Format version, currently `1`. |
 | `tool` | `{ "name": "playmonkey", "version": … }`. |
 | `startedAt`, `finishedAt` | ISO timestamps of the run. |
-| `seed` | The seed of the run. |
+| `seed` | The seed of the run; with `seeds`, the first of them. |
+| `seeds` | Only with `seeds` in the config: all of them. |
 | `config` | The config with defaults applied and every secret value masked as `***`. |
-| `roles[]` | Per role: `role`, `steps`, `durationMs`, `stopReason` (`maxSteps`, `maxMinutes`, `aborted`, `error`), `error`, `states`, `failedActions`, `findings` (count), `blockedNavigations`, and the paths `actionLog`, `trace`, `videos`. A role that could not log in has only `role`, `error`, `findings: 0` and empty `videos`. |
-| `findings[]` | Every finding as described in [oracles and findings](../explanation/oracles.md#finding-model), sorted like the HTML, with `screenshot` as a path. |
-| `counts` | Findings per severity: `critical`, `high`, `medium`, `low`. |
+| `roles[]` | One entry per run, in config order (roles, then seeds), whatever order they finished in: `role`, `seed`, `steps`, `durationMs`, `stopReason` (`maxSteps`, `maxMinutes`, `aborted`, `error`), `error`, `states`, `failedActions`, `findings` (count), `blockedNavigations`, and the paths `actionLog`, `trace`, `videos`. A run that could not log in or crashed has only `role`, `seed`, `error`, `findings: 0` and empty `videos`. |
+| `findings[]` | Every run's findings, deduplicated per run, as described in [oracles and findings](../explanation/oracles.md#finding-model), plus the run's `seed` and `screenshot` as a path. Sorted by severity, then occurrences, then run order. Ids (`F1`, …) count per run. |
+| `aggregated[]` | The findings across runs, one per dedup key: `key`, `oracle`, `severity`, `message`, `url` (of the first run that found it), `occurrences` (sum), `roles` (distinct, config order) and `runs[]` (`role`, `seed`, `id`). Sorted like the HTML. |
+| `counts` | Aggregated findings per severity: `critical`, `high`, `medium`, `low`. |
 | `llm` | Only with `llm` in the config; see below. |
 
 Paths are relative to the report directory.
@@ -65,7 +75,7 @@ Paths are relative to the report directory.
 | `preflight` | `{ ok, latencyMs }` or `{ ok: false, error }`. Its tokens are not counted below. |
 | `budget` | `maxCalls`, `maxTokens` as configured, and `exhausted: { role, step, reason }` once the budget ran out; the rest of the run was a pure monkey. |
 | `pricing` | Echo of `llm.pricing`, when set. |
-| `total`, `roles[]` | Usage of the whole run and per role (`roles[].role`), see below. |
+| `total`, `roles[]` | Usage of the whole invocation and per run (`roles[].role`: the role, or `role/seed` with `seeds`), see below. |
 
 Each usage entry has `calls`, `failedCalls`, `errors` (failed calls by kind, e.g. `{ "rateLimited": 2 }`),
 `inputTokens`, `outputTokens`, `cachedTokens` (cache reads), `cacheWriteTokens`, `retries` (requests the SDK

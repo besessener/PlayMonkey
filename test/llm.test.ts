@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { type Config, type LlmConfig, parseConfig } from "../src/config/config.ts";
-import { LlmDriver } from "../src/llm/driver.ts";
+import { LlmBreaker, LlmDriver } from "../src/llm/driver.ts";
 import { PromptPlaceholders } from "../src/llm/placeholders.ts";
 import { buildUserMessage, SYSTEM_PROMPT } from "../src/llm/prompt.ts";
 import { type DecideInput, LlmError } from "../src/llm/provider.ts";
@@ -295,10 +295,14 @@ describe("stuck detection", () => {
 
 describe("LLM driver", () => {
   /** A driver whose detector always reports a dialog, and a sequence of steps on one page. */
-  function setup(script: ConstructorParameters<typeof FakeProvider>[0], llm: Record<string, unknown> = {}) {
+  function setup(
+    script: ConstructorParameters<typeof FakeProvider>[0],
+    llm: Record<string, unknown> = {},
+    shared: { stats?: LlmStats; breaker?: LlmBreaker; run?: string } = {},
+  ) {
     const { config, secrets } = load(llm);
     const provider = new FakeProvider(script);
-    const stats = new LlmStats(config.llm as LlmConfig, provider.name);
+    const stats = shared.stats ?? new LlmStats(config.llm as LlmConfig, provider.name);
     const lines: string[] = [];
     const driver = new LlmDriver({
       provider,
@@ -307,6 +311,8 @@ describe("LLM driver", () => {
       detector: new StuckDetector((config.llm as LlmConfig).handoff, { authenticated: true }),
       placeholders: new PromptPlaceholders(config, secrets),
       role: "admin",
+      ...(shared.run === undefined ? {} : { run: shared.run }),
+      ...(shared.breaker === undefined ? {} : { breaker: shared.breaker }),
       findings: () => [],
       origin: "https://test.example.org",
       log: (line) => lines.push(line),
@@ -411,6 +417,48 @@ describe("LLM driver", () => {
       maxCalls: 2,
       exhausted: { role: "admin", step: 3, reason: "llm.maxCalls (2) reached" },
     });
+  });
+
+  it("counts calls in flight against llm.maxCalls, so parallel runs cannot overspend", async () => {
+    const click = { tool: "click", input: { ref: "e1" } };
+    const first = setup([click, click], { maxCalls: 1 }, { run: "admin/1" });
+    const second = setup([click, click], { maxCalls: 1 }, { stats: first.stats, run: "admin/2" });
+    // Both ask at the same time; only one call fits the budget.
+    const actions = await Promise.all([first.step(1), second.step(1)]);
+    assert.equal(first.provider.inputs.length + second.provider.inputs.length, 1);
+    assert.equal(actions.filter((action) => action !== undefined).length, 1);
+    const report = first.stats.report();
+    assert.equal(report.total.calls, 1);
+    // The first run started its call before the second asked; usage is kept per run.
+    assert.deepEqual(report.budget.exhausted, { role: "admin/2", step: 1, reason: "llm.maxCalls (1) reached" });
+    assert.deepEqual(
+      report.roles.map((r) => [r.role, r.calls]),
+      [
+        ["admin/1", 1],
+        ["admin/2", 0],
+      ],
+    );
+  });
+
+  it("shares the circuit breaker: a trip in one run pauses the LLM in the others", async () => {
+    const down = { error: new LlmError("unreachable", "connection failed (ECONNREFUSED)") };
+    const click = { tool: "click", input: { ref: "e1" } };
+    const llm = { handoff: { cooldownSteps: 0 }, breaker: { failures: 3, pauseSteps: 5 } };
+    const breaker = new LlmBreaker();
+    const failing = setup([down, down, down], llm, { breaker, run: "a" });
+    const healthy = setup(
+      Array.from({ length: 10 }, () => click),
+      llm,
+      { stats: failing.stats, breaker, run: "b" },
+    );
+    assert.deepEqual(await healthy.step(1), { type: "click", ref: "e1" });
+    for (let i = 1; i <= 3; i++) await failing.step(i);
+    assert.equal(breaker.trips, 1);
+    // Paused for steps 2 … 6 of the healthy run, then the LLM is back.
+    for (let i = 2; i <= 6; i++) assert.equal(await healthy.step(i), undefined, `step ${i}`);
+    assert.equal(healthy.provider.inputs.length, 1);
+    assert.deepEqual(await healthy.step(7), { type: "click", ref: "e1" });
+    assert.equal(failing.stats.report().total.breakerTrips, 1);
   });
 
   it("counts tokens against llm.maxTokens", async () => {

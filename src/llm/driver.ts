@@ -17,13 +17,28 @@ import {
 import type { StuckDetector } from "./stuck.ts";
 import type { LlmStats } from "./usage.ts";
 
+/**
+ * The circuit breaker, shared by all runs of an invocation: failures in a row count across runs, and a trip pauses
+ * the LLM for `llm.breaker.pauseSteps` steps in every run (counted in each run's own steps).
+ */
+export class LlmBreaker {
+  failures = 0;
+  /** Incremented on every trip; a driver that has not seen the latest trip pauses. */
+  trips = 0;
+}
+
 export interface LlmDriverOptions {
   provider: LlmProvider;
   config: LlmConfig;
   stats: LlmStats;
   detector: StuckDetector;
   placeholders: PromptPlaceholders;
+  /** The role name, shown to the LLM. */
   role: string;
+  /** Key for usage statistics and the debug log: the role, or `role/seed` with `seeds`. Default: `role`. */
+  run?: string;
+  /** Shared by parallel runs; default: one of its own. */
+  breaker?: LlmBreaker;
   /** One line per finding so far, for the prompt. */
   findings: () => string[];
   /** Origin the run must stay on, or undefined when `stayOnDomain` is off. */
@@ -52,13 +67,16 @@ export class LlmDriver {
   #goal = "";
   #cooldownUntil = 0;
   #pausedUntil = 0;
-  #failures = 0;
+  readonly #breaker: LlmBreaker;
+  #tripsSeen = 0;
   /** The LLM's own description of its last action, with placeholders instead of filled-in values. */
   #chosen: { step: number; text: string } | undefined;
 
   constructor(options: LlmDriverOptions) {
     this.#o = options;
     this.#now = options.now ?? Date.now;
+    this.#breaker = options.breaker ?? new LlmBreaker();
+    this.#tripsSeen = this.#breaker.trips;
   }
 
   observe(snapshot: Snapshot, isNewState: boolean): void {
@@ -67,7 +85,14 @@ export class LlmDriver {
 
   /** The LLM's action for `step`, or undefined when the monkey decides. */
   async choose(snapshot: Snapshot, step: number): Promise<Action | undefined> {
-    const { stats, config, role } = this.#o;
+    const { stats, config } = this.#o;
+    const role = this.#o.run ?? this.#o.role;
+    if (this.#breaker.trips !== this.#tripsSeen) {
+      // Another run tripped the shared breaker.
+      this.#tripsSeen = this.#breaker.trips;
+      this.#pausedUntil = Math.max(this.#pausedUntil, step + config.breaker.pauseSteps);
+      this.#decisionsLeft = 0;
+    }
     if (!stats.active || stats.exhausted || step < this.#pausedUntil) return undefined;
     if (this.#decisionsLeft === 0) {
       if (step < this.#cooldownUntil) return undefined;
@@ -89,13 +114,14 @@ export class LlmDriver {
         this.#end(step);
         return undefined;
       }
+      stats.begin();
       const started = this.#now();
       try {
         const result = await this.#o.provider.decide(input);
         const action = this.#accepted(result, snapshot);
         stats.call(role, { ok: true, usage: result.usage, latencyMs: this.#now() - started, retries: result.retries });
         await this.#debug({ role, step, attempt, input, result: result.decision, raw: result.raw });
-        this.#failures = 0;
+        this.#breaker.failures = 0;
         this.#decisionsLeft--;
         if (action === undefined) {
           this.#end(step);
@@ -132,9 +158,11 @@ export class LlmDriver {
       `step ${step}: LLM failed (${reason}: ${this.#o.placeholders.hide(failure?.message ?? "")}); monkey acts`,
     );
     this.#decisionsLeft--;
-    this.#failures++;
-    if (this.#failures >= config.breaker.failures) {
-      this.#failures = 0;
+    this.#breaker.failures++;
+    if (this.#breaker.failures >= config.breaker.failures) {
+      this.#breaker.failures = 0;
+      this.#breaker.trips++;
+      this.#tripsSeen = this.#breaker.trips;
       this.#pausedUntil = step + 1 + config.breaker.pauseSteps;
       stats.breakerTrip(role);
       this.#o.log(

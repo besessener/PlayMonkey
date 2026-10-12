@@ -10,7 +10,7 @@ import { SEVERITIES } from "../oracles/finding.ts";
 import { ActionLogError } from "../replay/log.ts";
 import { ReplayError, replayActionLog } from "../replay/replay.ts";
 import { buildReport, writeReport } from "../report/report.ts";
-import { describeFinding, type RunLlm, runAllRoles } from "../run.ts";
+import { describeFinding, planRuns, type RunLlm, runAllRoles } from "../run.ts";
 import { readVersion } from "../version.ts";
 
 export interface CliIo {
@@ -44,7 +44,8 @@ Options:
 Exit codes:
   0  no findings (replay: none of the recorded findings recurred)
   1  findings present (replay: at least one recorded finding recurred)
-  2  tool or config error (also: the LLM preflight failed with llm.required)
+  2  tool or config error (also: the LLM preflight failed with llm.required, or a
+     run did not complete; takes precedence over 1)
 `;
 
 const COMMANDS: Record<string, { argName: string }> = {
@@ -183,7 +184,13 @@ async function run(configFile: string, io: CliIo, spectator?: Spectator): Promis
   const loaded = await load("run", configFile, io);
   if (loaded === undefined) return ExitCode.Error;
   const { config, seedGenerated } = loaded;
-  io.stdout(`seed: ${config.seed}${seedGenerated ? ' (generated; set "seed" in the config to reuse it)' : ""}\n`);
+  if (config.seeds === undefined) {
+    io.stdout(`seed: ${config.seed}${seedGenerated ? ' (generated; set "seed" in the config to reuse it)' : ""}\n`);
+  } else {
+    io.stdout(`seeds: ${config.seeds.join(", ")}\n`);
+  }
+  const runs = planRuns(config).length;
+  if (runs > 1) io.stdout(`runs: ${runs}, ${Math.min(config.parallel, runs)} at a time\n`);
   // Before any browser work, so a broken endpoint fails fast.
   const llm = await startLlm("run", loaded, io);
   if (typeof llm === "number") return llm;
@@ -220,16 +227,21 @@ async function run(configFile: string, io: CliIo, spectator?: Spectator): Promis
       }
     }
 
-    const total = report.findings.length;
+    const total = report.aggregated.length;
     const counts = SEVERITIES.filter((severity) => report.counts[severity] > 0)
       .map((severity) => `${report.counts[severity]} ${severity}`)
       .join(", ");
     io.stdout(`findings: ${total}${total === 0 ? "" : ` (${counts})`}\n`);
     io.stdout(`report: ${paths.html}\n`);
+    // Precedence: a run that did not complete (2) outranks findings (1).
     const failed = outcomes.filter((outcome) => outcome.result === undefined || outcome.result.stopReason === "error");
     if (failed.length > 0) {
-      const roles = failed.map((outcome) => loaded.secrets.mask(outcome.role)).join(", ");
-      io.stdout(`exit 2: ${failed.length === 1 ? "role" : "roles"} ${roles} did not complete\n`);
+      const labels = failed
+        .map((outcome) =>
+          loaded.secrets.mask(config.seeds === undefined ? outcome.role : `${outcome.role}/${outcome.seed}`),
+        )
+        .join(", ");
+      io.stdout(`exit 2: ${failed.length === 1 ? "run" : "runs"} ${labels} did not complete\n`);
       return ExitCode.Error;
     }
     io.stdout(total > 0 ? "exit 1: findings present\n" : "exit 0: no findings\n");

@@ -59,6 +59,7 @@ describe("parseConfig", () => {
     assert.deepEqual(config, {
       baseUrl: "https://test.example.org",
       seed: 7,
+      parallel: 1,
       limits: { maxSteps: 500, maxMinutes: 20 },
       browser: { engine: "chromium", viewport: [1280, 800], headless: true },
       stayOnDomain: true,
@@ -217,6 +218,27 @@ describe("parseConfig", () => {
       );
     });
   }
+
+  it("runs several seeds: the first is the seed, and seed and seeds exclude each other", () => {
+    const { config, seedGenerated } = parse({ baseUrl: "https://x.test", seeds: [8, 3], parallel: 4 });
+    assert.equal(seedGenerated, false);
+    assert.equal(config.seed, 8);
+    assert.deepEqual(config.seeds, [8, 3]);
+    assert.equal(config.parallel, 4);
+    assert.equal(parse({ baseUrl: "https://x.test", seed: 1 }).config.seeds, undefined);
+    assert.deepEqual(
+      issuesOf(() => parse({ baseUrl: "https://x.test", seed: 1, seeds: [2] })),
+      ["seeds: use either seed or seeds, not both"],
+    );
+    assert.deepEqual(issuesOf(() => parse({ baseUrl: "https://x.test", seeds: [2, 2], parallel: 0 })).sort(), [
+      "parallel: must be >= 1",
+      "seeds: must NOT have duplicate items (items ## 1 and 0 are identical)",
+    ]);
+    assert.deepEqual(
+      issuesOf(() => parse({ baseUrl: "https://x.test", seeds: [] })),
+      ["seeds: must NOT have fewer than 1 items"],
+    );
+  });
 
   it("rejects values of the wrong type or range", () => {
     const issues = issuesOf(() =>
