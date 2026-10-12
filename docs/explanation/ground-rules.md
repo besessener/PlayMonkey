@@ -25,7 +25,9 @@ see [report](../reference/report.md#secrets) for exactly what they hold.
 
 ## Roles are isolated
 
-Every role runs in its own browser context. Cookies and storage of one role are never visible to another.
+Every run (a role with a seed) has its own browser context, also when runs execute in parallel. Cookies and storage
+of one run are never visible to another. Runs share only the browser process, the test environment itself and, with
+`llm`, the LLM budget and circuit breaker.
 
 ## Neutral and generic
 

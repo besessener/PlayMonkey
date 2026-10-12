@@ -1,19 +1,15 @@
 # Getting started
 
 This walks you from a fresh clone to a first `monkey run` against the local fixture site. You need
-Node.js 22 (22.18 or newer if you also want to run the tests) and git.
-
-> PlayMonkey is at v0.1: the random monkey, oracles, report and replay work without an LLM; the LLM backend arrives
-> next, see the [roadmap](../explanation/roadmap.md).
+Node.js 22.18 or newer (the fixture site runs TypeScript directly) and git. No LLM is needed.
 
 ## 1. Install
 
 ```sh
 git clone https://github.com/besessener/PlayMonkey.git
 cd PlayMonkey
-npm ci
-npx playwright install chromium
-npm run build
+npm ci                             # also builds the CLI
+npx playwright install chromium    # on Linux: --with-deps installs the system libraries too
 npx monkey --help
 ```
 
@@ -110,3 +106,6 @@ not set`), never a value, and the exit code is `2`.
 
 - Write a config for your own test environment: [configuration reference](../reference/configuration.md).
 - Set up roles and logins: [configure login](../how-to/configure-login.md).
+- Let an LLM help when the monkey is stuck: [configure the LLM](../how-to/configure-llm.md).
+- More roles and seeds at once: [run in parallel](../how-to/run-in-parallel.md).
+- Run it on every pull request: [run in CI](../how-to/run-in-ci.md).

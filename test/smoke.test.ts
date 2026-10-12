@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { readFileSync } from "node:fs";
+import { readFileSync, statSync } from "node:fs";
+import { join } from "node:path";
 import { describe, it } from "node:test";
 import { fileURLToPath } from "node:url";
 
@@ -21,6 +22,16 @@ describe("built monkey CLI", () => {
     assert.equal(code, 0);
     assert.match(stdout, /run <config\.json>/);
     assert.match(stdout, /replay <actions\.json>/);
+  });
+
+  it("builds an executable bin, so `npx monkey` works as in the CI example", {
+    skip: process.platform === "win32",
+  }, () => {
+    // tsc writes files without the executable bit; `npm run build` sets it.
+    assert.equal(statSync(join(root, pkg.bin.monkey)).mode & 0o111, 0o111);
+    const result = spawnSync("npx", ["--no-install", "monkey", "--version"], { cwd: root, encoding: "utf8" });
+    assert.equal(result.status, 0, result.stderr);
+    assert.match(result.stdout, /^\d+\.\d+\.\d+/);
   });
 
   it("unknown subcommand exits 2", () => {

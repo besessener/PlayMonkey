@@ -60,7 +60,8 @@ List them all; names must be unique. Each role runs separately, with its own coo
 }
 ```
 
-Without `auth`, PlayMonkey runs one anonymous role.
+Without `auth`, PlayMonkey runs one anonymous role. To run the roles at the same time instead of one after the
+other, set `parallel`; see [run in parallel](run-in-parallel.md).
 
 ## Keep secrets out of the file
 

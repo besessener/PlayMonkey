@@ -48,7 +48,7 @@ describe("monkey run against the fixture site", () => {
     const { code, stdout } = await run({ auth: [role("user", "${FIXTURE_PASS}")], report: { dir: "out-ok" } });
     // Seed 4 follows the broken link within 8 steps.
     assert.equal(code, 1, stdout);
-    assert.match(stdout, /^seed: 4\n/);
+    assert.match(stdout, /^seed: 4\n\[user\] starting\n/);
     assert.match(stdout, /\[user\] 8 steps in [\d.]+s, \d+ states, \d+ failed actions, stopped: maxSteps, 1 finding\n/);
     assert.match(stdout, /\[user\] {3}F1 medium http4xx: GET \/missing-page responded 404 Not Found \(step \d\)\n/);
     assert.match(stdout, /\nfindings: 1 \(1 medium\)\nreport: .*out-ok\/report\.html\nexit 1: findings present\n$/);
@@ -63,7 +63,7 @@ describe("monkey run against the fixture site", () => {
     assert.equal(code, 2);
     assert.match(stdout, /\[broken\] role "broken": login did not succeed/);
     assert.match(stdout, /\[fine\] 8 steps/);
-    assert.match(stdout, /\nexit 2: role broken did not complete\n$/);
+    assert.match(stdout, /\nexit 2: run broken did not complete\n$/);
     assert.ok(!stdout.includes("nope-123"));
   });
 

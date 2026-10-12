@@ -13,10 +13,34 @@
 environment**. It clicks, types and submits its way through the site with seeded randomness and reports what breaks,
 with the steps to reproduce it. An LLM steps in only when the random monkey gets stuck.
 
-> **Status:** milestone M3: the seeded random monkey with oracles, reports and replay; Claude on Microsoft Foundry
+**What it is:** exploratory testing that runs unattended: uncaught exceptions, console errors, HTTP 4xx/5xx, crashes,
+hangs, error pages, layout overflow and failed downloads, each reported once with a screenshot, a trace and a
+replayable action log. **What it is not:** a test-case generator, visual regression, a load or performance test, or
+anything for production. It has no guardrails by design: it will click "Delete" and submit every form, so point it
+only at environments you can throw away ([ground rules](docs/explanation/ground-rules.md)).
+
+> **Status:** milestone M4: the seeded random monkey with oracles, reports and replay; Claude on Microsoft Foundry
 > or any OpenAI-compatible endpoint as the LLM for stuck situations; cookie banners, native dialogs, iframes,
-> popups, file uploads and downloads handled. Next: parallel runs and a CI example, see the
+> popups, file uploads and downloads handled; parallel runs per role and seed; a CI example. See the
 > [roadmap](docs/explanation/roadmap.md).
+
+## Quick start
+
+Requires Node.js 22.18 or newer and a Playwright browser. From a clean checkout, against the bundled fixture site:
+
+```sh
+git clone https://github.com/besessener/PlayMonkey.git && cd PlayMonkey
+npm ci                                   # installs and builds
+npx playwright install chromium          # on Linux CI: add --with-deps
+PORT=8080 npm run fixture &              # the fixture site with seeded bugs, in the background
+export FIXTURE_URL=http://127.0.0.1:8080 FIXTURE_USER=monkey FIXTURE_PASS=banana-split
+npx monkey run fixtures/configs/fixture.json
+```
+
+It prints the seed, one summary per role, every finding, and where the report is:
+`fixtures/configs/monkey-report/report.html` (open it in a browser). The whole walk-through:
+[getting started](docs/tutorials/getting-started.md). In your own project, install it as a dev dependency with
+`npm install --save-dev github:besessener/PlayMonkey`.
 
 ## Usage
 
@@ -28,7 +52,12 @@ monkey run config.json --watch # spectator mode: watch it live, e.g. for a demo
 ```
 
 `--watch` opens a visible, slowed-down browser that outlines each element before acting and prints every step; see
-[watch a run](docs/how-to/watch-a-run.md). Exit codes: `0` no findings, `1` findings, `2` tool or config error.
+[watch a run](docs/how-to/watch-a-run.md).
+
+Exit codes: `0` no findings, `1` findings, `2` tool or config error, or a run that did not complete (failed login,
+crash); `2` takes precedence over `1`. Details: [commands](docs/reference/commands.md).
+
+A minimal config:
 
 ```json
 {
@@ -44,8 +73,31 @@ monkey run config.json --watch # spectator mode: watch it live, e.g. for a demo
 }
 ```
 
-Secrets come from environment variables (`${VAR}`) and are masked in all output. Step by step:
-[getting started](docs/tutorials/getting-started.md).
+Secrets come from environment variables (`${VAR}`) and are masked in all output. Every key:
+[configuration](docs/reference/configuration.md); logins and roles: [configure login](docs/how-to/configure-login.md).
+
+### Several roles and seeds at once
+
+```json
+"seeds": [1, 2, 3],
+"parallel": 3
+```
+
+runs every role with every seed, three at a time, each in its own browser context, into `<role>/<seed>/`, with one
+combined report that shows each problem once and where it was found ("found in admin, user"). See
+[run in parallel](docs/how-to/run-in-parallel.md).
+
+### Reproducing findings
+
+Each finding lists the steps that led to it. `npx playwright show-trace <role>/trace.zip` shows them in detail, and
+`monkey replay <role>/actions.json --config config.json` repeats them without randomness or LLM. See
+[reproduce a finding](docs/how-to/reproduce-a-finding.md).
+
+### CI
+
+[`.github/workflows/monkey.yml`](.github/workflows/monkey.yml) is a GitHub Actions example that installs the
+browser, runs the monkey with secrets from the CI secret store, uploads the report as an artifact and acts on the
+exit code. It runs in this repository's CI against the fixture site; see [run in CI](docs/how-to/run-in-ci.md).
 
 ## LLM
 
@@ -120,7 +172,8 @@ npm test
 npm run lint
 ```
 
-Details: [development setup](docs/tutorials/development-setup.md) and [commands](docs/reference/commands.md).
+See [CONTRIBUTING.md](CONTRIBUTING.md), [development setup](docs/tutorials/development-setup.md) and
+[commands](docs/reference/commands.md). Adding an oracle: [oracles](docs/explanation/oracles.md#adding-an-oracle).
 
 ## Documentation
 

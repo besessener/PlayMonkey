@@ -43,8 +43,10 @@
 | `$schema` | string | – | Optional JSON Schema reference for editors; ignored. |
 | `baseUrl` | string, required | – | Absolute `http(s)` URL of the site under test. |
 | `seed` | integer 0 … 4294967295 | random, printed | Seed of the random monkey. Set it to reproduce a run. |
-| `limits.maxSteps` | integer ≥ 1 | `500` | Maximum number of actions per role. |
-| `limits.maxMinutes` | number > 0 | `20` | Maximum wall-clock minutes per role. |
+| `seeds` | array of distinct integers 0 … 4294967295, at least one | absent | One run per seed and role instead of `seed`; each run writes to `<role>/<seed>/` in the report directory. See [run in parallel](../how-to/run-in-parallel.md). |
+| `parallel` | integer 1 … 64 | `1` | Runs (roles × seeds) at the same time, each in its own browser context of one browser. `1` runs them one after the other. |
+| `limits.maxSteps` | integer ≥ 1 | `500` | Maximum number of actions per run (role and seed). |
+| `limits.maxMinutes` | number > 0 | `20` | Maximum wall-clock minutes per run (role and seed). |
 | `browser.engine` | `chromium` \| `firefox` \| `webkit` | `chromium` | Playwright browser engine. |
 | `browser.viewport` | `[width, height]`, integers ≥ 1 | `[1280, 800]` | Viewport in CSS pixels. |
 | `browser.headless` | boolean | `true` | Run the browser without a window. |
@@ -64,8 +66,8 @@
 | `llm.required` | boolean | `true` | A failed [preflight](../how-to/configure-llm.md#troubleshooting) exits with code `2`; `false` warns and runs as pure random monkey. |
 | `llm.timeoutMs` | integer ≥ 1000 | `60000` | Timeout of one LLM request in milliseconds. |
 | `llm.maxRetries` | integer 0 … 10 | `2` | Retries of one request after a rate limit (429), server or connection error, with exponential backoff. Other errors are not retried. |
-| `llm.maxCalls` | integer ≥ 0 | unlimited | Budget: LLM calls per run, over all roles. When spent, the run continues as pure monkey and the report says so. |
-| `llm.maxTokens` | integer ≥ 0 | unlimited | Budget: tokens per run, over all roles (input, output, cache reads and writes). |
+| `llm.maxCalls` | integer ≥ 0 | unlimited | Budget: LLM calls per `monkey run`, over all roles and seeds, also when they run in parallel (calls in flight count). When spent, the runs continue as pure monkey and the report says so. |
+| `llm.maxTokens` | integer ≥ 0 | unlimited | Budget: tokens per `monkey run`, over all roles and seeds (input, output, cache reads and writes). Parallel calls already in flight can exceed it by their own tokens. |
 | `llm.debugLog` | boolean | `false` | Write every prompt and response, sanitized, to `llm-debug.jsonl` in the report directory. Off: no prompt content is written anywhere. |
 | `llm.historyActions` | integer ≥ 0 | `10` | Number of recent actions shown to the LLM. |
 | `llm.snapshotChars` | integer ≥ 500 | `8000` | Character budget of the page snapshot in the prompt (roughly four characters per token). |
@@ -77,8 +79,8 @@
 | `llm.handoff.loginWall` | boolean | `true` | Hand over when a role that logged in arrives on a login page (expired session). |
 | `llm.handoff.maxDecisions` | integer ≥ 1 | `3` | Consecutive LLM decisions per handoff; then the monkey takes over again. |
 | `llm.handoff.cooldownSteps` | integer ≥ 0 | `5` | Monkey steps after a handoff before the next one can start. |
-| `llm.breaker.failures` | integer ≥ 1 | `3` | Failed LLM decisions in a row that open the circuit breaker. |
-| `llm.breaker.pauseSteps` | integer ≥ 1 | `20` | Steps without LLM while the breaker is open. |
+| `llm.breaker.failures` | integer ≥ 1 | `3` | Failed LLM decisions in a row, over all runs, that open the circuit breaker. |
+| `llm.breaker.pauseSteps` | integer ≥ 1 | `20` | Steps without LLM while the breaker is open, counted in each run's own steps; a trip pauses every run. |
 | `llm.pricing` | object | absent | Prices per million tokens for an **estimated** cost in the report. There are no built-in prices. |
 | `llm.pricing.inputPerMTok` | number ≥ 0 | – | Price per million input tokens. Required in `pricing`. |
 | `llm.pricing.outputPerMTok` | number ≥ 0 | – | Price per million output tokens (thinking included). Required in `pricing`. |
@@ -128,6 +130,7 @@ How the LLM is used is explained in [the LLM](../explanation/llm.md); setting up
 
 ## Rules
 
+- **`seed` or `seeds`**, not both. Without either, a random seed is generated and printed.
 - **Auth roles:** each uses either `fields` with `loginUrl` and `submit`, or `storageState`, never both.
 - **Unknown keys are rejected**, not warned about: a typo such as `maxStep` would otherwise silently fall back to a
   default. Only `testData` and `auth[].fields` take arbitrary keys.

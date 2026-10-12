@@ -108,3 +108,25 @@ fail is a typical one.
 
 A crashed page throws on every call. The monkey closes it and continues in another tab, or in a fresh page on
 `baseUrl`, so one crash does not end the run.
+
+## Adding an oracle
+
+Oracles live in `src/oracles/oracles.ts`; each produces signals through `#add(oracle, signal)`, which applies the
+ignore rules and deduplicates by key.
+
+1. Add the name to `ORACLES` in `src/config/schema.ts`. That makes `oracles.<name>` a config key (default on);
+   document it in [configuration](../reference/configuration.md), which `test/docs.test.ts` enforces.
+2. Detect the problem in the `Oracles` class: an **event oracle** registers a listener in `#watch(page)`, which runs
+   for every page of the context, popups included; a **state oracle** checks the page after each step in
+   `#inspect(page, navigated)`; something recorded in the step's events belongs in `check`. Return early when
+   `this.#config.oracles.<name>` is off.
+3. Call `this.#add("<name>", { severity, key, message, url, details })`. Build the **key** from what identifies the
+   bug and stays the same across occurrences, runs and replay: use `normalizeUrl` and `normalizeMessage` from
+   `src/oracles/keys.ts`, and never the step, a timestamp or the port. Keep the message short; put the rest in
+   `details`.
+4. Add a page with the bug to the [fixture site](../how-to/use-the-fixture-site.md) and a test in
+   `test/oracles.test.ts` that the oracle reports it exactly once, and does not fire on a clean page.
+
+Everything else follows: the finding gets an id, the last actions and a screenshot, goes into the action log for
+replay, into both reports, and is aggregated across [parallel runs](../how-to/run-in-parallel.md).
+
