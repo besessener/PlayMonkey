@@ -2,7 +2,7 @@ import { mkdir, rm } from "node:fs/promises";
 import { join } from "node:path";
 import type { Browser } from "playwright";
 import { launchBrowser } from "./auth/browser.ts";
-import { ANONYMOUS_ROLE, LoginError, openRoleSession } from "./auth/session.ts";
+import { ANONYMOUS_ROLE, LoginError, openRoleSession, type RoleSession } from "./auth/session.ts";
 import type { AuthRole, LoadedConfig } from "./config/config.ts";
 import { maskSecrets, type Secrets } from "./config/secrets.ts";
 import { DebugLog } from "./llm/debug-log.ts";
@@ -113,16 +113,7 @@ export async function runAllRoles(loaded: LoadedConfig, options: RunAllOptions):
           browser,
           plan.role,
           { config: { ...config, seed: plan.seed }, secrets },
-          {
-            log: options.log,
-            label: plan.label,
-            outputDir: plan.outputDir,
-            actionLog: true,
-            ...(options.signal === undefined ? {} : { signal: options.signal }),
-            ...(options.onStep === undefined ? {} : { onStep: (record) => options.onStep?.(name, record, plan.seed) }),
-            ...(llm === undefined ? {} : { llm }),
-            ...(options.spectator === undefined ? {} : { spectator: options.spectator }),
-          },
+          plannedRoleOptions(plan, options, llm),
         );
       } catch (error) {
         // One crashed run must not take the others down.
@@ -140,6 +131,21 @@ export async function runAllRoles(loaded: LoadedConfig, options: RunAllOptions):
     await browser.close();
   }
   return outcomes.filter((outcome) => outcome !== undefined);
+}
+
+/** The options `runAllRoles` gives `runRole` for one planned run. */
+function plannedRoleOptions(plan: PlannedRun, options: RunAllOptions, llm: RunLlm | undefined): RoleOptions {
+  const name = plan.role?.name ?? ANONYMOUS_ROLE;
+  return {
+    log: options.log,
+    label: plan.label,
+    outputDir: plan.outputDir,
+    actionLog: true,
+    ...(options.signal === undefined ? {} : { signal: options.signal }),
+    ...(options.onStep === undefined ? {} : { onStep: (record) => options.onStep?.(name, record, plan.seed) }),
+    ...(llm === undefined ? {} : { llm }),
+    ...(options.spectator === undefined ? {} : { spectator: options.spectator }),
+  };
 }
 
 export interface RoleOptions {
@@ -172,7 +178,7 @@ export async function runRole(
   const label = options.label ?? name;
   const log = (line: string) => options.log(`[${secrets.mask(label)}] ${line}`);
   log(options.replay === undefined ? "starting" : `replaying ${plural(options.replay.actions.length, "action")}`);
-  let session: Awaited<ReturnType<typeof openRoleSession>>;
+  let session: RoleSession;
   try {
     session = await openRoleSession(browser, role, { config, secrets, outputDir: options.outputDir });
   } catch (error) {
@@ -180,42 +186,32 @@ export async function runRole(
     log(error.message);
     return { role: name, seed: config.seed, error: error.message, findings: [], blockedNavigations: 0 };
   }
+  return await runSession({ role, name, label, log, loaded, options }, session);
+}
+
+/** One call of `runRole`: its arguments, the role's name, the log label and the labelled log. */
+interface RoleRun {
+  role: AuthRole | undefined;
+  name: string;
+  label: string;
+  log: (line: string) => void;
+  loaded: Pick<LoadedConfig, "config" | "secrets">;
+  options: RoleOptions;
+}
+
+/** The part of `runRole` after the login: runs the monkey or the replay, then closes the session. */
+async function runSession(run: RoleRun, session: RoleSession): Promise<RoleOutcome> {
+  const { name, label, log, options } = run;
+  const { config } = run.loaded;
   const oracles = new Oracles(session.context, {
     config,
     role: name,
     screenshotDir: join(options.outputDir, "screenshots"),
   });
-  let writer: ActionLogWriter | undefined;
-  let outcome: RoleOutcome | undefined;
-  if (options.actionLog) {
-    await mkdir(options.outputDir, { recursive: true });
-    writer = new ActionLogWriter(
-      join(options.outputDir, "actions.json"),
-      { seed: config.seed, baseUrl: config.baseUrl, role: name, viewport: config.browser.viewport },
-      secrets,
-    );
-  }
-  const advisor =
-    options.replay === undefined && options.llm !== undefined && config.llm !== undefined
-      ? new LlmDriver({
-          provider: options.llm.provider,
-          config: config.llm,
-          stats: options.llm.stats,
-          detector: new StuckDetector(config.llm.handoff, {
-            authenticated: role !== undefined,
-            ...(role?.kind === "fields" ? { loginUrl: new URL(role.loginUrl, config.baseUrl).href } : {}),
-          }),
-          placeholders: new PromptPlaceholders(config, secrets),
-          role: name,
-          run: label,
-          ...(options.llm.breaker === undefined ? {} : { breaker: options.llm.breaker }),
-          findings: () => oracles.findings.map((f) => `${f.severity} ${f.oracle}: ${f.message}`),
-          ...(config.stayOnDomain ? { origin: new URL(config.baseUrl).origin } : {}),
-          ...(options.llm.debugLog === undefined ? {} : { debugLog: options.llm.debugLog }),
-          log,
-        })
-      : undefined;
+  const writer = options.actionLog ? await createActionLog(run) : undefined;
+  const advisor = createAdvisor(run, oracles);
   const downloadDir = join(options.outputDir, "downloads");
+  let outcome: RoleOutcome | undefined;
   try {
     const result = await runMonkey(session.context, {
       config,
@@ -224,20 +220,9 @@ export async function runRole(
       ...(options.replay === undefined ? {} : { replay: options.replay }),
       ...(advisor === undefined ? {} : { advisor }),
       ...(options.spectator === undefined ? {} : { spectator: options.spectator }),
-      onStep: async (record) => {
-        const pages = session.context.pages();
-        await oracles.check(record, pages[record.result.tab] ?? pages[0]);
-        if (record.skipped === true) log(`step ${record.step} skipped: ${secrets.mask(record.result.error ?? "")}`);
-        else if (options.spectator !== undefined) log(secrets.mask(describeStep(record)));
-        await writer?.append(record);
-        await options.onStep?.(record);
-      },
+      onStep: stepHandler(run, session, oracles, writer),
     });
-    const raw = await oracles.finish();
-    await writer?.setFindings(raw);
-    const findings = raw.map((finding) => maskFinding(finding, secrets));
-    log(`${secrets.mask(summarize(result))}, ${plural(findings.length, "finding")}`);
-    for (const finding of findings) log(`  ${describeFinding(finding)}`);
+    const findings = await collectFindings(run, result, oracles, writer);
     if (advisor !== undefined && options.llm !== undefined) log(describeUsage(options.llm.stats.role(label)));
     if (writer !== undefined) log(`actions: ${writer.file}`);
     outcome = {
@@ -258,6 +243,77 @@ export async function runRole(
     }
   }
   return outcome;
+}
+
+/** Writes `actions.json` of one run into its output directory. */
+async function createActionLog(run: RoleRun): Promise<ActionLogWriter> {
+  const { config, secrets } = run.loaded;
+  await mkdir(run.options.outputDir, { recursive: true });
+  return new ActionLogWriter(
+    join(run.options.outputDir, "actions.json"),
+    { seed: config.seed, baseUrl: config.baseUrl, role: run.name, viewport: config.browser.viewport },
+    secrets,
+  );
+}
+
+/** The LLM driver of a run; none for a replay or without an LLM. */
+function createAdvisor(run: RoleRun, oracles: Oracles): LlmDriver | undefined {
+  const { role, name, label, log, options } = run;
+  const { config, secrets } = run.loaded;
+  const llm = options.llm;
+  if (options.replay !== undefined || llm === undefined || config.llm === undefined) return undefined;
+  return new LlmDriver({
+    provider: llm.provider,
+    config: config.llm,
+    stats: llm.stats,
+    detector: new StuckDetector(config.llm.handoff, {
+      authenticated: role !== undefined,
+      ...(role?.kind === "fields" ? { loginUrl: new URL(role.loginUrl, config.baseUrl).href } : {}),
+    }),
+    placeholders: new PromptPlaceholders(config, secrets),
+    role: name,
+    run: label,
+    ...(llm.breaker === undefined ? {} : { breaker: llm.breaker }),
+    findings: () => oracles.findings.map((f) => `${f.severity} ${f.oracle}: ${f.message}`),
+    ...(config.stayOnDomain ? { origin: new URL(config.baseUrl).origin } : {}),
+    ...(llm.debugLog === undefined ? {} : { debugLog: llm.debugLog }),
+    log,
+  });
+}
+
+/** Checks every step with the oracles, logs it when skipped or in spectator mode, and appends it to the log. */
+function stepHandler(
+  run: RoleRun,
+  session: RoleSession,
+  oracles: Oracles,
+  writer: ActionLogWriter | undefined,
+): (record: StepRecord) => Promise<void> {
+  const { log, options } = run;
+  const { secrets } = run.loaded;
+  return async (record) => {
+    const pages = session.context.pages();
+    await oracles.check(record, pages[record.result.tab] ?? pages[0]);
+    if (record.skipped === true) log(`step ${record.step} skipped: ${secrets.mask(record.result.error ?? "")}`);
+    else if (options.spectator !== undefined) log(secrets.mask(describeStep(record)));
+    await writer?.append(record);
+    await options.onStep?.(record);
+  };
+}
+
+/** Masks the findings of a finished run, stores them in its action log and logs the run's summary. */
+async function collectFindings(
+  run: RoleRun,
+  result: RunResult,
+  oracles: Oracles,
+  writer: ActionLogWriter | undefined,
+): Promise<Finding[]> {
+  const { secrets } = run.loaded;
+  const raw = await oracles.finish();
+  await writer?.setFindings(raw);
+  const findings = raw.map((finding) => maskFinding(finding, secrets));
+  run.log(`${secrets.mask(summarize(result))}, ${plural(findings.length, "finding")}`);
+  for (const finding of findings) run.log(`  ${describeFinding(finding)}`);
+  return findings;
 }
 
 /** One line per step in spectator mode, e.g. `step 12 llm: click getByRole('link', { name: 'Home' }) -> failed: …`. */

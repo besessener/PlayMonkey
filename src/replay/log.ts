@@ -150,16 +150,7 @@ export async function readActionLog(
   file: string,
   env: NodeJS.ProcessEnv,
 ): Promise<{ log: ActionLog; secrets: { name: string; value: string }[] }> {
-  let json: unknown;
-  try {
-    json = JSON.parse(await readFile(file, "utf8"));
-  } catch (error) {
-    const reason =
-      error instanceof SyntaxError
-        ? `invalid JSON: ${error.message}`
-        : `cannot read file (${(error as NodeJS.ErrnoException).code ?? "unknown error"})`;
-    throw new ActionLogError(file, reason);
-  }
+  const json = await readJson(file);
   const fail = (reason: string): never => {
     throw new ActionLogError(file, reason);
   };
@@ -169,7 +160,7 @@ export async function readActionLog(
       `unsupported version ${JSON.stringify(json.version)}; this monkey reads versions ${READABLE_VERSIONS.join(" and ")}`,
     );
   }
-  if (!Array.isArray(json.placeholders) || !json.placeholders.every((name) => typeof name === "string")) {
+  if (!(Array.isArray(json.placeholders) && json.placeholders.every((name) => typeof name === "string"))) {
     fail("placeholders must be a list of variable names");
   }
 
@@ -179,25 +170,43 @@ export async function readActionLog(
     const variables = [...new Set(missing.map(({ name }) => name))].join(", ");
     fail(`environment variable${missing.length > 1 ? "s" : ""} ${variables} not set; the log needs them for replay`);
   }
-  const log = value as Record<string, unknown>;
-  if (typeof log.baseUrl !== "string") fail("baseUrl must be a string");
-  if (typeof log.role !== "string") fail("role must be a string");
-  if (!Number.isInteger(log.seed)) fail("seed must be an integer");
-  if (!Array.isArray(log.viewport) || log.viewport.length !== 2 || !log.viewport.every(isPositiveInteger)) {
-    fail("viewport must be [width, height]");
-  }
-  if (!Array.isArray(log.actions)) fail("actions must be a list");
-  if (!Array.isArray(log.findings)) fail("findings must be a list");
-  (log.actions as unknown[]).forEach((entry, index) => {
-    const problem = checkAction(entry);
-    if (problem !== undefined) fail(`actions[${index}]: ${problem}`);
-  });
-  (log.findings as unknown[]).forEach((entry, index) => {
-    if (!isObject(entry) || typeof entry.key !== "string" || typeof entry.id !== "string") {
-      fail(`findings[${index}]: needs id and key`);
-    }
-  });
+  const problem = checkLog(value as Record<string, unknown>);
+  if (problem !== undefined) fail(problem);
   return { log: value as ActionLog, secrets };
+}
+
+async function readJson(file: string): Promise<unknown> {
+  try {
+    return JSON.parse(await readFile(file, "utf8"));
+  } catch (error) {
+    const reason =
+      error instanceof SyntaxError
+        ? `invalid JSON: ${error.message}`
+        : `cannot read file (${(error as NodeJS.ErrnoException).code ?? "unknown error"})`;
+    throw new ActionLogError(file, reason);
+  }
+}
+
+/** Returns why a log with resolved placeholders is not usable, or undefined. */
+function checkLog(log: Record<string, unknown>): string | undefined {
+  if (typeof log.baseUrl !== "string") return "baseUrl must be a string";
+  if (typeof log.role !== "string") return "role must be a string";
+  if (!Number.isInteger(log.seed)) return "seed must be an integer";
+  if (!Array.isArray(log.viewport) || log.viewport.length !== 2 || !log.viewport.every(isPositiveInteger)) {
+    return "viewport must be [width, height]";
+  }
+  if (!Array.isArray(log.actions)) return "actions must be a list";
+  if (!Array.isArray(log.findings)) return "findings must be a list";
+  for (const [index, entry] of (log.actions as unknown[]).entries()) {
+    const problem = checkAction(entry);
+    if (problem !== undefined) return `actions[${index}]: ${problem}`;
+  }
+  for (const [index, entry] of (log.findings as unknown[]).entries()) {
+    if (!isObject(entry) || typeof entry.key !== "string" || typeof entry.id !== "string") {
+      return `findings[${index}]: needs id and key`;
+    }
+  }
+  return undefined;
 }
 
 /** Returns why `entry` is not a loggable action, or undefined. */
@@ -205,6 +214,19 @@ function checkAction(entry: unknown): string | undefined {
   if (!isObject(entry)) return "must be an object";
   if (!isPositiveInteger(entry.step)) return "step must be a positive integer";
   if (entry.source !== "monkey" && entry.source !== "llm") return 'source must be "monkey" or "llm"';
+  const problem = checkActionFields(entry);
+  if (problem !== undefined) return problem;
+  if (entry.locator !== undefined && typeof entry.locator !== "string") return "locator must be a string";
+  if (entry.toLocator !== undefined && typeof entry.toLocator !== "string") return "toLocator must be a string";
+  if (entry.events !== undefined && !(Array.isArray(entry.events) && entry.events.every(isEvent))) {
+    return "events must be a list of dialog, upload and download events";
+  }
+  if (typeof entry.pageUrl !== "string") return "pageUrl must be a string";
+  return undefined;
+}
+
+/** Returns why `entry` is not a known action type with the fields that type needs, or undefined. */
+function checkActionFields(entry: Record<string, unknown>): string | undefined {
   const fields: Record<string, Record<string, "string" | "number">> = {
     click: { ref: "string" },
     dblclick: { ref: "string" },
@@ -228,12 +250,6 @@ function checkAction(entry: unknown): string | undefined {
   for (const [key, type] of Object.entries(expected)) {
     if (typeof entry[key] !== type) return `${entry.type} needs ${key} (${type})`;
   }
-  if (entry.locator !== undefined && typeof entry.locator !== "string") return "locator must be a string";
-  if (entry.toLocator !== undefined && typeof entry.toLocator !== "string") return "toLocator must be a string";
-  if (entry.events !== undefined && !(Array.isArray(entry.events) && entry.events.every(isEvent))) {
-    return "events must be a list of dialog, upload and download events";
-  }
-  if (typeof entry.pageUrl !== "string") return "pageUrl must be a string";
   return undefined;
 }
 

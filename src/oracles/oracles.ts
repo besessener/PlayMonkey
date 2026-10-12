@@ -177,7 +177,7 @@ export class Oracles {
     const method = request.method();
     const path = normalizeUrl(url, this.#origin);
     this.#add(oracle, {
-      severity: status >= 500 ? "high" : isDocument ? "medium" : "low",
+      severity: httpSeverity(status, isDocument),
       key: `${method} ${path} ${status}`,
       message: `${method} ${path} responded ${status}${response.statusText() === "" ? "" : ` ${response.statusText()}`}`,
       url,
@@ -348,4 +348,9 @@ function safeUrl(page: Page): string {
   } catch {
     return "";
   }
+}
+
+function httpSeverity(status: number, isDocument: boolean): Signal["severity"] {
+  if (status >= 500) return "high";
+  return isDocument ? "medium" : "low";
 }

@@ -1,6 +1,6 @@
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
-import type { Browser, BrowserContext, BrowserContextOptions, Cookie, Page, Request } from "playwright";
+import type { Browser, BrowserContext, BrowserContextOptions, Cookie, Locator, Page, Request } from "playwright";
 import type { AuthRole, Config, FieldsLoginRole, StorageStateRole } from "../config/config.ts";
 import type { Secrets } from "../config/secrets.ts";
 
@@ -170,7 +170,7 @@ async function loginWithFields(
     const leftLoginPage = !onLoginPage(new URL(page.url()));
     const cookieChanged = fingerprint(await context.cookies()) !== cookiesBefore;
     const formGone = !(await submit.isVisible().catch(() => false));
-    if (!leftLoginPage && !(cookieChanged && formGone)) {
+    if (!(leftLoginPage || (cookieChanged && formGone))) {
       throw fail(
         `login did not succeed: still on ${role.loginUrl} after submitting (check the credentials and the fields)`,
       );
@@ -185,7 +185,7 @@ async function loginWithFields(
  * Finds a login field by key: a CSS selector if the key looks like one, otherwise the `name` attribute, then the
  * `id`, then the accessible label. The first strategy that matches exactly one element wins.
  */
-async function findField(page: Page, key: string) {
+async function findField(page: Page, key: string): Promise<Locator | undefined> {
   const candidates = /[#.[\]:>\s=*~+]/.test(key)
     ? [page.locator(key)]
     : [
@@ -196,7 +196,7 @@ async function findField(page: Page, key: string) {
   for (const candidate of candidates) {
     if ((await candidate.count()) === 1) return candidate;
   }
-  return;
+  return undefined;
 }
 
 async function readStorageState(

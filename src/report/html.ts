@@ -102,13 +102,14 @@ function llmRow(row: LlmSummary & { role: string }): string {
   return `      <tr><td>${e(row.role)}</td><td>${e(row.calls)}</td><td>${counts(row.errors)}</td><td>${e(row.inputTokens)}</td><td>${e(row.outputTokens)}</td><td>${e(row.cachedTokens)}</td><td>${e(row.retries)}</td><td>${counts(row.handoffs)}</td><td>${e(row.actions)}</td><td>${counts(row.fallbacks)}</td><td>${e(row.breakerTrips)}</td><td>${e(row.avgLatencyMs)} / ${e(row.p95LatencyMs)} ms</td>${cost}</tr>`;
 }
 
+function stopCell(role: RoleSummary): string {
+  if (role.stopReason === undefined) return `<span class="badge critical">did not start</span> ${e(role.error ?? "")}`;
+  if (role.stopReason === "error") return `<span class="badge critical">error</span> ${e(role.error ?? "")}`;
+  return e(role.stopReason);
+}
+
 function roleRow(role: RoleSummary): string {
-  const stopped =
-    role.stopReason === undefined
-      ? `<span class="badge critical">did not start</span> ${e(role.error ?? "")}`
-      : role.stopReason === "error"
-        ? `<span class="badge critical">error</span> ${e(role.error ?? "")}`
-        : e(role.stopReason);
+  const stopped = stopCell(role);
   const links = [
     role.actionLog === undefined ? "" : link(role.actionLog, "actions"),
     role.trace === undefined ? "" : link(role.trace, "trace"),
