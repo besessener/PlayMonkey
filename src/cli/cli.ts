@@ -1,7 +1,7 @@
 import { parseArgs } from "node:util";
 import { ConfigError, type LlmConfig, type LoadedConfig, loadConfig } from "../config/config.ts";
 import { ExitCode } from "../exit-codes.ts";
-import { createProvider, UnsupportedProviderError } from "../llm/factory.ts";
+import { createProvider } from "../llm/factory.ts";
 import { runPreflight } from "../llm/preflight.ts";
 import type { LlmProvider } from "../llm/provider.ts";
 import { describeUsage, LlmStats } from "../llm/usage.ts";
@@ -145,14 +145,7 @@ async function startLlm(command: string, loaded: LoadedConfig, io: CliIo): Promi
   const llm = config.llm;
   if (llm === undefined) return undefined;
   const log = (line: string) => io.stdout(`${secrets.mask(line)}\n`);
-  let provider: LlmProvider;
-  try {
-    provider = io.llmProvider === undefined ? createProvider(llm, log) : io.llmProvider(llm, log);
-  } catch (error) {
-    if (!(error instanceof UnsupportedProviderError)) throw error;
-    io.stderr(`monkey ${command}: ${error.message}\n`);
-    return ExitCode.Error;
-  }
+  const provider: LlmProvider = io.llmProvider === undefined ? createProvider(llm, log) : io.llmProvider(llm, log);
   const stats = new LlmStats(llm, provider.name);
   const { result, message } = await runPreflight(provider, llm, secrets);
   if (result.ok) {

@@ -74,7 +74,8 @@ Prompts and responses are not stored unless `llm.debugLog` is on, and then maske
 
 The system prompt and the tool definitions are identical for every call of a run and come first; the snapshot and
 history change and come last. Backends with prompt caching mark the stable part as cacheable (Anthropic:
-`cache_control` on the system prompt, which caches the tools with it). Cache reads show up as `cachedTokens`. Very
+`cache_control` on the system prompt, which caches the tools with it; OpenAI caches long identical prefixes
+automatically). Cache reads show up as `cachedTokens`. Very
 short prompts may be below a model's minimum cacheable length and are then simply not cached.
 
 ## Adding a backend
@@ -98,5 +99,17 @@ interface LlmProvider {
 - Report `usage` (input, output, cache read and write tokens) and how many requests were retried.
 - Add the name to `LLM_PROVIDERS` in `src/config/schema.ts` and to `createProvider` in `src/llm/factory.ts`.
 
-`test/helpers/fake-provider.ts` is a scripted provider for tests; `test/foundry.test.ts` shows how to test a backend
-with its HTTP layer mocked.
+`test/helpers/fake-provider.ts` is a scripted provider for tests; `test/foundry.test.ts` and `test/openai.test.ts`
+show how to test a backend with its HTTP layer mocked. Add the new backend to `test/provider-conformance.test.ts`:
+it runs the same conversations (valid and invalid tool calls, text only, retries, errors, preflight) against every
+backend.
+
+## Backends
+
+| Provider | SDK | API |
+| --- | --- | --- |
+| `anthropic-foundry` | `@anthropic-ai/foundry-sdk` | Anthropic Messages API on Foundry (`…/anthropic/v1/messages`) |
+| `openai` | `openai` | Responses API (default) or Chat Completions on any OpenAI-compatible base URL |
+
+Both map their SDK's typed errors through `src/llm/sdk-errors.ts`, so retries, error kinds and the preflight hints
+behave the same.

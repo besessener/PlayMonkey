@@ -118,6 +118,9 @@ export const THINKING_TYPES = ["adaptive", "disabled", "between_tools"] as const
 export type ThinkingType = (typeof THINKING_TYPES)[number];
 export const EFFORT_LEVELS = ["low", "medium", "high", "xhigh", "max"] as const;
 export type EffortLevel = (typeof EFFORT_LEVELS)[number];
+/** API surface of the `openai` backend: the Responses API or Chat Completions. */
+export const OPENAI_APIS = ["responses", "chat"] as const;
+export type OpenAiApi = (typeof OPENAI_APIS)[number];
 
 export interface RawLlm {
   provider: LlmProvider;
@@ -135,7 +138,7 @@ export interface RawLlm {
   handoff?: Partial<RawHandoff>;
   breaker?: { failures?: number; pauseSteps?: number };
   pricing?: { inputPerMTok: number; outputPerMTok: number; cacheReadPerMTok?: number; cacheWritePerMTok?: number };
-  options?: { maxOutputTokens?: number; thinking?: ThinkingType; effort?: EffortLevel };
+  options?: { maxOutputTokens?: number; thinking?: ThinkingType; effort?: EffortLevel; api?: OpenAiApi };
 }
 
 export interface RawHandoff {
@@ -439,19 +442,26 @@ export const configSchema: JSONSchemaType<RawConfig> = {
               minimum: 16,
               nullable: true,
               default: DEFAULTS.llm.options.maxOutputTokens,
-              description: "max_tokens of a request, including thinking tokens.",
+              description: "Output token limit of a request, including thinking or reasoning tokens.",
             },
             thinking: {
               type: "string",
               enum: THINKING_TYPES,
               nullable: true,
-              description: "Thinking mode sent to the model; the model's default when absent.",
+              description: "anthropic-foundry only: thinking mode sent to the model; the model's default when absent.",
             },
             effort: {
               type: "string",
               enum: EFFORT_LEVELS,
               nullable: true,
-              description: "Effort level sent to the model; the model's default when absent.",
+              description:
+                "Effort level sent to the model (Anthropic effort, OpenAI reasoning effort); the model's default when absent.",
+            },
+            api: {
+              type: "string",
+              enum: OPENAI_APIS,
+              nullable: true,
+              description: "openai only: the Responses API (default) or Chat Completions.",
             },
           },
         },

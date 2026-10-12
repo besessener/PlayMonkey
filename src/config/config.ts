@@ -13,6 +13,7 @@ import {
   type Engine,
   type LlmProvider,
   MAX_SEED,
+  type OpenAiApi,
   ORACLES,
   type OracleName,
   type RawAuth,
@@ -81,7 +82,7 @@ export interface LlmConfig {
   handoff: RawHandoff;
   breaker: { failures: number; pauseSteps: number };
   pricing?: LlmPricing;
-  options: { maxOutputTokens: number; thinking?: ThinkingType; effort?: EffortLevel };
+  options: { maxOutputTokens: number; thinking?: ThinkingType; effort?: EffortLevel; api?: OpenAiApi };
 }
 
 export interface LlmPricing {
@@ -247,6 +248,7 @@ function normalizeLlm(raw: RawLlm): LlmConfig {
   if (raw.pricing !== undefined) llm.pricing = { ...raw.pricing };
   if (raw.options?.thinking !== undefined) llm.options.thinking = raw.options.thinking;
   if (raw.options?.effort !== undefined) llm.options.effort = raw.options.effort;
+  if (raw.options?.api !== undefined) llm.options.api = raw.options.api;
   return llm;
 }
 
@@ -274,6 +276,18 @@ function semanticIssues(raw: unknown): { path: PathSegment[]; message: string }[
   }
   if (isObject(raw.llm) && typeof raw.llm.baseUrl === "string" && !isHttpUrl(raw.llm.baseUrl)) {
     issues.push({ path: ["llm", "baseUrl"], message: "must be an absolute http(s) URL" });
+  }
+  if (isObject(raw.llm) && isObject(raw.llm.options)) {
+    const { provider, options } = raw.llm;
+    if (options.thinking !== undefined && provider === "openai") {
+      issues.push({
+        path: ["llm", "options", "thinking"],
+        message: "is only for anthropic-foundry; use effort instead",
+      });
+    }
+    if (options.api !== undefined && provider === "anthropic-foundry") {
+      issues.push({ path: ["llm", "options", "api"], message: "is only for the openai provider" });
+    }
   }
 
   if (isObject(raw.findings) && Array.isArray(raw.findings.ignore)) {

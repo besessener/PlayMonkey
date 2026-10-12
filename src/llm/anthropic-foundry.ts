@@ -17,6 +17,7 @@ import {
   type LlmUsage,
   type PreflightResult,
 } from "./provider.ts";
+import { mapSdkError } from "./sdk-errors.ts";
 import { ACTION_TOOLS, isValidPing, PING_TOOL, parseToolCall, type ToolDefinition } from "./tools.ts";
 
 export interface FoundryOptions {
@@ -26,9 +27,6 @@ export interface FoundryOptions {
   log?: (line: string) => void;
   now?: () => number;
 }
-
-/** Network error codes (walked through `cause`) that mean the TLS handshake or certificate failed. */
-const TLS_CODES = /^(CERT_|ERR_TLS_|ERR_SSL_|UNABLE_TO_|DEPTH_ZERO_SELF_SIGNED_CERT|SELF_SIGNED_CERT_IN_CHAIN)/;
 
 /**
  * `LlmProvider` for Claude on Microsoft Foundry, through the official Anthropic SDK's Foundry client. The model is
@@ -159,29 +157,11 @@ export class AnthropicFoundryProvider implements LlmProvider {
 
   /** Maps the SDK's typed errors, most specific first. Messages never include the key. */
   #mapError(error: unknown): LlmError {
-    const C = AnthropicFoundry;
-    const retries = this.#retries();
-    const scrub = (text: string) => text.replaceAll(this.#config.apiKey, "***").split("\n")[0] ?? "";
-    const http = (kind: LlmErrorKind, e: InstanceType<typeof C.APIError>) =>
-      new LlmError(kind, scrub(e.message), { ...(e.status === undefined ? {} : { status: e.status }), retries });
-    if (error instanceof C.APIConnectionTimeoutError) {
-      return new LlmError("timeout", `no response within ${this.#config.timeoutMs} ms`, { retries });
-    }
-    if (error instanceof C.APIConnectionError) {
-      const code = causeCode(error);
-      const kind = code !== undefined && TLS_CODES.test(code) ? "tls" : "unreachable";
-      return new LlmError(kind, `connection failed${code === undefined ? "" : ` (${code})`}`, { retries });
-    }
-    if (error instanceof C.AuthenticationError) return http("auth", error);
-    if (error instanceof C.PermissionDeniedError) return http("forbidden", error);
-    if (error instanceof C.NotFoundError) return http("notFound", error);
-    if (error instanceof C.RateLimitError) return http("rateLimited", error);
-    if (error instanceof C.BadRequestError || error instanceof C.UnprocessableEntityError) {
-      return http("badRequest", error);
-    }
-    if (error instanceof C.InternalServerError) return http("server", error);
-    if (error instanceof C.APIError) return http("other", error);
-    return new LlmError("other", scrub(error instanceof Error ? error.message : String(error)), { retries });
+    return mapSdkError(AnthropicFoundry, error, {
+      apiKey: this.#config.apiKey,
+      timeoutMs: this.#config.timeoutMs,
+      retries: this.#retries(),
+    });
   }
 }
 
@@ -211,15 +191,4 @@ function mapUsage(message: Message): LlmUsage {
     ...(usage.cache_read_input_tokens == null ? {} : { cachedTokens: usage.cache_read_input_tokens }),
     ...(usage.cache_creation_input_tokens == null ? {} : { cacheWriteTokens: usage.cache_creation_input_tokens }),
   };
-}
-
-/** The first `code` in an error's cause chain, e.g. `ENOTFOUND` or `CERT_HAS_EXPIRED`. */
-function causeCode(error: unknown): string | undefined {
-  let current: unknown = error;
-  for (let depth = 0; depth < 5 && current instanceof Object; depth++) {
-    const code = (current as { code?: unknown }).code;
-    if (typeof code === "string") return code;
-    current = (current as { cause?: unknown }).cause;
-  }
-  return undefined;
 }
