@@ -5,7 +5,7 @@ import { durableLocator, type Snapshot, snapshot } from "../snapshot/snapshot.ts
 import { type Action, isElementAction } from "./actions.ts";
 import { chooseAction, Exploration } from "./chooser.ts";
 import { PageEvents, type StepEvent } from "./events.ts";
-import { type ActionResult, executeAction, type Tabs, type Targets } from "./executor.ts";
+import { type ActionResult, executeAction, installPopupProbe, type Tabs, type Targets } from "./executor.ts";
 import { Random } from "./random.ts";
 import type { Spectator } from "./spectator.ts";
 
@@ -137,6 +137,7 @@ export async function runMonkey(context: BrowserContext, options: RunOptions): P
   try {
     // Dialogs of the start page belong to the first step.
     events.beginStep(1, recordedEvents(0));
+    await installPopupProbe(context);
     const first = context.pages()[0] ?? (await context.newPage());
     if (first.url() === "about:blank") await first.goto(config.baseUrl, { timeout: config.monkey.actionTimeoutMs * 4 });
 

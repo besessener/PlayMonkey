@@ -1,14 +1,15 @@
 # Roadmap
 
 The plan lives in the [epic](https://github.com/besessener/PlayMonkey/issues/1); each work item is a sub-issue
-carrying its milestone in the title. Work goes in milestone order, with a review after each.
+carrying its milestone in the title. Work goes in milestone order, with a review after each. Released versions
+and what changed: [CHANGELOG](../../CHANGELOG.md).
 
 | Milestone | Scope | Status |
 | --- | --- | --- |
 | **M1** Monkey without LLM | Scaffold, config, fixture site, auth, snapshot and refs, random monkey, oracles, action log and replay, report | done (v0.1) |
 | **M2** LLM backend `anthropic-foundry` | Provider interface, preflight, stuck detection and fallback, token accounting | done |
 | **M3** Backend `openai` and hardening | OpenAI-compatible backend; cookie banners, dialogs, iframes, popups, file inputs, downloads | done |
-| **M4** Comfort | Parallel runs per role and seed, documentation, CI example | done |
+| **M4** Comfort | Parallel runs per role and seed, documentation, CI example | done (v0.4.0) |
 
 ## Definition of done for v0.1 (M1 complete)
 

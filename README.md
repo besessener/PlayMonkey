@@ -40,7 +40,7 @@ npx monkey run fixtures/configs/fixture.json
 It prints the seed, one summary per role, every finding, and where the report is:
 `fixtures/configs/monkey-report/report.html` (open it in a browser). The whole walk-through:
 [getting started](docs/tutorials/getting-started.md). In your own project, install it as a dev dependency with
-`npm install --save-dev github:besessener/PlayMonkey`.
+`npm install --save-dev github:besessener/PlayMonkey#v0.4.0`. Releases and changes: [CHANGELOG](CHANGELOG.md).
 
 ## Usage
 
