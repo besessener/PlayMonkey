@@ -61,6 +61,26 @@ The schema with every key, type, default and description is `src/config/schema.t
 - **Errors:** all problems are listed at once, each with its path (e.g. `auth[0].fields.password`), and the exit code
   is `2`.
 
+## Browser sessions and login
+
+One browser is launched (`browser.engine`, `browser.headless`); every role gets its **own browser context**, so cookies
+and storage never leak between roles. Without `auth` entries there is one anonymous role.
+
+- **`fields` login:** opens `baseUrl + loginUrl`, fills each field, clicks `submit`. A field key is used as a CSS
+  selector if it looks like one (`input[name=user]`, `#pass`); otherwise it is matched by `name` attribute, then
+  `id`, then accessible label, and must match exactly one element. The login counts as successful when the page left
+  the login URL, or (for single-page apps) a cookie changed and the submit button disappeared. It runs in a separate,
+  unrecorded context and the run starts from the resulting `storageState`, so the typed secrets never reach the trace
+  or video. A failed login names the role and the reason, never a value, and is a tool error (exit code `2`).
+- **`storageState` login:** loads a Playwright storage state file (for example one saved with
+  `context.storageState({ path })`). A missing or malformed file is a tool error.
+- **`stayOnDomain`:** top-level navigations to another origin are aborted (the page stays where it is) and recorded
+  as an info event, not a finding. Subresources from other origins (CDNs, fonts, APIs) still load. Service workers
+  are blocked in this mode because they bypass request routing; routing also disables the HTTP cache.
+- **Trace and video:** each role records `trace.zip` (open with `npx playwright show-trace trace.zip`) and a video
+  under `video/`. The trace contains what the run did, including cookies sent with requests, so treat it like the
+  test environment's session data.
+
 ## Development
 
 Requirements: Node.js 22.18 or newer for development (the tests run TypeScript directly via Node's built-in type
@@ -77,7 +97,8 @@ npm run fixture                   # start the local fixture site (see fixtures/R
 ```
 
 Browser tests launch the Chromium that matches the installed Playwright version. Where that cannot be installed,
-point them at another Chromium with `CHROMIUM_EXECUTABLE_PATH=/path/to/chrome npm test`.
+point them at another Chromium with `CHROMIUM_EXECUTABLE_PATH=/path/to/chrome npm test`. Video recording needs the
+ffmpeg build that matches the installed Playwright (`npx playwright install` installs it together with a browser).
 
 ### Tooling choices
 
@@ -95,8 +116,9 @@ point them at another Chromium with `CHROMIUM_EXECUTABLE_PATH=/path/to/chrome np
 ```
 src/cli/           CLI entry (bin) and argument parsing
 src/config/        config schema, ${VAR} resolution, validation, secret masking
+src/auth/          browser launch, per-role contexts, login, stayOnDomain, trace and video
 src/exit-codes.ts  exit code constants
-src/{auth,snapshot,monkey,oracles,report,llm}/   added by the follow-up issues
+src/{snapshot,monkey,oracles,report,llm}/   added by the follow-up issues
 fixtures/site/     local fixture site with seeded bugs for end-to-end tests
 fixtures/configs/  example config for the fixture site
 test/              node:test suites (*.test.ts)
