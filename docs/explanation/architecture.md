@@ -18,7 +18,7 @@ with a report.
 | `src/cli/` | Argument parsing (`node:util` `parseArgs`), subcommands, exit codes | done |
 | `src/config/` | JSON Schema, `${VAR}` resolution, validation, defaults, secret masking | done |
 | `src/auth/` | Browser launch, one context per role, login, `stayOnDomain`, trace and video | done |
-| `src/snapshot/` | Page snapshot with stable element refs | planned (#6) |
+| `src/snapshot/` | Page snapshot with element refs, snapshot hash, LLM serializer | done |
 | `src/monkey/` | Seeded random action generator and executor | planned (#7) |
 | `src/oracles/` | Detect and deduplicate findings | planned (#8) |
 | `src/report/` | Action log, replay, `report.json`, `report.html` | planned (#9, #10) |
