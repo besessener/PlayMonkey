@@ -1,0 +1,6 @@
+node_modules/
+dist/
+monkey-report/
+states/*.json
+*.tsbuildinfo
+.env
