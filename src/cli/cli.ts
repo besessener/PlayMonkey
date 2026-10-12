@@ -1,10 +1,12 @@
 import { readFileSync } from "node:fs";
 import { parseArgs } from "node:util";
+import { ConfigError, loadConfig } from "../config/config.ts";
 import { ExitCode } from "../exit-codes.ts";
 
 export interface CliIo {
   stdout: (text: string) => void;
   stderr: (text: string) => void;
+  env?: NodeJS.ProcessEnv;
 }
 
 const USAGE = `Usage: monkey <command> [options]
@@ -70,8 +72,30 @@ export async function runCli(argv: string[], io: CliIo): Promise<ExitCode> {
     return ExitCode.Error;
   }
 
-  // Stubs until the run loop (#7) and replay (#9) land.
+  const [file] = rest as [string];
+  if (command === "run") return run(file, io);
+
+  // Stub until replay (#9) lands.
   io.stderr(`monkey ${command}: not implemented yet\n`);
+  return ExitCode.Error;
+}
+
+async function run(configFile: string, io: CliIo): Promise<ExitCode> {
+  let loaded: Awaited<ReturnType<typeof loadConfig>>;
+  try {
+    loaded = await loadConfig(configFile, io.env === undefined ? {} : { env: io.env });
+  } catch (error) {
+    if (error instanceof ConfigError) {
+      io.stderr(`monkey run: ${error.message}\n`);
+      return ExitCode.Error;
+    }
+    throw error;
+  }
+  const { config, seedGenerated } = loaded;
+  io.stdout(`seed: ${config.seed}${seedGenerated ? ' (generated; set "seed" in the config to reuse it)' : ""}\n`);
+
+  // Stub until the run loop (#7) lands.
+  io.stderr("monkey run: run loop not implemented yet\n");
   return ExitCode.Error;
 }
 
