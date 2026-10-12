@@ -1,4 +1,4 @@
-import type { BrowserContext } from "playwright";
+import type { BrowserContext, Page } from "playwright";
 import type { Config } from "../config/config.ts";
 import { durableLocator, type Snapshot, snapshot } from "../snapshot/snapshot.ts";
 import { type Action, isElementAction } from "./actions.ts";
@@ -55,6 +55,11 @@ export async function runMonkey(context: BrowserContext, options: RunOptions): P
   const exploration = new Exploration();
   const origin = config.stayOnDomain ? new URL(config.baseUrl).origin : undefined;
   const tabs: Tabs = { context, current: 0 };
+  // A crashed page throws on every call; it is closed and the run continues (the crash oracle reports it).
+  const crashed = new WeakSet<Page>();
+  const watch = (page: Page) => page.once("crash", () => crashed.add(page));
+  for (const page of context.pages()) watch(page);
+  context.on("page", watch);
   let failedActions = 0;
   let step = 0;
 
@@ -76,13 +81,27 @@ export async function runMonkey(context: BrowserContext, options: RunOptions): P
       if (step >= config.limits.maxSteps) return finish("maxSteps");
       if (now() >= deadline) return finish("maxMinutes");
 
-      const page = context.pages()[tabs.current] ?? context.pages()[0];
+      let page = context.pages()[tabs.current] ?? context.pages()[0];
+      if (page !== undefined && crashed.has(page)) {
+        await page.close().catch(() => undefined);
+        tabs.current = 0;
+        page = context.pages()[0] ?? (await context.newPage());
+        if (page.url() === "about:blank")
+          await page.goto(config.baseUrl, { timeout: config.monkey.actionTimeoutMs * 4 }).catch(() => undefined);
+      }
       if (page === undefined) return finish("error", "all pages were closed");
       if (origin !== undefined && !isOn(page.url(), origin)) {
         await page.goto(config.baseUrl, { timeout: config.monkey.actionTimeoutMs * 4 }).catch(() => undefined);
       }
 
-      const snap = await snapshot(page);
+      let snap: Snapshot;
+      try {
+        snap = await snapshot(page);
+      } catch (error) {
+        // The page crashed while being read: start over on a fresh one.
+        if (crashed.has(page)) continue;
+        throw error;
+      }
       exploration.visit(snap.url, snap.hash);
       const viewport = page.viewportSize() ?? { width: config.browser.viewport[0], height: config.browser.viewport[1] };
       const { action, elementKey } = chooseAction(snap, exploration, random, {
@@ -117,6 +136,8 @@ export async function runMonkey(context: BrowserContext, options: RunOptions): P
     }
   } catch (error) {
     return finish("error", error instanceof Error ? error.message.split("\n")[0] : String(error));
+  } finally {
+    context.off("page", watch);
   }
 }
 

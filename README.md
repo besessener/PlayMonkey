@@ -13,8 +13,8 @@
 environment**. It clicks, types and submits its way through the site with seeded randomness and reports what breaks,
 with the steps to reproduce it. An LLM steps in only when the random monkey gets stuck.
 
-> **Status:** early development. Config, login per role and the seeded random monkey work; oracles, action log
-> and report are being built, see the [roadmap](docs/explanation/roadmap.md).
+> **Status:** early development. Config, login per role, the seeded random monkey and the oracles work; action
+> log, replay and report are being built, see the [roadmap](docs/explanation/roadmap.md).
 
 ## Usage
 

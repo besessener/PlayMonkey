@@ -29,6 +29,7 @@
     "apiKey": "${FOUNDRY_API_KEY}"
   },
   "oracles": { "overflow": false },
+  "findings": { "lastActions": 10, "ignoreStatus": [401], "ignore": [{ "oracle": "console", "message": "^\\[analytics\\]" }] },
   "report": { "dir": "./monkey-report" }
 }
 ```
@@ -66,6 +67,12 @@
 | `oracles.hang` | boolean | `true` | Report actions or navigations that exceed their timeout. |
 | `oracles.errorPage` | boolean | `true` | Report navigations that land on an error page. |
 | `oracles.overflow` | boolean | `true` | Report horizontal overflow. |
+| `findings.lastActions` | integer ≥ 0 | `10` | Number of actions before a finding that it records, for reproduction. |
+| `findings.ignoreStatus` | array of integers 400 … 599 | `[]` | HTTP statuses that are never findings, e.g. `[401, 403]`. |
+| `findings.ignore` | array | `[]` | Rules that drop known noise; see [ignore rules](../explanation/oracles.md#ignore-rules). |
+| `findings.ignore[].oracle` | oracle name | any | Only signals of this oracle. |
+| `findings.ignore[].url` | regular expression | – | Matched against the request URL (HTTP findings) or the page URL. |
+| `findings.ignore[].message` | regular expression | – | Matched against the finding message. Each rule needs `url` or `message`. |
 | `report.dir` | string | `./monkey-report` | Report output directory, relative to the config file. |
 | `monkey.actionTimeoutMs` | integer ≥ 100 | `5000` | Timeout of one action in milliseconds; a slower action fails and the run continues. |
 | `monkey.weights.click` | number ≥ 0 | `10` | Relative weight of clicking links, buttons and other clickable elements. |
@@ -79,8 +86,8 @@
 | `monkey.weights.setViewport` | number ≥ 0 | `0.2` | Relative weight of resizing the viewport. |
 | `monkey.weights.switchTab` | number ≥ 0 | `1` | Relative weight of switching to another open tab. |
 
-`llm` and the oracles are validated now; they take effect when their milestones land (see the
-[roadmap](../explanation/roadmap.md)).
+`llm` is validated now and takes effect with milestone M2 (see the [roadmap](../explanation/roadmap.md)). What each
+oracle reports is explained in [oracles and findings](../explanation/oracles.md).
 
 ## Rules
 
@@ -88,6 +95,8 @@
 - **Unknown keys are rejected**, not warned about: a typo such as `maxStep` would otherwise silently fall back to a
   default. Only `testData` and `auth[].fields` take arbitrary keys.
 - **`null` is rejected**; omit a key to get its default.
+- **Ignore rules** need `url` or `message`, and both must be valid JavaScript regular expressions; to switch an
+  oracle off entirely, use `oracles.<name>: false`.
 - **Relative paths** (`auth[].storageState`, `report.dir`) are resolved against the directory of the config file.
 - **Errors** are all listed at once, each with its path (e.g. `auth[0].fields.password`); the exit code is `2`.
 

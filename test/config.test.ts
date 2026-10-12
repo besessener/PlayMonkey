@@ -74,6 +74,7 @@ describe("parseConfig", () => {
         errorPage: true,
         overflow: true,
       },
+      findings: { lastActions: 10, ignoreStatus: [], ignore: [] },
       report: { dir: "/configs/monkey-report" },
       monkey: {
         actionTimeoutMs: 5000,
@@ -227,6 +228,33 @@ describe("parseConfig", () => {
       "limits.maxSteps: must be >= 1",
       "seed: must be >= 0",
       "stayOnDomain: must be boolean",
+    ]);
+  });
+
+  it("accepts findings settings and checks ignore rules", () => {
+    const findings = {
+      lastActions: 3,
+      ignoreStatus: [401, 403],
+      ignore: [{ oracle: "console", message: "^Third party" }, { url: "analytics\\.example" }],
+    };
+    assert.deepEqual(parse({ baseUrl: "https://x.test", seed: 1, findings }).config.findings, findings);
+    const issues = issuesOf(() =>
+      parse({
+        baseUrl: "https://x.test",
+        findings: {
+          lastActions: -1,
+          ignoreStatus: [200, 404, 404],
+          ignore: [{ oracle: "console" }, { url: "(" }, { oracle: "nope", message: "x" }],
+        },
+      }),
+    );
+    assert.deepEqual(issues.sort(), [
+      "findings.ignoreStatus: must NOT have duplicate items (items ## 2 and 1 are identical)",
+      "findings.ignoreStatus[0]: must be >= 400",
+      "findings.ignore[0]: needs url or message; use oracles.<name>: false to switch an oracle off",
+      "findings.ignore[1].url: is not a valid regular expression",
+      "findings.ignore[2].oracle: must be one of: pageerror, console, http5xx, http4xx, crash, hang, errorPage, overflow",
+      "findings.lastActions: must be >= 0",
     ]);
   });
 

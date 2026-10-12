@@ -26,5 +26,6 @@ Organised by [Diátaxis](https://diataxis.fr/).
 - [Sessions and login](explanation/sessions.md) – contexts, the login heuristic, stayOnDomain, trace and video.
 - [Page snapshots](explanation/snapshot.md) – elements and refs, frames, the snapshot hash, the LLM serializer.
 - [The random monkey](explanation/monkey.md) – seeding, how actions and values are chosen, limits.
+- [Oracles and findings](explanation/oracles.md) – what counts as a bug, the finding model, deduplication, ignore rules.
 - [Tooling choices](explanation/tooling.md) – why `node:test`, Biome, these TypeScript settings and so few dependencies.
 - [Roadmap](explanation/roadmap.md) – milestones and status.

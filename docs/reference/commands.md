@@ -11,7 +11,7 @@ monkey --version | -v
 
 | Command | Today |
 | --- | --- |
-| `run` | Validates the config, prints the seed, then runs the random monkey for every role and prints a summary per role and the trace path. Findings are not detected yet (oracles, #8), so a completed run exits `0`. |
+| `run` | Validates the config, prints the seed, then runs the random monkey with the [oracles](../explanation/oracles.md) for every role. Prints a summary per role, one line per finding, the trace path and the total number of findings; screenshots go to `<report.dir>/<role>/screenshots/`. The full report (`report.json`, `report.html`) follows with #10. |
 | `replay` | Not implemented yet. |
 
 ### Exit codes

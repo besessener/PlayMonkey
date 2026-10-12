@@ -36,13 +36,15 @@ Each action runs with `monkey.actionTimeoutMs` (default 5 s). Element actions re
 when it is stale. When the main document changed, the executor waits for its `load` event before the next snapshot.
 
 **A failed action is not a finding:** an element that vanished, is covered or does not respond is recorded with the
-error and the run continues. Problems of the site are the oracles' job.
+error and the run continues. Problems of the site are the [oracles'](oracles.md) job; a timeout while waiting
+for a navigation or page load is the exception, it is a `hang`.
 
 ## Limits
 
 The loop stops at `limits.maxSteps`, at `limits.maxMinutes` (checked before every step) or when interrupted
 (Ctrl+C finishes the current step, then writes the trace). With `stayOnDomain`, a page that ends up on another origin
-or a blank page is sent back to `baseUrl`.
+or a blank page is sent back to `baseUrl`. A crashed page is closed and the run continues in another tab or a fresh
+page; the `crash` oracle reports it.
 
 ## Coverage on the fixture site
 
