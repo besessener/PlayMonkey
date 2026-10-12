@@ -286,6 +286,29 @@ describe("the monkey against the fixture site", () => {
     });
   });
 
+  it("goes on in another tab when the page closes while it is being read", async () => {
+    await withContext(async (context) => {
+      const first = await context.newPage();
+      await first.goto(site.url);
+      const other = await context.newPage();
+      await other.goto(site.url);
+      // Like a popup that calls window.close() at the wrong moment: closes during the second snapshot.
+      let reads = 0;
+      const read = first.ariaSnapshotJSON.bind(first);
+      first.ariaSnapshotJSON = (async (options: Parameters<typeof read>[0]) => {
+        if (++reads === 2) await first.close();
+        return read(options);
+      }) as typeof read;
+      const weights = Object.fromEntries(ACTION_TYPES.map((t) => [t, t === "scroll" ? 1 : 0]));
+      const result = await runMonkey(context, {
+        config: config({ seed: 7, limits: { maxSteps: 4 }, monkey: { weights } }),
+      });
+      assert.equal(reads, 2);
+      assert.equal(result.stopReason, "maxSteps", result.error);
+      assert.equal(result.steps, 4);
+    });
+  });
+
   it("returns a failed result for a stale ref instead of throwing", async () => {
     await withContext(async (context) => {
       const page = await context.newPage();
