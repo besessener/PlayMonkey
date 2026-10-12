@@ -1,31 +1,29 @@
 # PlayMonkey
 
-`monkey` is a TypeScript CLI that drives a real browser (Playwright) against a website in a **throwaway test
-environment** and looks for bugs through seeded random interaction, with an LLM stepping in only when the random
-monkey gets stuck.
+[![CI](https://github.com/besessener/PlayMonkey/actions/workflows/ci.yml/badge.svg)](https://github.com/besessener/PlayMonkey/actions/workflows/ci.yml)
+![Node](https://img.shields.io/badge/node-%3E%3D22-339933?logo=nodedotjs&logoColor=white)
+![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178C6?logo=typescript&logoColor=white)
+![Playwright](https://img.shields.io/badge/browser-Playwright-2EAD33?logo=playwright&logoColor=white)
+![Biome](https://img.shields.io/badge/lint-Biome-60A5FA?logo=biome&logoColor=white)
+[![License: MIT](https://img.shields.io/github/license/besessener/PlayMonkey)](LICENSE)
 
-> Status: early scaffold. `monkey run` and `monkey replay` are stubs; see the
-> [epic](https://github.com/besessener/PlayMonkey/issues/1) for the roadmap.
+***Let a monkey loose on your test environment.***
+
+`monkey` is a command line tool that drives a real browser with Playwright against a website in a **throwaway test
+environment**. It clicks, types and submits its way through the site with seeded randomness and reports what breaks,
+with the steps to reproduce it. An LLM steps in only when the random monkey gets stuck.
+
+> **Status:** early development. Config validation, login per role and the fixture site work; the monkey loop,
+> oracles and report are being built, see the [roadmap](docs/explanation/roadmap.md).
 
 ## Usage
 
+```sh
+monkey run config.json        # explore the site and report findings
+monkey replay actions.json    # re-execute a recorded run, without an LLM
 ```
-monkey run <config.json>      Explore the site described by the config and report findings.
-monkey replay <actions.json>  Re-execute a recorded action log and check which findings recur.
-monkey --help | --version
-```
 
-### Exit codes
-
-| Code | Meaning              |
-| ---- | -------------------- |
-| `0`  | no findings          |
-| `1`  | findings present     |
-| `2`  | tool or config error |
-
-## Configuration
-
-`monkey run` takes one JSON file. Minimal example:
+Exit codes: `0` no findings, `1` findings, `2` tool or config error.
 
 ```json
 {
@@ -36,90 +34,37 @@ monkey --help | --version
       "loginUrl": "/login",
       "fields": { "username": "${ADMIN_USER}", "password": "${ADMIN_PASS}" },
       "submit": "button[type=submit]"
-    },
-    { "name": "user", "storageState": "./states/user.json" }
+    }
   ]
 }
 ```
 
-The schema with every key, type, default and description is `src/config/schema.ts`. Rules:
-
-- **Defaults:** random `seed` (printed at startup; set it to reproduce a run), `limits.maxSteps` 500,
-  `limits.maxMinutes` 20, `browser.engine` `chromium`, `browser.viewport` `[1280, 800]`, `browser.headless` `true`,
-  `stayOnDomain` `true`, all `oracles` on, `report.dir` `./monkey-report`. `auth` may be omitted (anonymous run);
-  `llm` may be omitted (pure random monkey).
-- **Unknown keys are rejected**, not warned about: a typo such as `maxStep` would otherwise silently fall back to a
-  default. Only `testData` and `auth[].fields` take arbitrary keys. A top-level `$schema` key is allowed for editors.
-- **`null` is rejected**; omit a key to get its default.
-- **Each `auth` role** uses either `fields` + `loginUrl` + `submit`, or `storageState`, never both. Role names must be
-  unique.
-- **Relative paths** (`storageState`, `report.dir`) are resolved against the directory of the config file.
-- **Secrets:** `${VAR}` in any string value is replaced with the environment variable `VAR`, also inside longer
-  strings (`"https://${HOST}/app"`). Substituted values are not expanded again. An unset variable is an error naming
-  the config path and the variable, never a value. Everything that came from a placeholder is shown as `***` in logs,
-  reports and error messages.
-- **Errors:** all problems are listed at once, each with its path (e.g. `auth[0].fields.password`), and the exit code
-  is `2`.
-
-## Browser sessions and login
-
-One browser is launched (`browser.engine`, `browser.headless`); every role gets its **own browser context**, so cookies
-and storage never leak between roles. Without `auth` entries there is one anonymous role.
-
-- **`fields` login:** opens `baseUrl + loginUrl`, fills each field, clicks `submit`. A field key is used as a CSS
-  selector if it looks like one (`input[name=user]`, `#pass`); otherwise it is matched by `name` attribute, then
-  `id`, then accessible label, and must match exactly one element. The login counts as successful when the page left
-  the login URL, or (for single-page apps) a cookie changed and the submit button disappeared. It runs in a separate,
-  unrecorded context and the run starts from the resulting `storageState`, so the typed secrets never reach the trace
-  or video. A failed login names the role and the reason, never a value, and is a tool error (exit code `2`).
-- **`storageState` login:** loads a Playwright storage state file (for example one saved with
-  `context.storageState({ path })`). A missing or malformed file is a tool error.
-- **`stayOnDomain`:** top-level navigations to another origin are aborted (the page stays where it is) and recorded
-  as an info event, not a finding. Subresources from other origins (CDNs, fonts, APIs) still load. Service workers
-  are blocked in this mode because they bypass request routing; routing also disables the HTTP cache.
-- **Trace and video:** each role records `trace.zip` (open with `npx playwright show-trace trace.zip`) and a video
-  under `video/`. The trace contains what the run did, including cookies sent with requests, so treat it like the
-  test environment's session data.
+Secrets come from environment variables (`${VAR}`) and are masked in all output. Step by step:
+[getting started](docs/tutorials/getting-started.md).
 
 ## Development
 
-Requirements: Node.js 22.18 or newer for development (the tests run TypeScript directly via Node's built-in type
-stripping, which is on by default from 22.18). The built CLI runs on any Node.js 22.
+Requires Node.js 22.18 or newer.
 
 ```sh
 npm ci
-npx playwright install chromium   # browsers for later end-to-end tests
-npm run build                     # tsc -> dist/
-npm test                          # builds, then runs node:test on test/**/*.test.ts
-npm run lint                      # biome ci + typecheck of src and tests
-npm run format                    # biome format + safe fixes
-npm run fixture                   # start the local fixture site (see fixtures/README.md)
+npx playwright install chromium
+npm test
+npm run lint
 ```
 
-Browser tests launch the Chromium that matches the installed Playwright version. Where that cannot be installed,
-point them at another Chromium with `CHROMIUM_EXECUTABLE_PATH=/path/to/chrome npm test`. Video recording needs the
-ffmpeg build that matches the installed Playwright (`npx playwright install` installs it together with a browser).
+Details: [development setup](docs/tutorials/development-setup.md) and [commands](docs/reference/commands.md).
 
-### Tooling choices
+## Documentation
 
-- **Test runner: `node:test`.** It ships with Node, so it adds no dependency, and with Node's type stripping the
-  tests import the `.ts` sources directly without a build or loader step. Vitest would add a large dependency tree for
-  features (watch UI, module mocking) this project does not need.
-- **Lint and format: Biome.** One dependency and one config file instead of ESLint + Prettier + plugins.
-- **TypeScript:** strict mode, `erasableSyntaxOnly` (no enums or namespaces, so Node can strip types), and
-  `rewriteRelativeImportExtensions` so sources import `./x.ts` and the build emits `./x.js`.
-- **Runtime dependencies:** `playwright` and `ajv` (JSON Schema validation) only. Argument parsing uses
-  `node:util` `parseArgs`.
+Website: <https://besessener.github.io/PlayMonkey/>. The full documentation is in [docs/](docs/README.md), organised
+by [Diátaxis](https://diataxis.fr/):
 
-### Layout
+- **[Tutorials](docs/README.md#tutorials)** – step by step to a first success, e.g. [getting started](docs/tutorials/getting-started.md)
+- **[How-to guides](docs/README.md#how-to-guides)** – reach one goal, e.g. [configure login](docs/how-to/configure-login.md)
+- **[Reference](docs/README.md#reference)** – look up exact behaviour, e.g. [configuration](docs/reference/configuration.md) or [commands](docs/reference/commands.md)
+- **[Explanation](docs/README.md#explanation)** – understand why, e.g. [architecture](docs/explanation/architecture.md) or [ground rules](docs/explanation/ground-rules.md)
 
-```
-src/cli/           CLI entry (bin) and argument parsing
-src/config/        config schema, ${VAR} resolution, validation, secret masking
-src/auth/          browser launch, per-role contexts, login, stayOnDomain, trace and video
-src/exit-codes.ts  exit code constants
-src/{snapshot,monkey,oracles,report,llm}/   added by the follow-up issues
-fixtures/site/     local fixture site with seeded bugs for end-to-end tests
-fixtures/configs/  example config for the fixture site
-test/              node:test suites (*.test.ts)
-```
+## License
+
+MIT, see [LICENSE](LICENSE).
