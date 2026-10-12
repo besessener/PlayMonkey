@@ -34,25 +34,8 @@ function otherOrigin(request: Request): string {
   return `http://localhost:${request.host.split(":")[1] ?? "80"}`;
 }
 
-export function labRoutes(): Route[] {
-  return [
-    {
-      method: "GET",
-      path: "/lab",
-      handle: () => {
-        const links = LAB_PAGES.map(({ path, link }) => `<li><a href="${path}">${link}</a></li>`);
-        links.push('<li><a href="/">Main site</a></li>');
-        return html(layout("Monkey lab", `<ul>\n${links.join("\n")}\n</ul>`));
-      },
-    },
-    {
-      method: "GET",
-      path: "/lab/consent",
-      // A full-screen consent overlay hides the page until it is answered; the answer is kept in a cookie.
-      handle: () =>
-        page(
-          "Cookie banner",
-          `<p>Today's offers are behind the banner.</p>
+// A full-screen consent overlay hides the page until it is answered; the answer is kept in a cookie.
+const CONSENT_BODY = `<p>Today's offers are behind the banner.</p>
 <button type="button" id="offers" aria-expanded="false">Show offers</button>
 <p id="list" hidden>Bananas, half price.</p>
 <div id="consent" role="dialog" aria-modal="true" aria-label="Cookie consent" hidden
@@ -78,16 +61,9 @@ export function labRoutes(): Route[] {
     list.hidden = !list.hidden;
     offers.setAttribute("aria-expanded", String(!list.hidden));
   });
-</script>`,
-        ),
-    },
-    {
-      method: "GET",
-      path: "/lab/dialogs",
-      handle: () =>
-        page(
-          "Native dialogs",
-          `<button type="button" id="alert">Show alert</button>
+</script>`;
+
+const DIALOGS_BODY = `<button type="button" id="alert">Show alert</button>
 <button type="button" id="confirm">Delete everything</button>
 <button type="button" id="prompt">Rename</button>
 <label><input type="checkbox" id="guard"> Warn before leaving</label>
@@ -110,94 +86,9 @@ export function labRoutes(): Route[] {
     if (event.target.checked) addEventListener("beforeunload", guard);
     else removeEventListener("beforeunload", guard);
   });
-</script>`,
-        ),
-    },
-    {
-      method: "GET",
-      path: "/lab/alert-on-load",
-      // The alert blocks the load event until it is answered.
-      handle: () =>
-        page("Alert on load", `<p>An alert greets every visitor.</p>\n<script>alert("Welcome to the lab");</script>`),
-    },
-    {
-      method: "GET",
-      path: "/lab/frames",
-      handle: (request) =>
-        page(
-          "Frames",
-          `<p>A same-origin frame, an inline frame and a frame from another origin.</p>
-<iframe src="/lab/frame-inner" title="Inner frame" width="400" height="120"></iframe>
-<iframe srcdoc="<button type=button onclick=&quot;this.textContent='Pressed'&quot;>Press me</button>" title="Inline frame" width="200" height="60"></iframe>
-<iframe src="${otherOrigin(request)}/lab/frame-outside" title="Other origin" width="300" height="60"></iframe>`,
-        ),
-    },
-    {
-      method: "GET",
-      path: "/lab/frame-inner",
-      handle: () =>
-        html(`<!doctype html>
-<html lang="en"><head><meta charset="utf-8"><title>Inner frame</title><link rel="icon" href="data:,"></head>
-<body>
-<button type="button" id="crash">Crash in frame</button>
-<script>
-  // Seeded bug: uncaught exception in a click handler inside an iframe.
-  document.getElementById("crash").addEventListener("click", () => {
-    throw new Error("Seeded bug: frame handler crashed");
-  });
-</script>
-</body></html>`),
-    },
-    {
-      method: "GET",
-      path: "/lab/frame-outside",
-      handle: () =>
-        html(`<!doctype html>
-<html lang="en"><head><meta charset="utf-8"><title>Other origin</title><link rel="icon" href="data:,"></head>
-<body><button type="button">Out of reach</button></body></html>`),
-    },
-    {
-      method: "GET",
-      path: "/lab/popups",
-      handle: () =>
-        page(
-          "Popups",
-          `<p><a href="/lab/popup-inner" target="_blank">Details in a new tab</a></p>
-<p><a href="https://example.invalid/" target="_blank" rel="noopener">External site</a></p>
-<button type="button" id="window">Open a window</button>
-<button type="button" id="closing">Open a window that closes itself</button>
-<script>
-  document.getElementById("window").addEventListener("click", () => window.open("/lab/popup-inner?via=script"));
-  document.getElementById("closing").addEventListener("click", () => window.open("/lab/popup-closing"));
-</script>`,
-        ),
-    },
-    {
-      method: "GET",
-      path: "/lab/popup-inner",
-      handle: () =>
-        page(
-          "Popup",
-          `<p>Opened in a new tab.</p>
-<script>
-  // Seeded bug: the popup's script fails while loading.
-  throw new Error("Seeded bug: popup failed to initialise");
-</script>`,
-        ),
-    },
-    {
-      method: "GET",
-      path: "/lab/popup-closing",
-      handle: () =>
-        page("Closing", "<p>This window closes itself.</p>\n<script>setTimeout(() => close(), 100);</script>"),
-    },
-    {
-      method: "GET",
-      path: "/lab/upload",
-      handle: () =>
-        page(
-          "Upload",
-          `<label>Document <input type="file" id="document"></label>
+</script>`;
+
+const UPLOAD_BODY = `<label>Document <input type="file" id="document"></label>
 <label>Attachments <input type="file" id="attachments" multiple></label>
 <input type="file" id="avatar" accept="image/*" hidden>
 <button type="button" id="pick">Upload avatar</button>
@@ -213,50 +104,9 @@ export function labRoutes(): Route[] {
   };
   for (const input of document.querySelectorAll("input[type=file]")) input.addEventListener("change", show);
   document.getElementById("pick").addEventListener("click", () => document.getElementById("avatar").click());
-</script>`,
-        ),
-    },
-    {
-      method: "GET",
-      path: "/lab/download",
-      handle: () =>
-        page(
-          "Download",
-          `<p><a href="/lab/files/report.csv">Download the report</a></p>
-<p><a href="/lab/files/export.zip">Download the export</a></p>`,
-        ),
-    },
-    {
-      method: "GET",
-      path: "/lab/files/report.csv",
-      handle: () => ({
-        status: 200,
-        headers: { "content-type": "text/csv", "content-disposition": 'attachment; filename="report.csv"' },
-        body: "fruit,price\nbanana,1\napple,2\n",
-      }),
-    },
-    {
-      method: "GET",
-      path: "/lab/files/export.zip",
-      // Seeded bug: the connection drops in the middle of the download.
-      handle: () => ({
-        status: 200,
-        headers: {
-          "content-type": "application/zip",
-          "content-disposition": 'attachment; filename="export.zip"',
-          "content-length": "100000",
-        },
-        body: "x".repeat(BROKEN_DOWNLOAD_BYTES),
-        abort: true,
-      }),
-    },
-    {
-      method: "GET",
-      path: "/lab/widgets",
-      handle: () =>
-        page(
-          "Widgets",
-          `<style>
+</script>`;
+
+const WIDGETS_BODY = `<style>
   .menu .submenu { display: none; }
   .menu:hover .submenu, .menu:focus-within .submenu { display: block; }
   #board { display: flex; gap: 1rem; }
@@ -314,8 +164,133 @@ export function labRoutes(): Route[] {
     timer = setTimeout(() => { status.textContent = "Confirmed."; }, 500);
   });
   for (const type of ["pointerup", "pointerleave", "pointercancel"]) hold.addEventListener(type, () => clearTimeout(timer));
-</script>`,
+</script>`;
+
+function labPage(path: string, title: string, body: string): Route {
+  return { method: "GET", path, handle: () => page(title, body) };
+}
+
+function labIndex(): Response {
+  const links = LAB_PAGES.map(({ path, link }) => `<li><a href="${path}">${link}</a></li>`);
+  links.push('<li><a href="/">Main site</a></li>');
+  return html(layout("Monkey lab", `<ul>\n${links.join("\n")}\n</ul>`));
+}
+
+/** The lab index, overlays, native dialogs and frames. */
+function dialogAndFrameRoutes(): Route[] {
+  return [
+    { method: "GET", path: "/lab", handle: labIndex },
+    labPage("/lab/consent", "Cookie banner", CONSENT_BODY),
+    labPage("/lab/dialogs", "Native dialogs", DIALOGS_BODY),
+    // The alert blocks the load event until it is answered.
+    labPage(
+      "/lab/alert-on-load",
+      "Alert on load",
+      `<p>An alert greets every visitor.</p>\n<script>alert("Welcome to the lab");</script>`,
+    ),
+    {
+      method: "GET",
+      path: "/lab/frames",
+      handle: (request) =>
+        page(
+          "Frames",
+          `<p>A same-origin frame, an inline frame and a frame from another origin.</p>
+<iframe src="/lab/frame-inner" title="Inner frame" width="400" height="120"></iframe>
+<iframe srcdoc="<button type=button onclick=&quot;this.textContent='Pressed'&quot;>Press me</button>" title="Inline frame" width="200" height="60"></iframe>
+<iframe src="${otherOrigin(request)}/lab/frame-outside" title="Other origin" width="300" height="60"></iframe>`,
         ),
     },
+    {
+      method: "GET",
+      path: "/lab/frame-inner",
+      handle: () =>
+        html(`<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>Inner frame</title><link rel="icon" href="data:,"></head>
+<body>
+<button type="button" id="crash">Crash in frame</button>
+<script>
+  // Seeded bug: uncaught exception in a click handler inside an iframe.
+  document.getElementById("crash").addEventListener("click", () => {
+    throw new Error("Seeded bug: frame handler crashed");
+  });
+</script>
+</body></html>`),
+    },
+    {
+      method: "GET",
+      path: "/lab/frame-outside",
+      handle: () =>
+        html(`<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>Other origin</title><link rel="icon" href="data:,"></head>
+<body><button type="button">Out of reach</button></body></html>`),
+    },
   ];
+}
+
+/** Popups, file inputs, downloads and widgets. */
+function popupFileAndWidgetRoutes(): Route[] {
+  return [
+    labPage(
+      "/lab/popups",
+      "Popups",
+      `<p><a href="/lab/popup-inner" target="_blank">Details in a new tab</a></p>
+<p><a href="https://example.invalid/" target="_blank" rel="noopener">External site</a></p>
+<button type="button" id="window">Open a window</button>
+<button type="button" id="closing">Open a window that closes itself</button>
+<script>
+  document.getElementById("window").addEventListener("click", () => window.open("/lab/popup-inner?via=script"));
+  document.getElementById("closing").addEventListener("click", () => window.open("/lab/popup-closing"));
+</script>`,
+    ),
+    labPage(
+      "/lab/popup-inner",
+      "Popup",
+      `<p>Opened in a new tab.</p>
+<script>
+  // Seeded bug: the popup's script fails while loading.
+  throw new Error("Seeded bug: popup failed to initialise");
+</script>`,
+    ),
+    labPage(
+      "/lab/popup-closing",
+      "Closing",
+      "<p>This window closes itself.</p>\n<script>setTimeout(() => close(), 100);</script>",
+    ),
+    labPage("/lab/upload", "Upload", UPLOAD_BODY),
+    labPage(
+      "/lab/download",
+      "Download",
+      `<p><a href="/lab/files/report.csv">Download the report</a></p>
+<p><a href="/lab/files/export.zip">Download the export</a></p>`,
+    ),
+    {
+      method: "GET",
+      path: "/lab/files/report.csv",
+      handle: () => ({
+        status: 200,
+        headers: { "content-type": "text/csv", "content-disposition": 'attachment; filename="report.csv"' },
+        body: "fruit,price\nbanana,1\napple,2\n",
+      }),
+    },
+    {
+      method: "GET",
+      path: "/lab/files/export.zip",
+      // Seeded bug: the connection drops in the middle of the download.
+      handle: () => ({
+        status: 200,
+        headers: {
+          "content-type": "application/zip",
+          "content-disposition": 'attachment; filename="export.zip"',
+          "content-length": "100000",
+        },
+        body: "x".repeat(BROKEN_DOWNLOAD_BYTES),
+        abort: true,
+      }),
+    },
+    labPage("/lab/widgets", "Widgets", WIDGETS_BODY),
+  ];
+}
+
+export function labRoutes(): Route[] {
+  return [...dialogAndFrameRoutes(), ...popupFileAndWidgetRoutes()];
 }

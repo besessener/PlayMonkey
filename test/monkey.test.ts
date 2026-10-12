@@ -190,7 +190,7 @@ describe("the monkey against the fixture site", () => {
     }
   }
 
-  async function record(seed: number, maxSteps: number): Promise<string[]> {
+  function record(seed: number, maxSteps: number): Promise<string[]> {
     return withContext(async (context) => {
       const steps: string[] = [];
       const result = await runMonkey(context, {

@@ -223,7 +223,7 @@ describe("action log and replay against the fixture site", () => {
     assert.deepEqual(log.findings.map((f) => f.key).sort(), keys);
     assert.ok(log.actions.every((a) => a.source === "monkey" && a.pageUrl.startsWith("${FIXTURE_URL}")));
     assert.ok(log.actions.filter((a) => "ref" in a).every((a) => a.locator !== undefined));
-    assert.ok(!text.includes(site.url) && !text.includes(FIXTURE_CREDENTIALS.password));
+    assert.ok(!(text.includes(site.url) || text.includes(FIXTURE_CREDENTIALS.password)));
 
     // Replay on a second fixture instance: only FIXTURE_URL changes.
     const { code, stdout } = await cli(["replay", "--config", configFile, logFile], moved.url);

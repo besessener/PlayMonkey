@@ -35,11 +35,16 @@ export class FakeProvider implements LlmProvider {
     this.#fallback = fallback;
   }
 
-  async preflight(): Promise<PreflightResult> {
-    return this.preflightResult;
+  preflight(): Promise<PreflightResult> {
+    return Promise.resolve(this.preflightResult);
   }
 
-  async decide(input: DecideInput): Promise<DecideResult> {
+  decide(input: DecideInput): Promise<DecideResult> {
+    // A throw inside the executor rejects the promise, as a real backend's failure does.
+    return new Promise((resolve) => resolve(this.#answer(input)));
+  }
+
+  #answer(input: DecideInput): DecideResult {
     this.inputs.push(input);
     const next = this.#script.shift() ?? this.#fallback;
     const response = typeof next === "function" ? next(input) : next;

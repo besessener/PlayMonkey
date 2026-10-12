@@ -176,7 +176,7 @@ describe("prompt placeholders", () => {
     assert.ok(message.indexOf("Current page:") > message.indexOf("Findings so far"));
     assert.match(message, /3\. \[monkey\] click e1 on \/ -> failed: timeout/);
     assert.match(SYSTEM_PROMPT, /exactly one tool call/);
-    assert.ok(!message.includes(SECRET) && !SYSTEM_PROMPT.includes(SECRET));
+    assert.ok(!(message.includes(SECRET) || SYSTEM_PROMPT.includes(SECRET)));
   });
 });
 

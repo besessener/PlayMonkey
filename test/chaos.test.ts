@@ -68,7 +68,7 @@ describe("chaos: 20 seeds on the full fixture", () => {
       assert.ok(result.durationMs < MAX_MINUTES * 60_000, `seed ${seed} took ${result.durationMs} ms`);
       // An unanswered dialog blocks the page: every later action would time out, and the page would hang.
       const findings = outcome.findings.map((f) => f.oracle);
-      assert.ok(!findings.includes("crash") && !findings.includes("hang"), `seed ${seed}: ${findings.join(", ")}`);
+      assert.ok(!(findings.includes("crash") || findings.includes("hang")), `seed ${seed}: ${findings.join(", ")}`);
       events.push(...records.flatMap((r) => r.events ?? []));
     }
     const answered = events.filter((e) => e.kind === "dialog");
