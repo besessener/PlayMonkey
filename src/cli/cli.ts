@@ -9,8 +9,8 @@ import { DEFAULT_SPECTATOR, type Spectator } from "../monkey/spectator.ts";
 import { SEVERITIES } from "../oracles/finding.ts";
 import { ActionLogError } from "../replay/log.ts";
 import { ReplayError, replayActionLog } from "../replay/replay.ts";
-import { buildReport, writeReport } from "../report/report.ts";
-import { describeFinding, planRuns, type RunLlm, runAllRoles } from "../run.ts";
+import { buildReport, type Report, writeReport } from "../report/report.ts";
+import { describeFinding, planRuns, type RoleOutcome, type RunLlm, runAllRoles } from "../run.ts";
 import { readVersion } from "../version.ts";
 
 export interface CliIo {
@@ -54,58 +54,73 @@ const COMMANDS: Record<string, { argName: string }> = {
   preflight: { argName: "config.json" },
 };
 
+type Parsed = ReturnType<typeof parse>;
+
+/** A command line that passed validation and is ready to dispatch. */
+interface Invocation {
+  command: string;
+  file: string;
+  values: Parsed["values"];
+  spectator: Spectator | undefined;
+}
+
 /** Parses `argv` (without the node and script paths), runs the command and returns the exit code. */
 export async function runCli(argv: string[], io: CliIo): Promise<ExitCode> {
-  let parsed: ReturnType<typeof parse>;
+  const invocation = resolveInvocation(argv, io);
+  if (typeof invocation === "number") return invocation;
+  return await dispatch(invocation, io);
+}
+
+/** Handles parse errors, `--version` and `--help`; returns the invocation to run or the exit code. */
+function resolveInvocation(argv: string[], io: CliIo): Invocation | ExitCode {
+  let parsed: Parsed;
   try {
     parsed = parse(argv);
   } catch (error) {
-    io.stderr(`monkey: ${(error as Error).message}\n\n${USAGE}`);
-    return ExitCode.Error;
+    return usageError(io, "monkey", (error as Error).message);
   }
-  const { values, positionals } = parsed;
-  const [command, ...rest] = positionals;
-
-  if (values.version) {
+  if (parsed.values.version) {
     io.stdout(`${readVersion()}\n`);
     return ExitCode.NoFindings;
   }
-  if (values.help) {
+  if (parsed.values.help) {
     io.stdout(USAGE);
     return ExitCode.NoFindings;
   }
-  if (command === undefined) {
-    io.stderr(`monkey: missing command\n\n${USAGE}`);
-    return ExitCode.Error;
-  }
-  const spec = COMMANDS[command];
-  if (spec === undefined) {
-    io.stderr(`monkey: unknown command '${command}'\n\n${USAGE}`);
-    return ExitCode.Error;
-  }
-  if (rest.length !== 1) {
-    io.stderr(`monkey ${command}: expected exactly one <${spec.argName}> argument\n\n${USAGE}`);
-    return ExitCode.Error;
-  }
+  return checkInvocation(parsed, io);
+}
 
+/** Validates the command, its argument and which options it may take. */
+function checkInvocation({ values, positionals }: Parsed, io: CliIo): Invocation | ExitCode {
+  const [command, ...rest] = positionals;
+  if (command === undefined) return usageError(io, "monkey", "missing command");
+  const spec = COMMANDS[command];
+  if (spec === undefined) return usageError(io, "monkey", `unknown command '${command}'`);
+  if (rest.length !== 1) {
+    return usageError(io, `monkey ${command}`, `expected exactly one <${spec.argName}> argument`);
+  }
   const [file] = rest as [string];
   const spectator = spectatorOf(values);
-  if (typeof spectator === "string") {
-    io.stderr(`monkey ${command}: ${spectator}\n\n${USAGE}`);
-    return ExitCode.Error;
-  }
+  if (typeof spectator === "string") return usageError(io, `monkey ${command}`, spectator);
   if (command === "preflight" && spectator !== undefined) {
-    io.stderr(`monkey preflight: --watch and --slow-mo belong to run and replay\n\n${USAGE}`);
-    return ExitCode.Error;
+    return usageError(io, "monkey preflight", "--watch and --slow-mo belong to run and replay");
   }
-  if (command === "run" || command === "preflight") {
-    if (values.config !== undefined || values.strict === true) {
-      io.stderr(`monkey ${command}: --config and --strict belong to replay\n\n${USAGE}`);
-      return ExitCode.Error;
-    }
-    return command === "run" ? run(file, io, spectator) : preflight(file, io);
+  const replayOnly = values.config !== undefined || values.strict === true;
+  if ((command === "run" || command === "preflight") && replayOnly) {
+    return usageError(io, `monkey ${command}`, "--config and --strict belong to replay");
   }
-  return replay(file, values.config, values.strict === true, io, spectator);
+  return { command, file, values, spectator };
+}
+
+function usageError(io: CliIo, prefix: string, message: string): ExitCode {
+  io.stderr(`${prefix}: ${message}\n\n${USAGE}`);
+  return ExitCode.Error;
+}
+
+function dispatch({ command, file, values, spectator }: Invocation, io: CliIo): Promise<ExitCode> {
+  if (command === "run") return run(file, io, spectator);
+  if (command === "preflight") return preflight(file, io);
+  return replay({ logFile: file, configFile: values.config, strict: values.strict === true, io, spectator });
 }
 
 /** The spectator settings from `--watch` and `--slow-mo`, undefined without them, or a usage error. */
@@ -183,7 +198,42 @@ async function preflight(configFile: string, io: CliIo): Promise<ExitCode> {
 async function run(configFile: string, io: CliIo, spectator?: Spectator): Promise<ExitCode> {
   const loaded = await load("run", configFile, io);
   if (loaded === undefined) return ExitCode.Error;
-  const { config, seedGenerated } = loaded;
+  printRunPlan(loaded, io);
+  // Before any browser work, so a broken endpoint fails fast.
+  const llm = await startLlm("run", loaded, io);
+  if (typeof llm === "number") return llm;
+
+  return await withStopSignal("run", io, async (signal) => {
+    try {
+      return await runAndReport({ loaded, llm, spectator, io }, signal);
+    } catch (error) {
+      const message = loaded.secrets.mask(error instanceof Error ? error.message : String(error));
+      io.stderr(`monkey run: ${launchHint(message, spectator)}\n`);
+      return ExitCode.Error;
+    }
+  });
+}
+
+/** Aborts the signal passed to `body` on SIGINT while it runs. */
+async function withStopSignal(
+  command: string,
+  io: CliIo,
+  body: (signal: AbortSignal) => Promise<ExitCode>,
+): Promise<ExitCode> {
+  const abort = new AbortController();
+  const onSignal = () => {
+    io.stderr(`monkey ${command}: stopping after the current step\n`);
+    abort.abort();
+  };
+  process.once("SIGINT", onSignal);
+  try {
+    return await body(abort.signal);
+  } finally {
+    process.off("SIGINT", onSignal);
+  }
+}
+
+function printRunPlan({ config, seedGenerated }: LoadedConfig, io: CliIo): void {
   if (config.seeds === undefined) {
     io.stdout(`seed: ${config.seed}${seedGenerated ? ' (generated; set "seed" in the config to reuse it)' : ""}\n`);
   } else {
@@ -191,115 +241,123 @@ async function run(configFile: string, io: CliIo, spectator?: Spectator): Promis
   }
   const runs = planRuns(config).length;
   if (runs > 1) io.stdout(`runs: ${runs}, ${Math.min(config.parallel, runs)} at a time\n`);
-  // Before any browser work, so a broken endpoint fails fast.
-  const llm = await startLlm("run", loaded, io);
-  if (typeof llm === "number") return llm;
+}
 
-  const abort = new AbortController();
-  const onSignal = () => {
-    io.stderr("monkey run: stopping after the current step\n");
-    abort.abort();
-  };
-  process.once("SIGINT", onSignal);
-  try {
-    const startedAt = new Date();
-    const outcomes = await runAllRoles(loaded, {
-      log: (line) => io.stdout(`${line}\n`),
-      signal: abort.signal,
-      ...(llm === undefined ? {} : { llm }),
-      ...(spectator === undefined ? {} : { spectator }),
-    });
-    const report = buildReport({
-      loaded,
-      outcomes,
-      version: readVersion(),
-      startedAt,
-      finishedAt: new Date(),
-      ...(llm === undefined ? {} : { llm: llm.stats.report() }),
-    });
-    const paths = await writeReport(report, config.report.dir);
+interface RunContext {
+  loaded: LoadedConfig;
+  llm: RunLlm | undefined;
+  spectator: Spectator | undefined;
+  io: CliIo;
+}
 
-    if (report.llm !== undefined) {
-      io.stdout(`${describeUsage(report.llm.total)}${report.llm.status === "disabled" ? " (disabled)" : ""}\n`);
-      const exhausted = report.llm.budget.exhausted;
-      if (exhausted !== undefined) {
-        io.stdout(`llm budget exhausted at step ${exhausted.step} of role ${exhausted.role}: ${exhausted.reason}\n`);
-      }
-    }
+async function runAndReport({ loaded, llm, spectator, io }: RunContext, signal: AbortSignal): Promise<ExitCode> {
+  const startedAt = new Date();
+  const outcomes = await runAllRoles(loaded, {
+    log: (line) => io.stdout(`${line}\n`),
+    signal,
+    ...(llm === undefined ? {} : { llm }),
+    ...(spectator === undefined ? {} : { spectator }),
+  });
+  const report = buildReport({
+    loaded,
+    outcomes,
+    version: readVersion(),
+    startedAt,
+    finishedAt: new Date(),
+    ...(llm === undefined ? {} : { llm: llm.stats.report() }),
+  });
+  const paths = await writeReport(report, loaded.config.report.dir);
 
-    const total = report.aggregated.length;
-    const counts = SEVERITIES.filter((severity) => report.counts[severity] > 0)
-      .map((severity) => `${report.counts[severity]} ${severity}`)
-      .join(", ");
-    io.stdout(`findings: ${total}${total === 0 ? "" : ` (${counts})`}\n`);
-    io.stdout(`report: ${paths.html}\n`);
-    // Precedence: a run that did not complete (2) outranks findings (1).
-    const failed = outcomes.filter((outcome) => outcome.result === undefined || outcome.result.stopReason === "error");
-    if (failed.length > 0) {
-      const labels = failed
-        .map((outcome) =>
-          loaded.secrets.mask(config.seeds === undefined ? outcome.role : `${outcome.role}/${outcome.seed}`),
-        )
-        .join(", ");
-      io.stdout(`exit 2: ${failed.length === 1 ? "run" : "runs"} ${labels} did not complete\n`);
-      return ExitCode.Error;
-    }
-    io.stdout(total > 0 ? "exit 1: findings present\n" : "exit 0: no findings\n");
-    return total > 0 ? ExitCode.Findings : ExitCode.NoFindings;
-  } catch (error) {
-    const message = loaded.secrets.mask(error instanceof Error ? error.message : String(error));
-    io.stderr(`monkey run: ${launchHint(message, spectator)}\n`);
-    return ExitCode.Error;
-  } finally {
-    process.off("SIGINT", onSignal);
+  printLlmUsage(report, io);
+  const total = report.aggregated.length;
+  const counts = SEVERITIES.filter((severity) => report.counts[severity] > 0)
+    .map((severity) => `${report.counts[severity]} ${severity}`)
+    .join(", ");
+  io.stdout(`findings: ${total}${total === 0 ? "" : ` (${counts})`}\n`);
+  io.stdout(`report: ${paths.html}\n`);
+  return runExitCode(total, incompleteRuns(outcomes, loaded), io);
+}
+
+function printLlmUsage({ llm }: Report, io: CliIo): void {
+  if (llm === undefined) return;
+  io.stdout(`${describeUsage(llm.total)}${llm.status === "disabled" ? " (disabled)" : ""}\n`);
+  const exhausted = llm.budget.exhausted;
+  if (exhausted !== undefined) {
+    io.stdout(`llm budget exhausted at step ${exhausted.step} of role ${exhausted.role}: ${exhausted.reason}\n`);
   }
 }
 
-async function replay(
-  logFile: string,
-  configFile: string | undefined,
-  strict: boolean,
-  io: CliIo,
-  spectator?: Spectator,
-): Promise<ExitCode> {
-  const abort = new AbortController();
-  const onSignal = () => {
-    io.stderr("monkey replay: stopping after the current step\n");
-    abort.abort();
-  };
-  process.once("SIGINT", onSignal);
-  try {
-    const { outcome, original, added } = await replayActionLog(logFile, {
-      ...(configFile === undefined ? {} : { config: configFile }),
-      strict,
-      env: io.env ?? process.env,
-      log: (line) => io.stdout(`${line}\n`),
-      signal: abort.signal,
-      ...(spectator === undefined ? {} : { spectator }),
-    });
-    if (outcome.result === undefined || outcome.result.stopReason === "error") return ExitCode.Error;
-    for (const finding of original) {
-      const verdict = finding.reproduced ? "reproduced    " : "not reproduced";
-      io.stdout(`${verdict}  ${finding.id} ${finding.severity} ${finding.oracle}: ${finding.message}\n`);
-    }
-    for (const finding of added) io.stdout(`new             ${describeFinding(finding)}\n`);
-    const reproduced = original.filter((finding) => finding.reproduced).length;
-    io.stdout(`reproduced: ${reproduced} of ${original.length}\n`);
-    return reproduced > 0 ? ExitCode.Findings : ExitCode.NoFindings;
-  } catch (error) {
-    if (error instanceof ConfigError || error instanceof ActionLogError || error instanceof ReplayError) {
-      io.stderr(`monkey replay: ${error.message}\n`);
-      return ExitCode.Error;
-    }
-    const message = error instanceof Error ? error.message : String(error);
-    if (launchHint(message, spectator) !== message) {
-      io.stderr(`monkey replay: ${launchHint(message, spectator)}\n`);
-      return ExitCode.Error;
-    }
-    throw error;
-  } finally {
-    process.off("SIGINT", onSignal);
+/** Masked labels of the runs that did not complete. */
+function incompleteRuns(outcomes: RoleOutcome[], { config, secrets }: LoadedConfig): string[] {
+  return outcomes
+    .filter((outcome) => outcome.result === undefined || outcome.result.stopReason === "error")
+    .map((outcome) => secrets.mask(config.seeds === undefined ? outcome.role : `${outcome.role}/${outcome.seed}`));
+}
+
+function runExitCode(findings: number, incomplete: string[], io: CliIo): ExitCode {
+  // Precedence: a run that did not complete (2) outranks findings (1).
+  if (incomplete.length > 0) {
+    io.stdout(`exit 2: ${incomplete.length === 1 ? "run" : "runs"} ${incomplete.join(", ")} did not complete\n`);
+    return ExitCode.Error;
   }
+  io.stdout(findings > 0 ? "exit 1: findings present\n" : "exit 0: no findings\n");
+  return findings > 0 ? ExitCode.Findings : ExitCode.NoFindings;
+}
+
+interface ReplayOptions {
+  logFile: string;
+  configFile: string | undefined;
+  strict: boolean;
+  io: CliIo;
+  spectator: Spectator | undefined;
+}
+
+async function replay(options: ReplayOptions): Promise<ExitCode> {
+  const { io, spectator } = options;
+  return await withStopSignal("replay", io, async (signal) => {
+    try {
+      return await replayAndReport(options, signal);
+    } catch (error) {
+      return replayFailure(error, spectator, io);
+    }
+  });
+}
+
+async function replayAndReport(
+  { logFile, configFile, strict, io, spectator }: ReplayOptions,
+  signal: AbortSignal,
+): Promise<ExitCode> {
+  const { outcome, original, added } = await replayActionLog(logFile, {
+    ...(configFile === undefined ? {} : { config: configFile }),
+    strict,
+    env: io.env ?? process.env,
+    log: (line) => io.stdout(`${line}\n`),
+    signal,
+    ...(spectator === undefined ? {} : { spectator }),
+  });
+  if (outcome.result === undefined || outcome.result.stopReason === "error") return ExitCode.Error;
+  for (const finding of original) {
+    const verdict = finding.reproduced ? "reproduced    " : "not reproduced";
+    io.stdout(`${verdict}  ${finding.id} ${finding.severity} ${finding.oracle}: ${finding.message}\n`);
+  }
+  for (const finding of added) io.stdout(`new             ${describeFinding(finding)}\n`);
+  const reproduced = original.filter((finding) => finding.reproduced).length;
+  io.stdout(`reproduced: ${reproduced} of ${original.length}\n`);
+  return reproduced > 0 ? ExitCode.Findings : ExitCode.NoFindings;
+}
+
+/** Reports expected replay errors and launch failures with a hint; rethrows anything else. */
+function replayFailure(error: unknown, spectator: Spectator | undefined, io: CliIo): ExitCode {
+  if (error instanceof ConfigError || error instanceof ActionLogError || error instanceof ReplayError) {
+    io.stderr(`monkey replay: ${error.message}\n`);
+    return ExitCode.Error;
+  }
+  const message = error instanceof Error ? error.message : String(error);
+  if (launchHint(message, spectator) !== message) {
+    io.stderr(`monkey replay: ${launchHint(message, spectator)}\n`);
+    return ExitCode.Error;
+  }
+  throw error;
 }
 
 function parse(argv: string[]) {
