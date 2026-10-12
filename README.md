@@ -13,14 +13,16 @@
 environment**. It clicks, types and submits its way through the site with seeded randomness and reports what breaks,
 with the steps to reproduce it. An LLM steps in only when the random monkey gets stuck.
 
-> **Status:** v0.1 (milestone M1): the seeded random monkey with oracles, reports and replay works without an LLM;
-> the LLM backend is next, see the [roadmap](docs/explanation/roadmap.md).
+> **Status:** milestone M2: the seeded random monkey with oracles, reports and replay, plus Claude on Microsoft
+> Foundry as the LLM for stuck situations. Next: an OpenAI-compatible backend and hardening, see the
+> [roadmap](docs/explanation/roadmap.md).
 
 ## Usage
 
 ```sh
-monkey run config.json        # explore the site and report findings
-monkey replay actions.json    # re-execute a recorded run, without an LLM
+monkey run config.json         # explore the site and report findings
+monkey replay actions.json     # re-execute a recorded run, without an LLM
+monkey preflight config.json   # check the configured LLM endpoint
 ```
 
 Exit codes: `0` no findings, `1` findings, `2` tool or config error.
@@ -41,6 +43,56 @@ Exit codes: `0` no findings, `1` findings, `2` tool or config error.
 
 Secrets come from environment variables (`${VAR}`) and are masked in all output. Step by step:
 [getting started](docs/tutorials/getting-started.md).
+
+## LLM
+
+Optional. When the random monkey is stuck (a dialog or cookie banner, a form that rejects its input, an expired
+session, no new pages), it hands a few decisions to an LLM; if the LLM fails, the monkey simply goes on.
+
+```json
+"llm": {
+  "provider": "anthropic-foundry",
+  "baseUrl": "https://<resource>.services.ai.azure.com/anthropic",
+  "deployment": "<deployment-name>",
+  "apiKey": "${FOUNDRY_API_KEY}",
+  "maxCalls": 200
+}
+```
+
+Secrets never enter a prompt: the model refers to login fields and test data by placeholders such as
+`{{admin.password}}`, filled in after it answered. The report shows calls, tokens, fallbacks and, with
+`llm.pricing`, an estimated cost. Details: [configure the LLM](docs/how-to/configure-llm.md) and
+[how the LLM is used](docs/explanation/llm.md).
+
+### Troubleshooting
+
+`monkey run` checks the endpoint before opening a browser (`monkey preflight` does only that): one probe request
+that must come back as a tool call. On failure it prints the cause and a hint and exits with `2`
+(`"required": false` continues without LLM instead).
+
+| Cause | Status | Fix |
+| --- | --- | --- |
+| `unreachable`, `tls`, `timeout` | – | Check `llm.baseUrl`, DNS, proxy, certificates (`NODE_EXTRA_CA_CERTS`), `llm.timeoutMs`. |
+| `auth` | 401 | `llm.apiKey` must be a key of this resource. |
+| `forbidden` | 403 | Give the identity a role such as Foundry User on the resource. |
+| `notFound` | 404 | `llm.deployment` is the deployment name, not the model ID; `llm.baseUrl` ends in `/anthropic`. |
+| `rateLimited` | 429 | Wait or raise the quota; requests are retried `llm.maxRetries` times first. |
+| `badRequest` | 400 | Remove an `llm.options` value the model rejects. |
+| `invalid` | 200 | The model did not return a tool call: tool calling is unsupported on this endpoint. |
+
+### Adding a backend
+
+Backends implement one interface (`src/llm/provider.ts`) and share the tools, prompt and validation:
+
+```ts
+interface LlmProvider {
+  readonly name: string;
+  preflight(): Promise<PreflightResult>; // probe: must come back as a `ping` tool call
+  decide(input: DecideInput): Promise<DecideResult>; // one action as a tool call, validated by parseToolCall
+}
+```
+
+See [adding a backend](docs/explanation/llm.md#adding-a-backend).
 
 ## Development
 

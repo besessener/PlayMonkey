@@ -99,6 +99,7 @@ describe("chooseAction", () => {
     elements,
     text: "",
     crossOriginFrames: 0,
+    dialogs: [],
     hash: "h",
   });
   const only = (type: ActionType) =>

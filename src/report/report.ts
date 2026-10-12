@@ -2,6 +2,7 @@ import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { join, relative, sep } from "node:path";
 import type { LoadedConfig } from "../config/config.ts";
 import { maskSecrets } from "../config/secrets.ts";
+import type { LlmReport } from "../llm/usage.ts";
 import type { StopReason } from "../monkey/loop.ts";
 import { type Finding, SEVERITIES, type Severity } from "../oracles/finding.ts";
 import type { RoleOutcome } from "../run.ts";
@@ -22,6 +23,8 @@ export interface Report {
   /** All roles' findings: by severity, then occurrences, then discovery. */
   findings: ReportFinding[];
   counts: Record<Severity, number>;
+  /** LLM usage; present when `llm` is configured. */
+  llm?: LlmReport;
 }
 
 export interface RoleSummary {
@@ -49,6 +52,7 @@ export interface ReportInput {
   version: string;
   startedAt: Date;
   finishedAt: Date;
+  llm?: LlmReport;
 }
 
 /** Builds the report from the run's in-memory result. Findings in `outcomes` are already masked. */
@@ -102,6 +106,7 @@ export function buildReport(input: ReportInput): Report {
     roles,
     findings,
     counts,
+    ...(input.llm === undefined ? {} : { llm: maskSecrets(input.llm, secrets) }),
   };
 }
 

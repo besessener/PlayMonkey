@@ -24,7 +24,7 @@ with a report.
 | `src/oracles/` | Detect and deduplicate findings, screenshots | done |
 | `src/replay/` | Action log writer and reader, durable locator parser, `monkey replay` | done |
 | `src/report/` | `report.json` and the self-contained `report.html` | done |
-| `src/llm/` | Provider interface, backends, stuck detection | planned (M2, M3) |
+| `src/llm/` | Provider interface, `anthropic-foundry` backend, prompt, preflight, stuck detection, handoff, usage | done (M2); `openai` with M3 |
 | `fixtures/site/` | Local site with seeded bugs, the ground truth for end-to-end tests | done |
 
 ## Design decisions

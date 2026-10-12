@@ -9,6 +9,7 @@ import {
   type ActionType,
   configSchema,
   DEFAULTS,
+  type EffortLevel,
   type Engine,
   type LlmProvider,
   MAX_SEED,
@@ -16,6 +17,9 @@ import {
   type OracleName,
   type RawAuth,
   type RawConfig,
+  type RawHandoff,
+  type RawLlm,
+  type ThinkingType,
 } from "./schema.ts";
 import { Secrets } from "./secrets.ts";
 
@@ -64,6 +68,27 @@ export interface LlmConfig {
   baseUrl: string;
   deployment: string;
   apiKey: string;
+  required: boolean;
+  timeoutMs: number;
+  maxRetries: number;
+  /** Absent: unlimited. */
+  maxCalls?: number;
+  /** Absent: unlimited. */
+  maxTokens?: number;
+  debugLog: boolean;
+  historyActions: number;
+  snapshotChars: number;
+  handoff: RawHandoff;
+  breaker: { failures: number; pauseSteps: number };
+  pricing?: LlmPricing;
+  options: { maxOutputTokens: number; thinking?: ThinkingType; effort?: EffortLevel };
+}
+
+export interface LlmPricing {
+  inputPerMTok: number;
+  outputPerMTok: number;
+  cacheReadPerMTok?: number;
+  cacheWritePerMTok?: number;
 }
 
 export interface LoadedConfig {
@@ -190,8 +215,39 @@ function normalize(raw: RawConfig, seed: number, baseDir: string): Config {
       ) as Record<ActionType, number>,
     },
   };
-  if (raw.llm !== undefined) config.llm = { ...raw.llm };
+  if (raw.llm !== undefined) config.llm = normalizeLlm(raw.llm);
   return config;
+}
+
+function normalizeLlm(raw: RawLlm): LlmConfig {
+  const defaults = DEFAULTS.llm;
+  const handoff = Object.fromEntries(
+    Object.entries(defaults.handoff).map(([key, value]) => [key, raw.handoff?.[key as keyof RawHandoff] ?? value]),
+  ) as unknown as RawHandoff;
+  const llm: LlmConfig = {
+    provider: raw.provider,
+    baseUrl: raw.baseUrl,
+    deployment: raw.deployment,
+    apiKey: raw.apiKey,
+    required: raw.required ?? defaults.required,
+    timeoutMs: raw.timeoutMs ?? defaults.timeoutMs,
+    maxRetries: raw.maxRetries ?? defaults.maxRetries,
+    debugLog: raw.debugLog ?? defaults.debugLog,
+    historyActions: raw.historyActions ?? defaults.historyActions,
+    snapshotChars: raw.snapshotChars ?? defaults.snapshotChars,
+    handoff,
+    breaker: {
+      failures: raw.breaker?.failures ?? defaults.breaker.failures,
+      pauseSteps: raw.breaker?.pauseSteps ?? defaults.breaker.pauseSteps,
+    },
+    options: { maxOutputTokens: raw.options?.maxOutputTokens ?? defaults.options.maxOutputTokens },
+  };
+  if (raw.maxCalls !== undefined) llm.maxCalls = raw.maxCalls;
+  if (raw.maxTokens !== undefined) llm.maxTokens = raw.maxTokens;
+  if (raw.pricing !== undefined) llm.pricing = { ...raw.pricing };
+  if (raw.options?.thinking !== undefined) llm.options.thinking = raw.options.thinking;
+  if (raw.options?.effort !== undefined) llm.options.effort = raw.options.effort;
+  return llm;
 }
 
 function normalizeRole(role: RawAuth, baseDir: string): AuthRole {

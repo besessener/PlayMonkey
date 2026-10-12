@@ -26,7 +26,9 @@
     "provider": "anthropic-foundry",
     "baseUrl": "https://<resource>.services.ai.azure.com/anthropic",
     "deployment": "<deployment-name>",
-    "apiKey": "${FOUNDRY_API_KEY}"
+    "apiKey": "${FOUNDRY_API_KEY}",
+    "maxCalls": 200,
+    "pricing": { "inputPerMTok": 3, "outputPerMTok": 15, "cacheReadPerMTok": 0.3 }
   },
   "oracles": { "overflow": false },
   "findings": { "lastActions": 10, "ignoreStatus": [401], "ignore": [{ "oracle": "console", "message": "^\\[analytics\\]" }] },
@@ -59,6 +61,32 @@
 | `llm.baseUrl` | string | – | Endpoint base URL. Required in `llm`. |
 | `llm.deployment` | string | – | Deployment name, used as the model. Required in `llm`. |
 | `llm.apiKey` | string | – | API key; use a `${VAR}` placeholder. Required in `llm`. |
+| `llm.required` | boolean | `true` | A failed [preflight](../how-to/configure-llm.md#troubleshooting) exits with code `2`; `false` warns and runs as pure random monkey. |
+| `llm.timeoutMs` | integer ≥ 1000 | `60000` | Timeout of one LLM request in milliseconds. |
+| `llm.maxRetries` | integer 0 … 10 | `2` | Retries of one request after a rate limit (429), server or connection error, with exponential backoff. Other errors are not retried. |
+| `llm.maxCalls` | integer ≥ 0 | unlimited | Budget: LLM calls per run, over all roles. When spent, the run continues as pure monkey and the report says so. |
+| `llm.maxTokens` | integer ≥ 0 | unlimited | Budget: tokens per run, over all roles (input, output, cache reads and writes). |
+| `llm.debugLog` | boolean | `false` | Write every prompt and response, sanitized, to `llm-debug.jsonl` in the report directory. Off: no prompt content is written anywhere. |
+| `llm.historyActions` | integer ≥ 0 | `10` | Number of recent actions shown to the LLM. |
+| `llm.snapshotChars` | integer ≥ 500 | `8000` | Character budget of the page snapshot in the prompt (roughly four characters per token). |
+| `llm.handoff.noStateChange` | integer ≥ 1 | `5` | Hand over after this many steps in a row without any change of the page. |
+| `llm.handoff.noProgress` | integer ≥ 1 | `25` | Hand over after this many steps in a row without a new (URL, snapshot hash) state. |
+| `llm.handoff.failedActions` | integer ≥ 1 | `5` | Hand over after this many failed monkey actions in a row. |
+| `llm.handoff.invalidForm` | integer ≥ 1 | `3` | Hand over after this many form submissions in a row that end on validation errors. |
+| `llm.handoff.blockingUi` | boolean | `true` | Hand over when a dialog or a cookie or consent banner is open. |
+| `llm.handoff.loginWall` | boolean | `true` | Hand over when a role that logged in arrives on a login page (expired session). |
+| `llm.handoff.maxDecisions` | integer ≥ 1 | `3` | Consecutive LLM decisions per handoff; then the monkey takes over again. |
+| `llm.handoff.cooldownSteps` | integer ≥ 0 | `5` | Monkey steps after a handoff before the next one can start. |
+| `llm.breaker.failures` | integer ≥ 1 | `3` | Failed LLM decisions in a row that open the circuit breaker. |
+| `llm.breaker.pauseSteps` | integer ≥ 1 | `20` | Steps without LLM while the breaker is open. |
+| `llm.pricing` | object | absent | Prices per million tokens for an **estimated** cost in the report. There are no built-in prices. |
+| `llm.pricing.inputPerMTok` | number ≥ 0 | – | Price per million input tokens. Required in `pricing`. |
+| `llm.pricing.outputPerMTok` | number ≥ 0 | – | Price per million output tokens (thinking included). Required in `pricing`. |
+| `llm.pricing.cacheReadPerMTok` | number ≥ 0 | `inputPerMTok` | Price per million tokens read from the prompt cache. |
+| `llm.pricing.cacheWritePerMTok` | number ≥ 0 | `inputPerMTok` | Price per million tokens written to the prompt cache. |
+| `llm.options.maxOutputTokens` | integer ≥ 16 | `4096` | `max_tokens` of a request. Thinking tokens count against it. |
+| `llm.options.thinking` | `adaptive` \| `disabled` \| `between_tools` | model default | Thinking mode sent to the model. Absent sends nothing; which values a model accepts differs, see [configure the LLM](../how-to/configure-llm.md#thinking-and-effort). |
+| `llm.options.effort` | `low` \| `medium` \| `high` \| `xhigh` \| `max` | model default | Effort level sent to the model. |
 | `oracles.pageerror` | boolean | `true` | Report uncaught exceptions. |
 | `oracles.console` | boolean | `true` | Report `console.error` messages. |
 | `oracles.http5xx` | boolean | `true` | Report responses with status ≥ 500. |
@@ -86,8 +114,9 @@
 | `monkey.weights.setViewport` | number ≥ 0 | `0.2` | Relative weight of resizing the viewport. |
 | `monkey.weights.switchTab` | number ≥ 0 | `1` | Relative weight of switching to another open tab. |
 
-`llm` is validated now and takes effect with milestone M2 (see the [roadmap](../explanation/roadmap.md)). What each
-oracle reports is explained in [oracles and findings](../explanation/oracles.md).
+How the LLM is used is explained in [the LLM](../explanation/llm.md); setting up a backend in
+[configure the LLM](../how-to/configure-llm.md). `llm.provider: "openai"` is accepted by the schema but not available
+before milestone M3. What each oracle reports is explained in [oracles and findings](../explanation/oracles.md).
 
 ## Rules
 

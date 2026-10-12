@@ -40,6 +40,26 @@ export const DEFAULTS = {
   oracle: true,
   report: { dir: "./monkey-report" },
   findings: { lastActions: 10, ignoreStatus: [] as number[] },
+  llm: {
+    required: true,
+    timeoutMs: 60_000,
+    maxRetries: 2,
+    debugLog: false,
+    historyActions: 10,
+    snapshotChars: 8000,
+    handoff: {
+      noStateChange: 5,
+      noProgress: 25,
+      failedActions: 5,
+      invalidForm: 3,
+      blockingUi: true,
+      loginWall: true,
+      maxDecisions: 3,
+      cooldownSteps: 5,
+    },
+    breaker: { failures: 3, pauseSteps: 20 },
+    options: { maxOutputTokens: 4096 },
+  },
   monkey: {
     actionTimeoutMs: 5000,
     weights: {
@@ -94,11 +114,39 @@ export interface RawIgnoreRule {
   message?: string;
 }
 
+export const THINKING_TYPES = ["adaptive", "disabled", "between_tools"] as const;
+export type ThinkingType = (typeof THINKING_TYPES)[number];
+export const EFFORT_LEVELS = ["low", "medium", "high", "xhigh", "max"] as const;
+export type EffortLevel = (typeof EFFORT_LEVELS)[number];
+
 export interface RawLlm {
   provider: LlmProvider;
   baseUrl: string;
   deployment: string;
   apiKey: string;
+  required?: boolean;
+  timeoutMs?: number;
+  maxRetries?: number;
+  maxCalls?: number;
+  maxTokens?: number;
+  debugLog?: boolean;
+  historyActions?: number;
+  snapshotChars?: number;
+  handoff?: Partial<RawHandoff>;
+  breaker?: { failures?: number; pauseSteps?: number };
+  pricing?: { inputPerMTok: number; outputPerMTok: number; cacheReadPerMTok?: number; cacheWritePerMTok?: number };
+  options?: { maxOutputTokens?: number; thinking?: ThinkingType; effort?: EffortLevel };
+}
+
+export interface RawHandoff {
+  noStateChange: number;
+  noProgress: number;
+  failedActions: number;
+  invalidForm: number;
+  blockingUi: boolean;
+  loginWall: boolean;
+  maxDecisions: number;
+  cooldownSteps: number;
 }
 
 const nonEmptyString = { type: "string", minLength: 1 } as const;
@@ -217,6 +265,196 @@ export const configSchema: JSONSchemaType<RawConfig> = {
         baseUrl: { ...nonEmptyString, description: "Endpoint base URL." },
         deployment: { ...nonEmptyString, description: "Deployment name used as model." },
         apiKey: { ...nonEmptyString, description: "API key; use a ${VAR} placeholder." },
+        required: {
+          type: "boolean",
+          nullable: true,
+          default: DEFAULTS.llm.required,
+          description: "Exit with code 2 when the preflight check fails; false continues as pure random monkey.",
+        },
+        timeoutMs: {
+          type: "integer",
+          minimum: 1000,
+          nullable: true,
+          default: DEFAULTS.llm.timeoutMs,
+          description: "Timeout of one LLM request in milliseconds.",
+        },
+        maxRetries: {
+          type: "integer",
+          minimum: 0,
+          maximum: 10,
+          nullable: true,
+          default: DEFAULTS.llm.maxRetries,
+          description: "Retries of a request after a rate limit, server or connection error.",
+        },
+        maxCalls: {
+          type: "integer",
+          minimum: 0,
+          nullable: true,
+          description: "Budget: LLM calls per run (all roles). Unlimited when absent.",
+        },
+        maxTokens: {
+          type: "integer",
+          minimum: 0,
+          nullable: true,
+          description: "Budget: tokens per run (all roles; input, output and cache). Unlimited when absent.",
+        },
+        debugLog: {
+          type: "boolean",
+          nullable: true,
+          default: DEFAULTS.llm.debugLog,
+          description: "Write sanitized prompts and responses to llm-debug.jsonl in the report directory.",
+        },
+        historyActions: {
+          type: "integer",
+          minimum: 0,
+          nullable: true,
+          default: DEFAULTS.llm.historyActions,
+          description: "Number of recent actions shown to the LLM.",
+        },
+        snapshotChars: {
+          type: "integer",
+          minimum: 500,
+          nullable: true,
+          default: DEFAULTS.llm.snapshotChars,
+          description: "Character budget of the page snapshot in the prompt.",
+        },
+        handoff: {
+          type: "object",
+          nullable: true,
+          additionalProperties: false,
+          required: [],
+          description: "When the monkey hands the next decisions to the LLM.",
+          properties: {
+            noStateChange: {
+              type: "integer",
+              minimum: 1,
+              nullable: true,
+              default: DEFAULTS.llm.handoff.noStateChange,
+              description: "Steps in a row without any change of the page.",
+            },
+            noProgress: {
+              type: "integer",
+              minimum: 1,
+              nullable: true,
+              default: DEFAULTS.llm.handoff.noProgress,
+              description: "Steps in a row without discovering a new state.",
+            },
+            failedActions: {
+              type: "integer",
+              minimum: 1,
+              nullable: true,
+              default: DEFAULTS.llm.handoff.failedActions,
+              description: "Failed monkey actions in a row.",
+            },
+            invalidForm: {
+              type: "integer",
+              minimum: 1,
+              nullable: true,
+              default: DEFAULTS.llm.handoff.invalidForm,
+              description: "Form submissions in a row that end on validation errors.",
+            },
+            blockingUi: {
+              type: "boolean",
+              nullable: true,
+              default: DEFAULTS.llm.handoff.blockingUi,
+              description: "Hand off when a dialog, overlay or cookie banner is open.",
+            },
+            loginWall: {
+              type: "boolean",
+              nullable: true,
+              default: DEFAULTS.llm.handoff.loginWall,
+              description: "Hand off when a role that logged in lands on a login page.",
+            },
+            maxDecisions: {
+              type: "integer",
+              minimum: 1,
+              nullable: true,
+              default: DEFAULTS.llm.handoff.maxDecisions,
+              description: "Consecutive LLM decisions per handoff.",
+            },
+            cooldownSteps: {
+              type: "integer",
+              minimum: 0,
+              nullable: true,
+              default: DEFAULTS.llm.handoff.cooldownSteps,
+              description: "Monkey steps after a handoff before the next one.",
+            },
+          },
+        },
+        breaker: {
+          type: "object",
+          nullable: true,
+          additionalProperties: false,
+          required: [],
+          description: "Circuit breaker for an unavailable LLM.",
+          properties: {
+            failures: {
+              type: "integer",
+              minimum: 1,
+              nullable: true,
+              default: DEFAULTS.llm.breaker.failures,
+              description: "Failed LLM decisions in a row that open the breaker.",
+            },
+            pauseSteps: {
+              type: "integer",
+              minimum: 1,
+              nullable: true,
+              default: DEFAULTS.llm.breaker.pauseSteps,
+              description: "Steps without LLM while the breaker is open.",
+            },
+          },
+        },
+        pricing: {
+          type: "object",
+          nullable: true,
+          additionalProperties: false,
+          required: ["inputPerMTok", "outputPerMTok"],
+          description: "Prices per million tokens, for an estimated cost in the report. No built-in prices.",
+          properties: {
+            inputPerMTok: { type: "number", minimum: 0, description: "Price per million input tokens." },
+            outputPerMTok: { type: "number", minimum: 0, description: "Price per million output tokens." },
+            cacheReadPerMTok: {
+              type: "number",
+              minimum: 0,
+              nullable: true,
+              description: "Price per million cache-read tokens; inputPerMTok when absent.",
+            },
+            cacheWritePerMTok: {
+              type: "number",
+              minimum: 0,
+              nullable: true,
+              description: "Price per million cache-write tokens; inputPerMTok when absent.",
+            },
+          },
+        },
+        options: {
+          type: "object",
+          nullable: true,
+          additionalProperties: false,
+          required: [],
+          description: "Model request options.",
+          properties: {
+            maxOutputTokens: {
+              type: "integer",
+              minimum: 16,
+              nullable: true,
+              default: DEFAULTS.llm.options.maxOutputTokens,
+              description: "max_tokens of a request, including thinking tokens.",
+            },
+            thinking: {
+              type: "string",
+              enum: THINKING_TYPES,
+              nullable: true,
+              description: "Thinking mode sent to the model; the model's default when absent.",
+            },
+            effort: {
+              type: "string",
+              enum: EFFORT_LEVELS,
+              nullable: true,
+              description: "Effort level sent to the model; the model's default when absent.",
+            },
+          },
+        },
       },
     },
     oracles: {

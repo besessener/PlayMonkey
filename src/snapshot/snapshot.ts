@@ -38,6 +38,8 @@ const INTERACTIVE_ROLES = new Set([
   "treeitem",
 ]);
 
+const DIALOG_ROLES = new Set(["dialog", "alertdialog"]);
+
 const CHECKABLE_ROLES = new Set(["checkbox", "menuitemcheckbox", "menuitemradio", "radio", "switch"]);
 
 /** Keys that identify an element in one snapshot only, or change without the page's state changing. */
@@ -71,6 +73,8 @@ export interface Snapshot {
   text: string;
   /** Number of cross-origin iframes: listed, not entered. */
   crossOriginFrames: number;
+  /** Accessible names of open dialogs (`dialog`, `alertdialog`), in document order; `""` for an unnamed one. */
+  dialogs: string[];
   /** Stable for an unchanged page, different after a state change. Independent of refs and layout. */
   hash: string;
 }
@@ -96,6 +100,7 @@ export async function snapshot(page: Page): Promise<Snapshot> {
 
   const elements: SnapshotElement[] = [];
   const texts: string[] = [];
+  const dialogs: string[] = [];
   let crossOriginFrames = 0;
 
   const visit = async (node: AriaNode | string, inFrame: boolean): Promise<void> => {
@@ -111,6 +116,7 @@ export async function snapshot(page: Page): Promise<Snapshot> {
       for (const child of node.children ?? []) await visit(child, true);
       return;
     }
+    if (DIALOG_ROLES.has(node.role)) dialogs.push(node.name ?? "");
     const actionable = node.ref !== undefined && isActionable(node);
     if (actionable) elements.push(toElement(node, node.ref as string, viewport, inFrame));
     // Headings and other named landmarks carry their text as the name.
@@ -130,6 +136,7 @@ export async function snapshot(page: Page): Promise<Snapshot> {
       .filter((t) => t !== "")
       .join("\n"),
     crossOriginFrames,
+    dialogs,
     hash: hashTree(roots),
   };
 }
