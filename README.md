@@ -28,10 +28,9 @@ with the steps to reproduce it. An LLM steps in only when the random monkey gets
 - **Test environments only** – no guardrails by design: it will click "Delete" and submit every form
   ([ground rules](docs/explanation/ground-rules.md)). Not a test-case generator, visual regression or load test.
 
-> **Status:** milestone M4: the seeded random monkey with oracles, reports and replay; Claude on Microsoft Foundry
+> **Status:** version 0.4.0: the seeded random monkey with oracles, reports and replay; Claude on Microsoft Foundry
 > or any OpenAI-compatible endpoint as the LLM for stuck situations; cookie banners, native dialogs, iframes,
-> popups, file uploads and downloads handled; parallel runs per role and seed; a CI example. See the
-> [roadmap](docs/explanation/roadmap.md).
+> popups, file uploads and downloads handled; parallel runs per role and seed; a CI example.
 
 ## Installation
 

@@ -2,7 +2,7 @@
 
 The seeded random monkey is good at hammering a page and bad at getting past obstacles: a consent banner, a dialog,
 a form that wants a valid IBAN, an expired session. The LLM is only asked then, for a few decisions, so runs stay
-cheap and fast, and an LLM outage never stops a run. Without `llm` in the config the loop is exactly the M1 monkey.
+cheap and fast, and an LLM outage never stops a run. Without `llm` in the config the loop is exactly the random monkey.
 
 ## A step with an LLM
 

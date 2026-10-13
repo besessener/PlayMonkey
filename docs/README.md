@@ -49,7 +49,6 @@ Organised by [Diátaxis](https://diataxis.fr/): by what you need right now.
 - [The LLM](explanation/llm.md) – when the monkey hands over, fallback and circuit breaker, secrets, adding a backend.
 - [Replay](explanation/replay.md) – how a run is repeated without randomness or LLM, drift, the result.
 - [Tooling choices](explanation/tooling.md) – why `node:test`, Biome, Knip, these TypeScript settings and so few dependencies.
-- [Roadmap](explanation/roadmap.md) – milestones and status.
 
 Related projects with the same idea and the same documentation layout:
 [flakipype](https://github.com/besessener/flakipype/blob/main/docs/README.md) and
