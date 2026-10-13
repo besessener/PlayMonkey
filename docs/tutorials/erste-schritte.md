@@ -1,7 +1,7 @@
 # Erste Schritte
 
 Dieses Tutorial führt dich von einem frischen Klon zu einem ersten `monkey run` gegen die lokale Fixture-Seite. Du
-brauchst Node.js 22.18 oder neuer (die Fixture-Seite führt TypeScript direkt aus) und git. Ein LLM ist nicht nötig.
+brauchst Node.js 26 oder neuer (die Fixture-Seite führt TypeScript direkt aus) und git. Ein LLM ist nicht nötig.
 
 ## 1. Installieren
 

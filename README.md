@@ -1,6 +1,6 @@
 # PlayMonkey
 
-![Node](https://img.shields.io/badge/node-%3E%3D22-339933?logo=nodedotjs&logoColor=white)
+![Node](https://img.shields.io/badge/node-%3E%3D26-339933?logo=nodedotjs&logoColor=white)
 ![TypeScript](https://img.shields.io/badge/language-TypeScript-3178C6?logo=typescript&logoColor=white)
 ![Playwright](https://img.shields.io/badge/browser-Playwright-2EAD33?logo=playwright&logoColor=white)
 ![Biome](https://img.shields.io/badge/lint-Biome-60A5FA?logo=biome&logoColor=white)
@@ -37,7 +37,7 @@ feststeckt.
 
 ## Installation
 
-Voraussetzungen: Node.js 22.18 oder neuer und ein Playwright-Browser. Installiere PlayMonkey in deinem eigenen
+Voraussetzungen: Node.js 26 oder neuer und ein Playwright-Browser. Installiere PlayMonkey in deinem eigenen
 Projekt als Dev-Abhängigkeit:
 
 ```sh
@@ -95,7 +95,7 @@ Secrets kommen aus Umgebungsvariablen (`${VAR}`) und werden in jeder Ausgabe mas
 
 ## Entwicklung
 
-Voraussetzungen: Node.js 22.18 oder neuer.
+Voraussetzungen: Node.js 26 oder neuer.
 
 ```sh
 npm ci

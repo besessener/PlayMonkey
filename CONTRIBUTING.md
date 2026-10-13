@@ -5,7 +5,7 @@ Danke, dass du hilfst. PlayMonkey ist ein kleines TypeScript-CLI auf Basis von P
 
 ## Einrichten
 
-Node.js 22.18 oder neuer:
+Node.js 26 oder neuer:
 
 ```sh
 npm ci                            # installs and builds (prepare)

@@ -9,7 +9,7 @@
     "url": "git+https://github.com/besessener/PlayMonkey.git"
   },
   "engines": {
-    "node": ">=22"
+    "node": ">=26"
   },
   "bin": {
     "monkey": "dist/cli/main.js"

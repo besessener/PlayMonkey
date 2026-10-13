@@ -51,7 +51,7 @@ describe("monkey run against the fixture site", () => {
     assert.match(stdout, /^seed: 4\n\[user\] starting\n/);
     assert.match(stdout, /\[user\] 8 steps in [\d.]+s, \d+ states, \d+ failed actions, stopped: maxSteps, 1 finding\n/);
     assert.match(stdout, /\[user\] {3}F1 medium http4xx: GET \/missing-page responded 404 Not Found \(step \d\)\n/);
-    assert.match(stdout, /\nfindings: 1 \(1 medium\)\nreport: .*out-ok\/report\.html\nexit 1: findings present\n$/);
+    assert.match(stdout, /\nfindings: 1 \(1 medium\)\nreport: .*out-ok[\\/]report\.html\nexit 1: findings present\n$/);
     assert.ok((await stat(join(dir, "out-ok", "user", "trace.zip"))).size > 0);
   });
 
