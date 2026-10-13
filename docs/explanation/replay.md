@@ -1,43 +1,48 @@
 # Replay
 
-Every finding must be reproducible. The random monkey is reproducible by its seed as long as the site renders the
-same, but LLM decisions are not, and a changed site sends a seeded run elsewhere. So `monkey run` records every
-executed action in an [action log](../reference/aktionsprotokoll.md), and `monkey replay` executes that log again:
+Jeder Befund muss reproduzierbar sein. Der Zufalls-Monkey ist über seinen Seed reproduzierbar, solange die Seite
+gleich gerendert wird, LLM-Entscheidungen aber nicht, und eine veränderte Seite schickt einen Lauf mit Seed woanders
+hin. Deshalb hält `monkey run` jede ausgeführte Aktion in einem [Aktionsprotokoll](../reference/aktionsprotokoll.md)
+fest, und `monkey replay` führt dieses Protokoll erneut aus:
 
 ```sh
 monkey replay monkey-report/user/actions.json --config config.json
 ```
 
-## What replay does
+## Was Replay tut
 
-1. Reads the log, checks its `version`, and resolves its `${VAR}` placeholders from the environment.
-2. Opens a fresh browser context for the recorded role, logged in as the config describes. Without `--config`,
-   only anonymous logs replay; browser and oracle settings are then the defaults. `baseUrl`, viewport and seed
-   always come from the log.
-3. Executes the actions in order through the same loop as `monkey run`, with the same page handling: a page that
-   left the site's origin is sent back to `baseUrl`, a crashed page is replaced.
-4. Runs the same [oracles](orakel.md) and compares their findings with the recorded ones by dedup key.
+1. Liest das Protokoll, prüft seine `version` und löst seine Platzhalter `${VAR}` aus der Umgebung auf.
+2. Öffnet einen frischen Browserkontext für die aufgezeichnete Rolle, angemeldet so, wie die Konfiguration es
+   beschreibt. Ohne `--config` lassen sich nur anonyme Protokolle abspielen; Browser- und Orakel-Einstellungen sind
+   dann die Standardwerte. `baseUrl`, Viewport und Seed kommen immer aus dem Protokoll.
+3. Führt die Aktionen der Reihe nach durch dieselbe Schleife wie `monkey run` aus, mit demselben Umgang mit Seiten:
+   Eine Seite, die den Origin der Website verlassen hat, wird zurück zu `baseUrl` geschickt, eine abgestürzte Seite
+   wird ersetzt.
+4. Lässt dieselben [Orakel](orakel.md) laufen und vergleicht ihre Befunde über den Dedup-Schlüssel mit den
+   aufgezeichneten.
 
-No LLM is involved, and replay needs neither an `llm` config nor network access to one: LLM decisions are in the log
-as plain actions.
+Kein LLM ist beteiligt, und Replay braucht weder eine `llm`-Konfiguration noch Netzwerkzugang zu einem LLM:
+LLM-Entscheidungen stehen als gewöhnliche Aktionen im Protokoll.
 
-## Finding elements again
+## Elemente wiederfinden
 
-Refs only exist for one snapshot, so element actions are found by their **durable locator**, such as
-`getByRole('button', { name: 'Send' })` or `locator('iframe').contentFrame().getByRole('link', { name: 'Home' })`.
-Replay parses that text back into a Playwright locator. It accepts only Playwright's locator methods with literal
-arguments (`getByRole`, `getByText`, `getByLabel`, `locator`, `contentFrame`, `nth`, …) and never evaluates the
-text, so a log cannot run code.
+Refs gibt es nur für einen Snapshot, deshalb werden Elemente für Aktionen über ihren **dauerhaften Locator**
+gefunden, etwa `getByRole('button', { name: 'Send' })` oder
+`locator('iframe').contentFrame().getByRole('link', { name: 'Home' })`. Replay parst diesen Text zurück in einen
+Playwright-Locator. Es akzeptiert nur die Locator-Methoden von Playwright mit literalen Argumenten (`getByRole`,
+`getByText`, `getByLabel`, `locator`, `contentFrame`, `nth`, …) und wertet den Text nie aus, sodass ein Protokoll
+keinen Code ausführen kann.
 
-A `drag` also finds its drop target by `toLocator`. Native dialogs and file choosers get the answers recorded in the
-step's `events` (accepted or dismissed, the prompt text, the uploaded file names), so a replay takes the same path
-through `confirm` dialogs and uploads as the recording.
+Auch ein `drag` findet sein Ablageziel über `toLocator`. Native Dialoge und Dateiauswahlen bekommen die Antworten, die
+in den `events` des Schritts festgehalten sind (angenommen oder abgelehnt, der Prompt-Text, die Namen der
+hochgeladenen Dateien), sodass ein Replay denselben Weg durch `confirm`-Dialoge und Uploads nimmt wie die
+Aufzeichnung.
 
-Each element gets `monkey.actionTimeoutMs` to appear. When it does not, the site has **drifted** since the recording:
-replay logs `step N skipped: element not found: …` and continues with the next action. With `--strict` it stops
-there instead and exits `2`.
+Jedes Element hat `monkey.actionTimeoutMs` Zeit, zu erscheinen. Tut es das nicht, ist die Seite seit der Aufzeichnung
+**abgedriftet**: Replay protokolliert `step N skipped: element not found: …` und macht mit der nächsten Aktion weiter.
+Mit `--strict` hält es stattdessen dort an und endet mit `2`.
 
-## Result
+## Ergebnis
 
 ```text
 reproduced      F1 medium console: Seeded bug: console error on load
@@ -46,7 +51,8 @@ new             F3 low overflow: horizontal overflow on /overflow: div makes the
 reproduced: 1 of 2
 ```
 
-Each recorded finding is `reproduced` or `not reproduced`; findings the recording did not have are listed as `new`.
-The exit code is `1` when at least one recorded finding reproduced, `0` when none did, and `2` on errors (unreadable
-log, unsupported version, missing variable, failed login, `--strict` drift). Replay writes its trace, video and
-screenshots to `replay/` next to the log.
+Jeder aufgezeichnete Befund ist `reproduced` oder `not reproduced`; Befunde, die die Aufzeichnung nicht hatte,
+erscheinen als `new`. Der Exit-Code ist `1`, wenn mindestens ein aufgezeichneter Befund reproduziert wurde, `0`, wenn
+keiner, und `2` bei Fehlern (unlesbares Protokoll, nicht unterstützte Version, fehlende Variable, fehlgeschlagene
+Anmeldung, Abdrift mit `--strict`). Replay schreibt seinen Trace, sein Video und seine Screenshots nach `replay/`
+neben dem Protokoll.

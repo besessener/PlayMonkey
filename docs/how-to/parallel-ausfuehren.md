@@ -1,7 +1,8 @@
-# Run in parallel
+# Parallel ausführen
 
-Several roles, or the same role with several seeds, cover more of a site in the same wall-clock time. Each run is
-one role with one seed, in its own browser context (cookies and storage never mix), in one shared browser.
+Mehrere Rollen, oder dieselbe Rolle mit mehreren Seeds, decken in derselben Zeit mehr von einer Seite ab. Jeder Lauf
+ist eine Rolle mit einem Seed, in einem eigenen Browserkontext (Cookies und Storage vermischen sich nie), in einem
+gemeinsamen Browser.
 
 ```json
 {
@@ -16,7 +17,7 @@ one role with one seed, in its own browser context (cookies and storage never mi
 }
 ```
 
-This plans 2 roles × 3 seeds = 6 runs and executes 3 at a time:
+Das plant 2 Rollen × 3 Seeds = 6 Läufe und führt jeweils 3 gleichzeitig aus:
 
 ```text
 seeds: 1, 2, 3
@@ -27,14 +28,14 @@ runs: 6, 3 at a time
 …
 ```
 
-- **`seeds`** replaces `seed`: one run per seed and role. Without it, each role runs once with `seed`.
-- **`parallel`** is how many runs execute at the same time (default `1`: one after the other). More runs at once
-  need more CPU and memory, and put more load on the test environment; start with the number of CPU cores.
-- `limits.maxSteps` and `limits.maxMinutes` apply **per run**.
+- **`seeds`** ersetzt `seed`: ein Lauf je Seed und Rolle. Ohne `seeds` läuft jede Rolle einmal mit `seed`.
+- **`parallel`** gibt an, wie viele Läufe gleichzeitig ausgeführt werden (Standard `1`: nacheinander). Mehr Läufe auf
+  einmal brauchen mehr CPU und Speicher und belasten die Testumgebung stärker; fang mit der Zahl der CPU-Kerne an.
+- `limits.maxSteps` und `limits.maxMinutes` gelten **je Lauf**.
 
-## Output
+## Ausgabe
 
-With `seeds` every run writes to its own directory, and there is one combined report:
+Mit `seeds` schreibt jeder Lauf in ein eigenes Verzeichnis, und es gibt einen gemeinsamen Bericht:
 
 ```text
 monkey-report/
@@ -44,28 +45,29 @@ monkey-report/
   user/3/…
 ```
 
-Findings are deduplicated per run as usual, and then **aggregated across runs** by their dedup key: the report shows
-each problem once, with the roles and runs that found it ("found in admin, user"), and the steps to reproduce from
-the first of them. `report.json` keeps both, `findings[]` per run and `aggregated[]`; see the
-[report reference](../reference/bericht.md#reportjson). Runs are listed in config order, roles first, then seeds,
-whatever order they finished in.
+Befunde werden wie gewohnt je Lauf dedupliziert und dann über ihren Dedup-Schlüssel **über die Läufe hinweg
+zusammengefasst**: Der Bericht zeigt jedes Problem einmal, mit den Rollen und Läufen, die es gefunden haben
+(„found in admin, user“), und den Schritten zum Reproduzieren aus dem ersten davon. `report.json` enthält beides,
+`findings[]` je Lauf und `aggregated[]`; siehe die [Referenz zum Bericht](../reference/bericht.md#reportjson). Läufe
+stehen in der Reihenfolge der Konfiguration, erst die Rollen, dann die Seeds, egal, in welcher Reihenfolge sie fertig
+wurden.
 
-## Determinism
+## Determinismus
 
-Each run is as reproducible as a single one: with the LLM off, the same config and seeds take the same actions
-whether the runs execute in parallel or one after the other, as long as the site behaves the same. Runs of different
-roles on one test environment can still influence each other through the site's shared data (one role deletes what
-another opens); that is a property of the site, not of the monkey. Replay a single run with its own
-`<role>/<seed>/actions.json`.
+Jeder Lauf ist so reproduzierbar wie ein einzelner: Ohne LLM führen dieselbe Konfiguration und dieselben Seeds zu
+denselben Aktionen, ob die Läufe parallel oder nacheinander laufen, solange sich die Seite gleich verhält.
+Läufe verschiedener Rollen auf einer Testumgebung können sich trotzdem über die gemeinsamen Daten der Seite
+beeinflussen (eine Rolle löscht, was eine andere öffnet); das ist eine Eigenschaft der Seite, nicht des Monkeys. Einen
+einzelnen Lauf spielst du mit seiner eigenen `<role>/<seed>/actions.json` ab.
 
-## Failures and exit code
+## Fehlschläge und Exit-Code
 
-A run that cannot log in, or crashes, is recorded in the report and the others go on. The exit code is `2` when any
-run did not complete, otherwise `1` with findings, otherwise `0`.
+Ein Lauf, der sich nicht anmelden kann oder abstürzt, wird im Bericht festgehalten, und die anderen laufen weiter. Der
+Exit-Code ist `2`, wenn ein Lauf nicht vollständig war, sonst `1` bei Befunden, sonst `0`.
 
-## With an LLM
+## Mit einem LLM
 
-All runs share one LLM: `llm.maxCalls` and `llm.maxTokens` are budgets for the whole `monkey run`, and calls in
-flight count against `maxCalls`, so parallel runs cannot overspend it. The circuit breaker is shared too: failures in
-a row count across runs, and a trip pauses the LLM in every run. The report's LLM table has one row per run
-(`admin/1`, …).
+Alle Läufe teilen sich ein LLM: `llm.maxCalls` und `llm.maxTokens` sind Budgets für den ganzen `monkey run`, und
+laufende Aufrufe zählen schon gegen `maxCalls`, sodass parallele Läufe es nicht überziehen können. Auch der Circuit
+Breaker ist gemeinsam: Fehlschläge in Folge zählen über alle Läufe, und löst er aus, pausiert das LLM in jedem Lauf.
+Die LLM-Tabelle im Bericht hat eine Zeile je Lauf (`admin/1`, …).

@@ -1,35 +1,39 @@
-# Ground rules
+# Grundregeln
 
-PlayMonkey is built to break things in environments that get reset. These rules shape the design.
+PlayMonkey ist dafür gebaut, Dinge in Umgebungen kaputtzumachen, die zurückgesetzt werden. Diese Regeln prägen den
+Entwurf.
 
-## Test environments only, no guardrails
+## Nur Testumgebungen, keine Schutzgeländer
 
-There is no read-only mode, no filter for destructive actions and no confirmation. The monkey clicks, deletes and
-submits anything it finds; that is how it finds bugs. Point it only at throwaway test environments.
+Es gibt keinen Nur-Lesen-Modus, keinen Filter für zerstörerische Aktionen und keine Bestätigung. Der Monkey klickt,
+löscht und sendet alles ab, was er findet; so findet er Fehler. Richte ihn nur auf Testumgebungen, die du wegwerfen
+kannst.
 
-## Runs always end
+## Läufe enden immer
 
-`limits.maxSteps` and `limits.maxMinutes` stop every role's run. With `stayOnDomain` (on by default) the monkey does
-not follow navigations to other origins, so it cannot wander off to external sites.
+`limits.maxSteps` und `limits.maxMinutes` beenden den Lauf jeder Rolle. Mit `stayOnDomain` (standardmäßig an) folgt
+der Monkey keinen Navigationen zu anderen Origins und kann so nicht zu externen Seiten abwandern.
 
-## Secrets come from the environment and never leave masked output
+## Secrets kommen aus der Umgebung und erscheinen nur maskiert
 
-Credentials and keys are written as `${VAR}` placeholders and resolved from environment variables at start, never
-read from files. Every substituted value is masked as `***` in console output, error messages and reports. Error
-messages name the config path and the variable, never a value.
+Zugangsdaten und Schlüssel stehen als Platzhalter `${VAR}` in der Konfiguration und werden beim Start aus
+Umgebungsvariablen aufgelöst, nie aus Dateien gelesen. Jeder eingesetzte Wert wird in Konsolenausgabe,
+Fehlermeldungen und Berichten als `***` maskiert. Fehlermeldungen nennen den Konfigurationspfad und die Variable, nie
+einen Wert.
 
-Traces and videos are the exception: Playwright cannot redact them, and they contain the base URL, the session
-cookie, request headers and every value the monkey typed. A login's typed values never reach them (the login runs in
-a separate, unrecorded browser context). Treat `trace.zip` and the videos like the test environment's session data;
-see [report](../reference/bericht.md#secrets) for exactly what they hold.
+Traces und Videos sind die Ausnahme: Playwright kann sie nicht schwärzen, und sie enthalten die Basis-URL, das
+Sitzungs-Cookie, Request-Header und jeden Wert, den der Monkey eingetippt hat. Die bei einer Anmeldung eingetippten
+Werte erreichen sie nie (die Anmeldung läuft in einem eigenen, nicht aufgezeichneten Browserkontext). Behandle
+`trace.zip` und die Videos wie die Sitzungsdaten der Testumgebung; was genau sie enthalten, steht im
+[Bericht](../reference/bericht.md#secrets).
 
-## Roles are isolated
+## Rollen sind isoliert
 
-Every run (a role with a seed) has its own browser context, also when runs execute in parallel. Cookies and storage
-of one run are never visible to another. Runs share only the browser process, the test environment itself and, with
-`llm`, the LLM budget and circuit breaker.
+Jeder Lauf (eine Rolle mit einem Seed) hat seinen eigenen Browserkontext, auch wenn Läufe parallel laufen. Cookies und
+Speicher eines Laufs sind für einen anderen nie sichtbar. Läufe teilen sich nur den Browserprozess, die Testumgebung
+selbst und, mit `llm`, das LLM-Budget und den Circuit Breaker.
 
-## Neutral and generic
+## Neutral und generisch
 
-No organisation-specific names, branding or URLs in the code or the defaults; everything site-specific lives in the
-config.
+Keine organisationsspezifischen Namen, kein Branding und keine URLs im Code oder in den Standardwerten; alles
+Seitenspezifische steht in der Konfiguration.

@@ -1,4 +1,4 @@
-# Architecture
+# Architektur
 
 ```text
 config  ->  auth/session  ->  loop { snapshot -> choose action (monkey | LLM) -> execute -> oracles }  ->  action log + report
@@ -6,34 +6,34 @@ config  ->  auth/session  ->  loop { snapshot -> choose action (monkey | LLM) ->
                                      provider interface: anthropic-foundry | openai
 ```
 
-A run loads the config, opens one browser and one context per role, and then repeats: take a snapshot of the page,
-pick the next action (the seeded random monkey, or the LLM when the monkey is stuck), execute it, and let the oracles
-check what happened. Every action goes to an action log, every problem to a deduplicated finding, and the run ends
-with a report.
+Ein Lauf lädt die Konfiguration, öffnet einen Browser und einen Kontext pro Rolle und wiederholt dann: einen Snapshot
+der Seite aufnehmen, die nächste Aktion wählen (der Zufalls-Monkey mit Seed oder das LLM, wenn der Monkey feststeckt),
+sie ausführen und die Orakel prüfen lassen, was passiert ist. Jede Aktion landet in einem Aktionsprotokoll, jedes
+Problem in einem deduplizierten Befund, und am Ende des Laufs steht ein Bericht.
 
-## Modules
+## Module
 
-| Path | Responsibility | Status |
+| Pfad | Zuständigkeit | Stand |
 | --- | --- | --- |
-| `src/cli/` | Argument parsing (`node:util` `parseArgs`), subcommands, exit codes | done |
-| `src/config/` | JSON Schema, `${VAR}` resolution, validation, defaults, secret masking | done |
-| `src/auth/` | Browser launch, one context per role, login, `stayOnDomain`, trace and video | done |
-| `src/snapshot/` | Page snapshot with element refs, snapshot hash, LLM serializer | done |
-| `src/monkey/` | Seeded random action generator, executor and run loop | done |
-| `src/run.ts` | Plans the runs (roles × seeds) and runs them, `parallel` at a time: session, monkey or replay, oracles, action log, artifacts | done |
-| `src/oracles/` | Detect and deduplicate findings, screenshots | done |
-| `src/replay/` | Action log writer and reader, durable locator parser, `monkey replay` | done |
-| `src/report/` | `report.json` and the self-contained `report.html` | done |
-| `src/llm/` | Provider interface, `anthropic-foundry` and `openai` backends, prompt, preflight, stuck detection, handoff, usage | done |
-| `fixtures/site/` | Local site with seeded bugs, the ground truth for end-to-end tests | done |
+| `src/cli/` | Argumente parsen (`node:util` `parseArgs`), Unterbefehle, Exit-Codes | umgesetzt |
+| `src/config/` | JSON Schema, Auflösung von `${VAR}`, Validierung, Standardwerte, Maskierung von Secrets | umgesetzt |
+| `src/auth/` | Browserstart, ein Kontext pro Rolle, Anmeldung, `stayOnDomain`, Trace und Video | umgesetzt |
+| `src/snapshot/` | Seiten-Snapshot mit Element-Refs, Snapshot-Hash, Serialisierer für das LLM | umgesetzt |
+| `src/monkey/` | Zufallsgenerator für Aktionen mit Seed, Ausführung und Schleife des Laufs | umgesetzt |
+| `src/run.ts` | Plant die Läufe (Rollen × Seeds) und führt jeweils `parallel` davon gleichzeitig aus: Sitzung, Monkey oder Replay, Orakel, Aktionsprotokoll, Artefakte | umgesetzt |
+| `src/oracles/` | Befunde erkennen und deduplizieren, Screenshots | umgesetzt |
+| `src/replay/` | Schreiben und Lesen des Aktionsprotokolls, Parser für dauerhafte Locators, `monkey replay` | umgesetzt |
+| `src/report/` | `report.json` und der in sich geschlossene `report.html` | umgesetzt |
+| `src/llm/` | Anbieter-Schnittstelle, Backends `anthropic-foundry` und `openai`, Prompt, Vorabprüfung, Erkennung des Feststeckens, Übergabe, Verbrauch | umgesetzt |
+| `fixtures/site/` | Lokale Seite mit eingebauten Fehlern, die Grundwahrheit für End-to-End-Tests | umgesetzt |
 
-## Design decisions
+## Entwurfsentscheidungen
 
-- **Playwright library API, not the MCP server:** the tool needs control over action selection, seeding and the
-  oracles.
-- **The LLM is optional and occasional.** The random monkey is the default; the LLM only steps in when it is stuck,
-  so runs stay cheap and an LLM outage never stops a run.
-- **Findings must be reproducible.** LLM decisions are not deterministic, so every action is logged with a durable
-  locator and `monkey replay` re-executes the log without an LLM.
-- **One context per run:** cookies and storage never leak between roles or seeds, so runs can execute in parallel
-  in one browser. The LLM budget and circuit breaker are shared by all runs.
+- **Die Bibliotheks-API von Playwright, nicht der MCP-Server:** Das Werkzeug braucht die Kontrolle über die Wahl der
+  Aktionen, den Seed und die Orakel.
+- **Das LLM ist optional und kommt nur gelegentlich zum Zug.** Standard ist der Zufalls-Monkey; das LLM springt nur
+  ein, wenn er feststeckt. So bleiben Läufe günstig, und ein Ausfall des LLM hält nie einen Lauf an.
+- **Befunde müssen reproduzierbar sein.** LLM-Entscheidungen sind nicht deterministisch, deshalb wird jede Aktion
+  mit einem dauerhaften Locator protokolliert, und `monkey replay` führt das Protokoll ohne LLM erneut aus.
+- **Ein Kontext pro Lauf:** Cookies und Speicher gehen nie zwischen Rollen oder Seeds über, deshalb können Läufe
+  parallel in einem Browser laufen. LLM-Budget und Circuit Breaker teilen sich alle Läufe.

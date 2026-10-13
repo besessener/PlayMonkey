@@ -1,26 +1,27 @@
-# Run in CI
+# In der CI ausführen
 
-Run the monkey on every pull request, nightly or by hand, keep the report as a build artifact, and let the
-[exit code](../reference/befehle.md#exit-codes) decide whether the job fails.
+Lass den Monkey bei jedem Pull Request, nachts oder von Hand laufen, bewahr den Bericht als Build-Artefakt auf und lass
+den [Exit-Code](../reference/befehle.md#exit-codes) entscheiden, ob der Job fehlschlägt.
 
-## Install PlayMonkey in your project
+## PlayMonkey in deinem Projekt installieren
 
-PlayMonkey is installed from git as a dev dependency; npm builds it on install (its `prepare` script):
+PlayMonkey wird aus git als Dev-Dependency installiert; npm baut es bei der Installation (über sein Skript `prepare`):
 
 ```sh
 npm install --save-dev github:besessener/PlayMonkey
 npx monkey --help
 ```
 
-Pin a release tag (`github:besessener/PlayMonkey#v0.4.0`, see the [releases](https://github.com/besessener/PlayMonkey/releases)) or a commit for
-repeatable builds. Commit your config next to it, e.g.
-`monkey.json`, with every secret as a `${VAR}` placeholder (see [configure login](anmeldung-einrichten.md#keep-secrets-out-of-the-file)).
+Leg dich für reproduzierbare Builds auf ein Release-Tag (`github:besessener/PlayMonkey#v0.4.0`, siehe die
+[Releases](https://github.com/besessener/PlayMonkey/releases)) oder einen Commit fest. Check deine Konfiguration
+daneben ein, z. B. `monkey.json`, mit jedem Secret als Platzhalter `${VAR}` (siehe
+[Anmeldung einrichten](anmeldung-einrichten.md#secrets-aus-der-datei-heraushalten)).
 
-## The workflow
+## Der Workflow
 
-This is `.github/workflows/monkey.yml` of the PlayMonkey repository. It runs there on every pull request against the
-[fixture site](fixture-seite-nutzen.md), and `test/docs.test.ts` checks that this page shows it unchanged, so the
-example cannot rot. Copy it to your repository and adapt the lines marked `CHANGE`:
+Das ist `.github/workflows/monkey.yml` aus dem PlayMonkey-Repository. Er läuft dort bei jedem Pull Request gegen die
+[Fixture-Seite](fixture-seite-nutzen.md), und `test/docs.test.ts` prüft, dass diese Seite ihn unverändert zeigt; so
+kann das Beispiel nicht veralten. Kopier ihn in dein Repository und pass die mit `CHANGE` markierten Zeilen an:
 
 ```yaml
 # Example: run PlayMonkey against a test environment in GitHub Actions.
@@ -112,30 +113,34 @@ jobs:
           esac
 ```
 
-What it does:
+Was er tut:
 
-1. **Installs** Node.js 22, the project's dependencies (PlayMonkey among them) and Chromium with its system
-   libraries (`--with-deps`).
-2. **Starts the fixture site.** Only PlayMonkey's own copy needs this; your test environment is already deployed,
-   so delete the step.
-3. **Runs the monkey** with the variables of the config's `${VAR}` placeholders taken from the CI secret store
-   (*Settings → Secrets and variables → Actions*). Set the base URL the same way if it differs per environment, e.g.
-   `"baseUrl": "${TEST_URL}"` and `TEST_URL: ${{ vars.TEST_URL }}`. `set +e` keeps the step green so the report is
-   uploaded whatever happened; the exit code goes to the step output.
-4. **Uploads the report directory** as the artifact `monkey-report`, also when the run failed. Download it from the
-   run's summary page and open `report.html`. Traces and videos in it contain the test environment's session
-   cookies (see [report: secrets](../reference/bericht.md#secrets)), hence the short retention.
-5. **Checks the exit code:** `0` passes; `1` (findings) warns, or fails with `FAIL_ON_FINDINGS: "true"`; `2`
-   (config error, failed login, failed [LLM preflight](llm-einrichten.md#troubleshooting), crashed run) always fails.
+1. **Installiert** Node.js 22, die Abhängigkeiten des Projekts (darunter PlayMonkey) und Chromium mit seinen
+   Systembibliotheken (`--with-deps`).
+2. **Startet die Fixture-Seite.** Das braucht nur PlayMonkeys eigene Kopie; deine Testumgebung läuft schon, also
+   lösch den Schritt.
+3. **Führt den Monkey aus**, mit den Variablen für die Platzhalter `${VAR}` der Konfiguration aus dem Secret-Speicher
+   der CI (*Settings → Secrets and variables → Actions*). Setz die Basis-URL genauso, wenn sie je Umgebung anders ist,
+   z. B. `"baseUrl": "${TEST_URL}"` und `TEST_URL: ${{ vars.TEST_URL }}`. `set +e` hält den Schritt grün, damit der
+   Bericht in jedem Fall hochgeladen wird; der Exit-Code geht in die Ausgabe des Schritts.
+4. **Lädt das Berichtsverzeichnis** als Artefakt `monkey-report` hoch, auch wenn der Lauf fehlgeschlagen ist. Lad es
+   von der Übersichtsseite des Laufs herunter und öffne `report.html`. Traces und Videos darin enthalten die
+   Sitzungscookies der Testumgebung (siehe [Bericht: Secrets](../reference/bericht.md#secrets)), daher die kurze
+   Aufbewahrung.
+5. **Prüft den Exit-Code:** `0` besteht; `1` (Befunde) warnt oder schlägt mit `FAIL_ON_FINDINGS: "true"` fehl; `2`
+   (Konfigurationsfehler, gescheiterte Anmeldung, gescheiterter [LLM-Preflight](llm-einrichten.md#fehlerbehebung),
+   abgestürzter Lauf) schlägt immer fehl.
 
-## Variations
+## Varianten
 
-- **Nightly:** add `schedule: [{ cron: "17 3 * * *" }]` under `on:`, and run longer (`limits.maxSteps`,
-  `limits.maxMinutes`) than on pull requests.
-- **More coverage in the same time:** several seeds and roles side by side, see [run in parallel](parallel-ausfuehren.md).
-  Keep `limits.maxMinutes` × the number of runs ÷ `parallel` under the job's `timeout-minutes`.
-- **With an LLM:** add the `llm` section and its key (`FOUNDRY_API_KEY: ${{ secrets.FOUNDRY_API_KEY }}`); set a
-  budget with `llm.maxCalls`. A broken endpoint fails the job with exit `2` before any browser starts, unless
-  `llm.required` is `false`. See [configure the LLM](llm-einrichten.md).
-- **Reproduce a CI finding locally:** download the artifact and replay the run's `actions.json`, see
-  [reproduce a finding](befund-reproduzieren.md).
+- **Nachts:** Füg `schedule: [{ cron: "17 3 * * *" }]` unter `on:` hinzu und lass länger laufen (`limits.maxSteps`,
+  `limits.maxMinutes`) als bei Pull Requests.
+- **Mehr Abdeckung in derselben Zeit:** mehrere Seeds und Rollen nebeneinander, siehe
+  [Parallel ausführen](parallel-ausfuehren.md). Halte `limits.maxMinutes` × Anzahl der Läufe ÷ `parallel` unter dem
+  `timeout-minutes` des Jobs.
+- **Mit einem LLM:** Füg den Abschnitt `llm` und seinen Schlüssel hinzu
+  (`FOUNDRY_API_KEY: ${{ secrets.FOUNDRY_API_KEY }}`); setz mit `llm.maxCalls` ein Budget. Ein kaputter Endpunkt
+  lässt den Job mit Exit `2` fehlschlagen, bevor ein Browser startet, außer `llm.required` ist `false`. Siehe
+  [LLM einrichten](llm-einrichten.md).
+- **Einen CI-Befund lokal reproduzieren:** Lad das Artefakt herunter und spiel die `actions.json` des Laufs ab, siehe
+  [Einen Befund reproduzieren](befund-reproduzieren.md).

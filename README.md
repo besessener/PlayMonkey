@@ -13,35 +13,39 @@
 [![Last commit](https://img.shields.io/github/last-commit/besessener/PlayMonkey)](https://github.com/besessener/PlayMonkey/commits/main)
 [![License: MIT](https://img.shields.io/github/license/besessener/PlayMonkey)](LICENSE)
 
-***Let a monkey loose on your test environment.***
+***Lass einen Affen auf deine Testumgebung los.***
 
-`monkey` is a command line tool that drives a real browser with Playwright against a website in a **throwaway test
-environment**. It clicks, types and submits its way through the site with seeded randomness and reports what breaks,
-with the steps to reproduce it. An LLM steps in only when the random monkey gets stuck.
+`monkey` ist ein Kommandozeilenwerkzeug, das mit Playwright einen echten Browser gegen eine Website in einer
+**Wegwerf-Testumgebung** steuert. Mit Seed-gesteuertem Zufall klickt, tippt und sendet es sich durch die Website
+und meldet, was kaputtgeht, mit den Schritten zum Nachstellen. Ein LLM springt nur ein, wenn der Zufalls-Monkey
+feststeckt.
 
-- **Seeded random monkey** – clicks links and buttons, fills forms with valid and nasty values; the same seed gives
-  the same run.
-- **Findings, not noise** – uncaught exceptions, console errors, HTTP 4xx/5xx, crashes, hangs, error pages, layout
-  overflow and failed downloads, each reported once with a screenshot, a trace and a replayable action log.
-- **An LLM only when stuck** – optional; cookie banners, dialogs or forms that need valid data get a few model
-  decisions, and if the model fails the monkey simply goes on.
-- **Test environments only** – no guardrails by design: it will click "Delete" and submit every form
-  ([ground rules](docs/explanation/grundregeln.md)). Not a test-case generator, visual regression or load test.
+- **Zufalls-Monkey mit Seed** – klickt Links und Buttons, füllt Formulare mit gültigen und fiesen Werten; derselbe
+  Seed ergibt denselben Lauf.
+- **Befunde statt Rauschen** – nicht abgefangene Exceptions, Konsolenfehler, HTTP 4xx/5xx, Abstürze, Hänger,
+  Fehlerseiten, Layout-Überlauf und fehlgeschlagene Downloads, jeder einmal gemeldet, mit Screenshot, Trace und einem
+  abspielbaren Aktionsprotokoll.
+- **Ein LLM nur, wenn er feststeckt** – optional; Cookie-Banner, Dialoge oder Formulare, die gültige Daten brauchen,
+  bekommen ein paar Modellentscheidungen, und wenn das Modell versagt, macht der Monkey einfach weiter.
+- **Nur für Testumgebungen** – bewusst ohne Schutzgeländer: Er klickt auf „Delete“ und sendet jedes Formular ab
+  ([Grundregeln](docs/explanation/grundregeln.md)). Kein Testfall-Generator, kein visueller Regressionstest, kein
+  Lasttest.
 
-> **Status:** version 0.4.0: the seeded random monkey with oracles, reports and replay; Claude on Microsoft Foundry
-> or any OpenAI-compatible endpoint as the LLM for stuck situations; cookie banners, native dialogs, iframes,
-> popups, file uploads and downloads handled; parallel runs per role and seed; a CI example.
+> **Stand:** Version 0.4.0: der Zufalls-Monkey mit Seed, mit Orakeln, Berichten und Replay; Claude auf Microsoft
+> Foundry oder jeder OpenAI-kompatible Endpunkt als LLM für festgefahrene Situationen; Cookie-Banner, native Dialoge,
+> iframes, Popups, Datei-Uploads und -Downloads werden behandelt; parallele Läufe je Rolle und Seed; ein CI-Beispiel.
 
 ## Installation
 
-Requires Node.js 22.18 or newer and a Playwright browser. In your own project, install it as a dev dependency:
+Voraussetzungen: Node.js 22.18 oder neuer und ein Playwright-Browser. Installiere PlayMonkey in deinem eigenen
+Projekt als Dev-Abhängigkeit:
 
 ```sh
 npm install --save-dev github:besessener/PlayMonkey#v0.4.0
 npx playwright install chromium          # on Linux CI: add --with-deps
 ```
 
-To try it first against the bundled fixture site with seeded bugs:
+Zum Ausprobieren zuerst gegen die mitgelieferte Fixture-Seite mit eingebauten Fehlern:
 
 ```sh
 git clone https://github.com/besessener/PlayMonkey.git && cd PlayMonkey
@@ -52,11 +56,12 @@ export FIXTURE_URL=http://127.0.0.1:8080 FIXTURE_USER=monkey FIXTURE_PASS=banana
 npx monkey run fixtures/configs/fixture.json
 ```
 
-It prints the seed, one summary per role, every finding, and where the report is:
-`fixtures/configs/monkey-report/report.html`. Step by step: [getting started](docs/tutorials/erste-schritte.md).
-Releases and changes: [GitHub Releases](https://github.com/besessener/PlayMonkey/releases).
+Es gibt den Seed aus, eine Zusammenfassung je Rolle, jeden Befund und wo der Bericht liegt:
+`fixtures/configs/monkey-report/report.html`. Schritt für Schritt:
+[Erste Schritte](docs/tutorials/erste-schritte.md). Releases und Änderungen:
+[GitHub Releases](https://github.com/besessener/PlayMonkey/releases).
 
-## Usage
+## Benutzung
 
 ```sh
 monkey run config.json         # explore the site and report findings
@@ -65,8 +70,8 @@ monkey preflight config.json   # check the configured LLM endpoint
 monkey run config.json --watch # spectator mode: watch it live, e.g. for a demo
 ```
 
-Exit codes: `0` no findings, `1` findings, `2` tool or config error, or a run that did not complete; `2` takes
-precedence over `1`. A minimal config:
+Exit-Codes: `0` keine Befunde, `1` Befunde, `2` Werkzeug- oder Konfigurationsfehler oder ein Lauf, der nicht zu Ende
+kam; `2` hat Vorrang vor `1`. Eine minimale Konfiguration:
 
 ```json
 {
@@ -82,14 +87,15 @@ precedence over `1`. A minimal config:
 }
 ```
 
-Secrets come from environment variables (`${VAR}`) and are masked in all output. Next steps:
-[configure login](docs/how-to/anmeldung-einrichten.md), [configure the LLM](docs/how-to/llm-einrichten.md),
-[run in parallel](docs/how-to/parallel-ausfuehren.md), [run in CI](docs/how-to/in-ci-ausfuehren.md) and
-[reproduce a finding](docs/how-to/befund-reproduzieren.md); every key: [configuration](docs/reference/konfiguration.md).
+Secrets kommen aus Umgebungsvariablen (`${VAR}`) und werden in jeder Ausgabe maskiert. Weiter geht es mit
+[Anmeldung einrichten](docs/how-to/anmeldung-einrichten.md), [LLM einrichten](docs/how-to/llm-einrichten.md),
+[Parallel ausführen](docs/how-to/parallel-ausfuehren.md), [In der CI ausführen](docs/how-to/in-ci-ausfuehren.md) und
+[Einen Befund reproduzieren](docs/how-to/befund-reproduzieren.md); jeder Schlüssel:
+[Konfiguration](docs/reference/konfiguration.md).
 
-## Development
+## Entwicklung
 
-Requires Node.js 22.18 or newer.
+Voraussetzungen: Node.js 22.18 oder neuer.
 
 ```sh
 npm ci
@@ -97,27 +103,28 @@ npx playwright install chromium
 npm run check
 ```
 
-Details: [development setup](docs/tutorials/entwicklungsumgebung.md), [commands](docs/reference/befehle.md) and
-[CONTRIBUTING.md](CONTRIBUTING.md).
+Ausführlich: [Entwicklungsumgebung aufsetzen](docs/tutorials/entwicklungsumgebung.md),
+[Befehle](docs/reference/befehle.md) und [CONTRIBUTING.md](CONTRIBUTING.md).
 
-## Documentation
+## Dokumentation
 
-Website: <https://besessener.github.io/PlayMonkey/>. The full documentation is in [docs/](docs/README.md), organised
-by [Diátaxis](https://diataxis.fr/):
+Webseite: <https://besessener.github.io/PlayMonkey/>. Die vollständige Dokumentation liegt unter
+[docs/](docs/README.md), gegliedert nach [Diátaxis](https://diataxis.fr/):
 
-- **[Tutorials](docs/README.md#tutorials)** – step by step to a first success, e.g. [getting started](docs/tutorials/erste-schritte.md)
-- **[How-to guides](docs/README.md#how-to-guides)** – reach one goal, e.g. [configure login](docs/how-to/anmeldung-einrichten.md) or [configure the LLM](docs/how-to/llm-einrichten.md)
-- **[Reference](docs/README.md#reference)** – look up exact behaviour, e.g. [configuration](docs/reference/konfiguration.md) or [commands](docs/reference/befehle.md)
-- **[Explanation](docs/README.md#explanation)** – understand why, e.g. [architecture](docs/explanation/architektur.md) or [ground rules](docs/explanation/grundregeln.md)
+- **[Tutorials](docs/README.md#tutorials)** – Schritt für Schritt zum ersten Erfolg, z. B. [Erste Schritte](docs/tutorials/erste-schritte.md)
+- **[Anleitungen](docs/README.md#anleitungen)** – konkrete Aufgaben lösen, z. B. [Anmeldung einrichten](docs/how-to/anmeldung-einrichten.md) oder [LLM einrichten](docs/how-to/llm-einrichten.md)
+- **[Referenz](docs/README.md#referenz)** – genaues Verhalten nachschlagen, z. B. [Konfiguration](docs/reference/konfiguration.md) oder [Befehle](docs/reference/befehle.md)
+- **[Hintergrund](docs/README.md#hintergrund)** – verstehen, warum es so ist, z. B. [Architektur](docs/explanation/architektur.md) oder [Grundregeln](docs/explanation/grundregeln.md)
 
-## Related projects
+## Verwandte Projekte
 
-PlayMonkey, flakipype and Archivist started from the same agentic idea and share their ground rules, quality gates
-and documentation layout:
+PlayMonkey, flakipype und Archivist sind aus derselben agentischen Idee entstanden und teilen Grundregeln,
+Qualitätsprüfungen und den Aufbau der Dokumentation:
 
-- [flakipype](https://github.com/besessener/flakipype) – find, explain and fix flaky GitHub Actions pipelines.
-- [Archivist](https://github.com/besessener/Archivist) – a personal, agentic AI archivist for Windows (in German).
+- [flakipype](https://github.com/besessener/flakipype) – findet, erklärt und behebt instabile („flaky“)
+  GitHub-Actions-Pipelines.
+- [Archivist](https://github.com/besessener/Archivist) – ein persönlicher, agentischer KI-Archivar für Windows.
 
-## License
+## Lizenz
 
-MIT, see [LICENSE](LICENSE).
+MIT, siehe [LICENSE](LICENSE).

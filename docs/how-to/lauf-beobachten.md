@@ -1,18 +1,19 @@
-# Watch a run (spectator mode)
+# Einen Lauf beobachten (Zuschauermodus)
 
-To see what the monkey does, for keeping an eye on it or for a demo, add `--watch` (`-w`):
+Um zu sehen, was der Monkey tut, sei es, um ein Auge darauf zu haben, oder für eine Demo, hängst du `--watch` (`-w`)
+an:
 
 ```sh
 monkey run config.json --watch
 monkey replay monkey-report/user/actions.json --config config.json --watch
 ```
 
-Spectator mode:
+Der Zuschauermodus:
 
-- opens a **visible browser**, whatever `browser.headless` says;
-- slows every browser operation down (Playwright's `slowMo`, default 250 ms);
-- **outlines each element** in orange, labelled with its locator, for a moment before clicking, typing or selecting;
-- prints **one line per step**, with who chose it (`monkey` or `llm`) and how it went:
+- öffnet einen **sichtbaren Browser**, egal, was in `browser.headless` steht;
+- verlangsamt jede Browseroperation (`slowMo` von Playwright, Standard 250 ms);
+- **umrandet jedes Element** kurz vor dem Klicken, Tippen oder Auswählen orange, beschriftet mit seinem Locator;
+- gibt **eine Zeile pro Schritt** aus, mit dem, der ihn gewählt hat (`monkey` oder `llm`), und wie er ausging:
 
   ```text
   [user] step 12 monkey: click getByRole('link', { name: 'Contact form' })
@@ -20,33 +21,35 @@ Spectator mode:
   [user] step 14 monkey: press Enter -> failed: Timeout 5000ms exceeded.
   ```
 
-Values typed from `${VAR}` secrets show as `***`. Spectator mode changes only timing: the same seed takes the same actions as without `--watch`, the outline is removed before the
-action and the next snapshot, and findings, action log, trace and report are written as usual.
+Werte, die aus `${VAR}`-Secrets getippt werden, erscheinen als `***`. Der Zuschauermodus ändert nur das Timing:
+Derselbe Seed führt zu denselben Aktionen wie ohne `--watch`, die Umrandung wird vor der Aktion und dem nächsten
+Snapshot entfernt, und Befunde, Aktionsprotokoll, Trace und Bericht werden wie gewohnt geschrieben.
 
-## Speed
+## Geschwindigkeit
 
-`--slow-mo <ms>` sets the delay per browser operation and implies `--watch`. The outline lasts twice as long, at
-least 300 ms.
+`--slow-mo <ms>` setzt die Verzögerung pro Browseroperation und schließt `--watch` ein. Die Umrandung bleibt doppelt
+so lange stehen, mindestens 300 ms.
 
-| Use | Flags |
+| Zweck | Flags |
 | --- | --- |
-| Live demo, easy to follow | `--slow-mo 600` |
-| Default | `--watch` (250 ms) |
-| Keep an eye on a long run | `--slow-mo 0`: full speed, no outline, still visible with step lines |
+| Live-Demo, leicht zu verfolgen | `--slow-mo 600` |
+| Standard | `--watch` (250 ms) |
+| Einen langen Lauf im Auge behalten | `--slow-mo 0`: volle Geschwindigkeit, keine Umrandung, trotzdem sichtbar mit Schrittzeilen |
 
-Lower `limits.maxSteps` for a demo: at the default speed a step takes about one to two seconds. Ctrl+C stops after the
-current step and still writes the report.
+Senk `limits.maxSteps` für eine Demo: Bei der Standardgeschwindigkeit dauert ein Schritt etwa ein bis zwei Sekunden.
+Strg+C hält nach dem aktuellen Schritt an und schreibt trotzdem den Bericht.
 
-A good demo is a [replay](../explanation/replay.md) of a run that found something: it shows exactly the steps to the
-bug, ending on it, without randomness or LLM.
+Eine gute Demo ist ein [Replay](../explanation/replay.md) eines Laufs, der etwas gefunden hat: Es zeigt genau die
+Schritte bis zum Fehler und endet dort, ohne Zufall und ohne LLM.
 
-## Without a display
+## Ohne Bildschirm
 
-A visible browser needs a display. On a Linux machine or container without one, run under a virtual display:
+Ein sichtbarer Browser braucht einen Bildschirm. Auf einem Linux-Rechner oder in einem Container ohne Bildschirm
+lässt du ihn unter einem virtuellen Bildschirm laufen:
 
 ```sh
 xvfb-run -a monkey run config.json --watch
 ```
 
-Without a display, `monkey run --watch` exits with code `2` and says so. To review a headless run afterwards, use the
-trace (`npx playwright show-trace <role>/trace.zip`) and the video in the report directory.
+Ohne Bildschirm endet `monkey run --watch` mit Exit-Code `2` und sagt das. Um einen headless Lauf hinterher
+anzusehen, nimm den Trace (`npx playwright show-trace <role>/trace.zip`) und das Video im Berichtsverzeichnis.

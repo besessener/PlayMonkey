@@ -1,93 +1,100 @@
-# Oracles and findings
+# Orakel und Befunde
 
-After every step of the [monkey](monkey.md), the oracles decide whether something went wrong. Each problem becomes
-a **finding**, deduplicated so a bug hit fifty times is reported once, with enough context to reproduce it. The code
-lives in `src/oracles/`.
+Nach jedem Schritt des [Monkeys](monkey.md) entscheiden die Orakel, ob etwas schiefgegangen ist. Jedes Problem wird
+zu einem **Befund**, dedupliziert, sodass ein Fehler, der fünfzigmal getroffen wird, einmal gemeldet wird, mit genug
+Kontext, um ihn zu reproduzieren. Der Code liegt in `src/oracles/`.
 
-## The oracles
+## Die Orakel
 
-| Oracle | Signal | Severity |
+| Orakel | Signal | Schweregrad |
 | --- | --- | --- |
-| `pageerror` | Uncaught exception in a page (`page.on('pageerror')`). | high |
-| `console` | `console.error` message (`page.on('console')`, type `error`). | medium |
-| `http5xx` | Response with status 500 … 599 (`page.on('response')`), any resource type. | high |
-| `http4xx` | Response with status 400 … 499, except `findings.ignoreStatus`. | medium for the page itself, low for subresources and API calls |
-| `crash` | The page's renderer crashed (`page.on('crash')`). | critical |
-| `hang` | A navigation or page load exceeded `monkey.actionTimeoutMs`, or the page stopped answering a trivial script. | high |
-| `errorPage` | A navigation landed on an error page (see below). | medium |
-| `overflow` | Horizontal overflow: the document's `scrollWidth` is larger than its `clientWidth`. | low |
-| `download` | A download the site started failed, e.g. the connection dropped mid-file (`download.failure()`). | medium |
+| `pageerror` | Nicht abgefangene Exception in einer Seite (`page.on('pageerror')`). | high |
+| `console` | Meldung über `console.error` (`page.on('console')`, Typ `error`). | medium |
+| `http5xx` | Antwort mit Status 500 … 599 (`page.on('response')`), jeder Ressourcentyp. | high |
+| `http4xx` | Antwort mit Status 400 … 499, außer `findings.ignoreStatus`. | medium für die Seite selbst, low für Subressourcen und API-Aufrufe |
+| `crash` | Der Renderer der Seite ist abgestürzt (`page.on('crash')`). | critical |
+| `hang` | Eine Navigation oder das Laden einer Seite hat `monkey.actionTimeoutMs` überschritten, oder die Seite hat auf ein triviales Skript nicht mehr geantwortet. | high |
+| `errorPage` | Eine Navigation ist auf einer Fehlerseite gelandet (siehe unten). | medium |
+| `overflow` | Horizontaler Overflow: Die `scrollWidth` des Dokuments ist größer als seine `clientWidth`. | low |
+| `download` | Ein Download, den die Seite gestartet hat, ist fehlgeschlagen, z. B. weil die Verbindung mitten in der Datei abgebrochen ist (`download.failure()`). | medium |
 
-Each one can be switched off with `oracles.<name>: false` in the [config](../reference/konfiguration.md).
+Jedes lässt sich mit `oracles.<name>: false` in der [Konfiguration](../reference/konfiguration.md) abschalten.
 
-The event oracles (`pageerror`, `console`, `http*`, `crash`) listen on every page of the role's browser context,
-including tabs and popups the site opens and the iframes inside them. `download` looks at the downloads of each step
-(see [the monkey](monkey.md#pages-that-ask-for-something)). The state oracles (`hang`, `errorPage`, `overflow`) look at the page the monkey is on
-after each step, with one script evaluation per step.
+Die Event-Orakel (`pageerror`, `console`, `http*`, `crash`) lauschen auf jeder Seite des Browserkontexts der Rolle,
+auch auf Tabs und Popups, die die Seite öffnet, und den Iframes darin. `download` sieht sich die Downloads jedes
+Schritts an (siehe [den Monkey](monkey.md#seiten-die-etwas-wissen-wollen)). Die Zustands-Orakel (`hang`,
+`errorPage`, `overflow`) sehen sich nach jedem Schritt die Seite an, auf der der Monkey ist, mit einer
+Skriptauswertung pro Schritt.
 
-### What is not a finding
+### Was kein Befund ist
 
-- **A failed action.** An element that is covered, gone or never becomes clickable times out, but that is the
-  monkey's problem, not the site's. Only timeouts while waiting for a navigation or a page load count as `hang`.
-- **Chromium's echo of a failed response** (`Failed to load resource: the server responded with a status of 404`) in
-  the console. The response itself is the HTTP oracles' finding; the echo would report it twice.
-- **An error page whose status the HTTP oracles report.** A 404 page is one `http4xx` finding, not also an
-  `errorPage`. `errorPage` covers what the HTTP oracles cannot see: soft error pages served with status 200 whose
-  title or main heading says "Not found", "Something went wrong", "Internal Server Error", "Error 500" and the like;
-  and failed pages whose HTTP oracle is switched off.
-- **Off-domain navigations** blocked by `stayOnDomain`: they are logged as session events, see
-  [sessions](sitzungen.md).
+- **Eine fehlgeschlagene Aktion.** Ein Element, das verdeckt ist, verschwunden ist oder nie klickbar wird, läuft in
+  einen Timeout, aber das ist das Problem des Monkeys, nicht das der Seite. Nur Timeouts beim Warten auf eine
+  Navigation oder das Laden einer Seite zählen als `hang`.
+- **Das Echo von Chromium auf eine fehlgeschlagene Antwort**
+  (`Failed to load resource: the server responded with a status of 404`) in der Konsole. Die Antwort selbst ist der
+  Befund der HTTP-Orakel; das Echo würde sie doppelt melden.
+- **Eine Fehlerseite, deren Status die HTTP-Orakel melden.** Eine 404-Seite ist ein Befund `http4xx`, nicht auch noch
+  `errorPage`. `errorPage` deckt ab, was die HTTP-Orakel nicht sehen können: weiche Fehlerseiten, die mit Status 200
+  ausgeliefert werden und deren Titel oder Hauptüberschrift „Not found“, „Something went wrong“, „Internal Server
+  Error“, „Error 500“ und Ähnliches sagt; und fehlgeschlagene Seiten, deren HTTP-Orakel abgeschaltet ist.
+- **Navigationen zu anderen Domains**, die `stayOnDomain` blockiert: Sie werden als Sitzungs-Events protokolliert,
+  siehe [Sitzungen](sitzungen.md).
 
-## Finding model
+## Befundmodell
 
-| Field | Meaning |
+| Feld | Bedeutung |
 | --- | --- |
-| `id` | `F1`, `F2`, … in order of discovery within a role. |
-| `oracle`, `severity` | As in the table above. |
-| `key` | Dedup key, see below. |
-| `message` | One line, e.g. `GET /missing-page responded 404 Not Found`. |
-| `url` | The page the monkey was on when the finding was detected. |
-| `step` | The step after which it was detected; signals that arrive while a step runs belong to that step. |
-| `role` | The role that found it. |
-| `occurrences` | How often the same key was seen. |
-| `details` | Oracle-specific: method, request URL, status and resource type for HTTP; the stack for `pageerror`; the console location; widths and the culprit element for `overflow`. |
-| `lastActions` | The last `findings.lastActions` actions (default 10) up to and including `step`, each with its durable locator: the way to the bug. |
-| `screenshotPath` | A screenshot taken right after detection, in `<report.dir>/<role>/screenshots/`. Absent for crashed or hung pages. |
+| `id` | `F1`, `F2`, … in der Reihenfolge der Entdeckung innerhalb einer Rolle. |
+| `oracle`, `severity` | Wie in der Tabelle oben. |
+| `key` | Dedup-Schlüssel, siehe unten. |
+| `message` | Eine Zeile, z. B. `GET /missing-page responded 404 Not Found`. |
+| `url` | Die Seite, auf der der Monkey war, als der Befund erkannt wurde. |
+| `step` | Der Schritt, nach dem er erkannt wurde; Signale, die eintreffen, während ein Schritt läuft, gehören zu diesem Schritt. |
+| `role` | Die Rolle, die ihn gefunden hat. |
+| `occurrences` | Wie oft derselbe Schlüssel gesehen wurde. |
+| `details` | Orakelspezifisch: Methode, Request-URL, Status und Ressourcentyp bei HTTP; der Stack bei `pageerror`; die Fundstelle in der Konsole; Breiten und das verursachende Element bei `overflow`. |
+| `lastActions` | Die letzten `findings.lastActions` Aktionen (Standard 10) bis einschließlich `step`, jede mit ihrem dauerhaften Locator: der Weg zum Fehler. |
+| `screenshotPath` | Ein Screenshot direkt nach der Erkennung, in `<report.dir>/<role>/screenshots/`. Fehlt bei abgestürzten oder hängenden Seiten. |
 
-Everything in a finding except the screenshot path goes through [secret masking](grundregeln.md), because pages can
-echo what was typed into them.
+Alles in einem Befund außer dem Screenshot-Pfad durchläuft die [Maskierung von Secrets](grundregeln.md), weil Seiten
+wiedergeben können, was in sie eingetippt wurde.
 
-## Deduplication
+## Deduplizierung
 
-Every signal gets a key. A key that was seen before raises the first finding's `occurrences`; the finding keeps the
-context (step, screenshot, last actions) of its **first** occurrence, which is usually the shortest way to it.
+Jedes Signal bekommt einen Schlüssel. Ein schon gesehener Schlüssel erhöht `occurrences` des ersten Befunds; der
+Befund behält den Kontext (Schritt, Screenshot, letzte Aktionen) seines **ersten** Auftretens, das meist der kürzeste
+Weg dorthin ist.
 
-| Oracle | Key |
+| Orakel | Schlüssel |
 | --- | --- |
-| `pageerror` | Normalized message + first stack frame (with line and column: the same message from two places is two bugs). |
-| `console` | Normalized message. |
-| `http4xx`, `http5xx` | Method + normalized URL + status. |
-| `overflow` | Normalized page URL + the culprit element (the outermost element sticking out on the right, e.g. `div.banner`). |
-| `errorPage` | Normalized page URL + status. |
-| `hang` | Kind (`navigation` or `unresponsive`) + normalized URL. |
-| `crash` | Normalized page URL. |
-| `download` | Normalized download URL. |
+| `pageerror` | Normalisierte Meldung + erster Stack-Frame (mit Zeile und Spalte: Dieselbe Meldung von zwei Stellen sind zwei Fehler). |
+| `console` | Normalisierte Meldung. |
+| `http4xx`, `http5xx` | Methode + normalisierte URL + Status. |
+| `overflow` | Normalisierte Seiten-URL + das verursachende Element (das äußerste Element, das rechts herausragt, z. B. `div.banner`). |
+| `errorPage` | Normalisierte Seiten-URL + Status. |
+| `hang` | Art (`navigation` oder `unresponsive`) + normalisierte URL. |
+| `crash` | Normalisierte Seiten-URL. |
+| `download` | Normalisierte Download-URL. |
 
-**Normalization** removes what changes between occurrences of the same bug:
+Die **Normalisierung** entfernt, was sich zwischen Auftreten desselben Fehlers ändert:
 
-- URLs lose query and fragment; numeric path segments become `:n`, uuids, hex ids and long tokens `:id`
-  (`/orders/4711/items/9?x=1` → `/orders/:n/items/:n`). The site's own origin is dropped, so keys stay the same when
-  the test environment moves to another host or port, between a run and its replay for example.
-- Messages get the same treatment for URLs inside them; other numbers become `#`, ids `:id`, and whitespace is
-  collapsed.
+- URLs verlieren Query und Fragment; numerische Pfadsegmente werden zu `:n`, UUIDs, Hex-IDs und lange Tokens zu
+  `:id` (`/orders/4711/items/9?x=1` → `/orders/:n/items/:n`). Der eigene Origin der Seite fällt weg, sodass Schlüssel
+  gleich bleiben, wenn die Testumgebung auf einen anderen Host oder Port umzieht, zum Beispiel zwischen einem Lauf und
+  seinem Replay.
+- Meldungen werden für URLs darin genauso behandelt; andere Zahlen werden zu `#`, IDs zu `:id`, und Leerraum wird
+  zusammengefasst.
 
-An overflow is keyed by its culprit rather than by viewport size: a too-wide element overflows phone, tablet and
-laptop viewports alike and is one bug. Overflows caused by different elements, at different breakpoints, stay
-separate. Staying on an overflowing page counts once per visit, not once per step.
+Ein Overflow wird nach seinem Verursacher geschlüsselt, nicht nach der Viewport-Größe: Ein zu breites Element läuft
+in Smartphone-, Tablet- und Laptop-Viewports gleichermaßen über und ist ein Fehler. Overflows, die von verschiedenen
+Elementen an verschiedenen Breakpoints verursacht werden, bleiben getrennt. Bleibt der Monkey auf einer überlaufenden
+Seite, zählt das einmal pro Besuch, nicht einmal pro Schritt.
 
-## Ignore rules
+## Ignorierregeln
 
-Known noise, such as a third-party widget that logs errors, is dropped with `findings.ignore`:
+Bekanntes Rauschen, etwa ein Widget eines Drittanbieters, das Fehler protokolliert, wird mit `findings.ignore`
+verworfen:
 
 ```json
 "findings": {
@@ -99,33 +106,36 @@ Known noise, such as a third-party widget that logs errors, is dropped with `fin
 }
 ```
 
-A rule matches when every part it sets matches: `oracle` exactly, `url` and `message` as JavaScript regular
-expressions (case-sensitive) against the request URL (HTTP findings) or page URL (all others) and the finding
-message. `findings.ignoreStatus` lists HTTP statuses that are never findings; a 401 from an API the site expects to
-fail is a typical one.
+Eine Regel greift, wenn jeder Teil passt, den sie setzt: `oracle` exakt, `url` und `message` als reguläre Ausdrücke
+von JavaScript (Groß- und Kleinschreibung beachtet) gegen die Request-URL (HTTP-Befunde) oder die Seiten-URL (alle
+anderen) und die Meldung des Befunds. `findings.ignoreStatus` listet HTTP-Status, die nie Befunde sind; ein 401 von
+einer API, von der die Seite erwartet, dass sie fehlschlägt, ist ein typischer.
 
-## Crashes
+## Abstürze
 
-A crashed page throws on every call. The monkey closes it and continues in another tab, or in a fresh page on
-`baseUrl`, so one crash does not end the run.
+Eine abgestürzte Seite wirft bei jedem Aufruf. Der Monkey schließt sie und macht in einem anderen Tab weiter oder in
+einer frischen Seite auf `baseUrl`, sodass ein Absturz den Lauf nicht beendet.
 
-## Adding an oracle
+## Ein Orakel hinzufügen
 
-Oracles live in `src/oracles/oracles.ts`; each produces signals through `#add(oracle, signal)`, which applies the
-ignore rules and deduplicates by key.
+Orakel liegen in `src/oracles/oracles.ts`; jedes erzeugt Signale über `#add(oracle, signal)`, das die Ignorierregeln
+anwendet und nach Schlüssel dedupliziert.
 
-1. Add the name to `ORACLES` in `src/config/values.ts`. That makes `oracles.<name>` a config key (default on);
-   document it in [configuration](../reference/konfiguration.md), which `test/docs.test.ts` enforces.
-2. Detect the problem in the `Oracles` class: an **event oracle** registers a listener in `#watch(page)`, which runs
-   for every page of the context, popups included; a **state oracle** checks the page after each step in
-   `#inspect(page, navigated)`; something recorded in the step's events belongs in `check`. Return early when
-   `this.#config.oracles.<name>` is off.
-3. Call `this.#add("<name>", { severity, key, message, url, details })`. Build the **key** from what identifies the
-   bug and stays the same across occurrences, runs and replay: use `normalizeUrl` and `normalizeMessage` from
-   `src/oracles/keys.ts`, and never the step, a timestamp or the port. Keep the message short; put the rest in
-   `details`.
-4. Add a page with the bug to the [fixture site](../how-to/fixture-seite-nutzen.md) and a test in
-   `test/oracles.test.ts` that the oracle reports it exactly once, and does not fire on a clean page.
+1. Trage den Namen in `ORACLES` in `src/config/values.ts` ein. Das macht `oracles.<name>` zu einem
+   Konfigurationsschlüssel (standardmäßig an); dokumentiere ihn in der [Konfiguration](../reference/konfiguration.md),
+   was `test/docs.test.ts` erzwingt.
+2. Erkenne das Problem in der Klasse `Oracles`: Ein **Event-Orakel** registriert einen Listener in `#watch(page)`, das
+   für jede Seite des Kontexts läuft, Popups eingeschlossen; ein **Zustands-Orakel** prüft die Seite nach jedem
+   Schritt in `#inspect(page, navigated)`; was in den Events des Schritts festgehalten ist, gehört in `check`. Kehre
+   früh zurück, wenn `this.#config.oracles.<name>` aus ist.
+3. Rufe `this.#add("<name>", { severity, key, message, url, details })` auf. Bilde den **Schlüssel** aus dem, was den
+   Fehler identifiziert und über Auftreten, Läufe und Replay gleich bleibt: Verwende `normalizeUrl` und
+   `normalizeMessage` aus `src/oracles/keys.ts` und nie den Schritt, einen Zeitstempel oder den Port. Halte die
+   Meldung kurz; der Rest gehört in `details`.
+4. Füge der [Fixture-Seite](../how-to/fixture-seite-nutzen.md) eine Seite mit dem Fehler hinzu und in
+   `test/oracles.test.ts` einen Test, dass das Orakel ihn genau einmal meldet und auf einer sauberen Seite nicht
+   anschlägt.
 
-Everything else follows: the finding gets an id, the last actions and a screenshot, goes into the action log for
-replay, into both reports, and is aggregated across [parallel runs](../how-to/parallel-ausfuehren.md).
+Alles andere folgt von selbst: Der Befund bekommt eine ID, die letzten Aktionen und einen Screenshot, kommt für
+Replay ins Aktionsprotokoll, in beide Berichte und wird über [parallele Läufe](../how-to/parallel-ausfuehren.md)
+hinweg zusammengefasst.

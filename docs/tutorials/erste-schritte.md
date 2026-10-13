@@ -1,9 +1,9 @@
-# Getting started
+# Erste Schritte
 
-This walks you from a fresh clone to a first `monkey run` against the local fixture site. You need
-Node.js 22.18 or newer (the fixture site runs TypeScript directly) and git. No LLM is needed.
+Dieses Tutorial führt dich von einem frischen Klon zu einem ersten `monkey run` gegen die lokale Fixture-Seite. Du
+brauchst Node.js 22.18 oder neuer (die Fixture-Seite führt TypeScript direkt aus) und git. Ein LLM ist nicht nötig.
 
-## 1. Install
+## 1. Installieren
 
 ```sh
 git clone https://github.com/besessener/PlayMonkey.git
@@ -13,15 +13,15 @@ npx playwright install chromium    # on Linux: --with-deps installs the system l
 npx monkey --help
 ```
 
-## 2. Start the fixture site
+## 2. Die Fixture-Seite starten
 
-The repository ships a small site with deliberately seeded bugs. In a second terminal:
+Das Repository bringt eine kleine Seite mit absichtlich eingebauten Fehlern mit. In einem zweiten Terminal:
 
 ```sh
 npm run fixture
 ```
 
-It prints its URL, the test login and the variables the example config needs, for example:
+Sie gibt ihre URL, die Testanmeldung und die Variablen aus, die die Beispielkonfiguration braucht, zum Beispiel:
 
 ```text
 Fixture site running at http://127.0.0.1:41234
@@ -30,16 +30,17 @@ For fixtures/configs/fixture.json:
   export FIXTURE_URL=http://127.0.0.1:41234 FIXTURE_USER=monkey FIXTURE_PASS=banana-split
 ```
 
-## 3. Run the monkey
+## 3. Den Monkey laufen lassen
 
-Copy the `export` line into your first terminal, then:
+Kopier die Zeile mit `export` in dein erstes Terminal, dann:
 
 ```sh
 npx monkey run fixtures/configs/fixture.json
 ```
 
-The monkey logs in as the role `user`, takes 300 random steps (the config's `limits.maxSteps`) and prints a summary
-with the five seeded bugs, each reported once however often the monkey ran into it:
+Der Monkey meldet sich als Rolle `user` an, geht 300 zufällige Schritte (`limits.maxSteps` der Konfiguration) und gibt
+eine Zusammenfassung mit den fünf eingebauten Fehlern aus, jeder einmal gemeldet, egal, wie oft der Monkey darauf
+gestoßen ist:
 
 ```text
 seed: 42
@@ -57,22 +58,22 @@ report: …/fixtures/configs/monkey-report/report.html
 exit 1: findings present
 ```
 
-Open `fixtures/configs/monkey-report/report.html` in a browser: each finding with its steps to reproduce, a
-screenshot and links to the trace and video. The same data is in `report.json`; see the
-[report reference](../reference/bericht.md).
+Öffne `fixtures/configs/monkey-report/report.html` im Browser: jeder Befund mit seinen Schritten zum Reproduzieren,
+einem Screenshot und Links zu Trace und Video. Dieselben Daten stehen in `report.json`; siehe die
+[Referenz zum Bericht](../reference/bericht.md).
 
-Watch what it did with `npx playwright show-trace fixtures/configs/monkey-report/user/trace.zip`, or look at the video
-next to it. Run it again: with the same seed it takes the same steps.
+Sieh dir an, was er getan hat, mit `npx playwright show-trace fixtures/configs/monkey-report/user/trace.zip`, oder
+schau dir das Video daneben an. Führ ihn noch einmal aus: Mit demselben Seed geht er dieselben Schritte.
 
-## 4. Replay the run
+## 4. Den Lauf abspielen
 
-Every action went to `actions.json`. Replay it, with the config for the login:
+Jede Aktion ist in `actions.json` gelandet. Spiel sie ab, mit der Konfiguration für die Anmeldung:
 
 ```sh
 npx monkey replay fixtures/configs/monkey-report/user/actions.json --config fixtures/configs/fixture.json
 ```
 
-It repeats the 300 steps without choosing anything and checks which findings recur:
+Replay wiederholt die 300 Schritte, ohne etwas auszuwählen, und prüft, welche Befunde wieder auftreten:
 
 ```text
 [user] replaying 300 actions
@@ -86,12 +87,12 @@ reproduced      F5 high http5xx: POST /form responded 500 Internal Server Error
 reproduced: 5 of 5
 ```
 
-The log stores the URL and the login as `${FIXTURE_URL}` and friends, so it also replays after you restart the
-fixture on another port. See [replay](../explanation/replay.md).
+Das Protokoll speichert die URL und die Anmeldung als `${FIXTURE_URL}` und Co., deshalb lässt es sich auch abspielen,
+nachdem du die Fixture-Seite auf einem anderen Port neu gestartet hast. Siehe [Replay](../explanation/replay.md).
 
-## 5. See a config error
+## 5. Einen Konfigurationsfehler sehen
 
-Unset a variable and run again:
+Entferne eine Variable und führ den Lauf noch einmal aus:
 
 ```sh
 unset FIXTURE_PASS
@@ -99,13 +100,13 @@ npx monkey run fixtures/configs/fixture.json
 echo $?
 ```
 
-The error names the config path and the variable (`auth[0].fields.password: environment variable FIXTURE_PASS is
-not set`), never a value, and the exit code is `2`.
+Der Fehler nennt den Konfigurationspfad und die Variable (`auth[0].fields.password: environment variable FIXTURE_PASS is
+not set`), nie einen Wert, und der Exit-Code ist `2`.
 
-## Next
+## Als Nächstes
 
-- Write a config for your own test environment: [configuration reference](../reference/konfiguration.md).
-- Set up roles and logins: [configure login](../how-to/anmeldung-einrichten.md).
-- Let an LLM help when the monkey is stuck: [configure the LLM](../how-to/llm-einrichten.md).
-- More roles and seeds at once: [run in parallel](../how-to/parallel-ausfuehren.md).
-- Run it on every pull request: [run in CI](../how-to/in-ci-ausfuehren.md).
+- Eine Konfiguration für deine eigene Testumgebung schreiben: [Referenz zur Konfiguration](../reference/konfiguration.md).
+- Rollen und Anmeldungen einrichten: [Anmeldung einrichten](../how-to/anmeldung-einrichten.md).
+- Ein LLM helfen lassen, wenn der Monkey festgefahren ist: [LLM einrichten](../how-to/llm-einrichten.md).
+- Mehr Rollen und Seeds auf einmal: [Parallel ausführen](../how-to/parallel-ausfuehren.md).
+- Bei jedem Pull Request ausführen: [In der CI ausführen](../how-to/in-ci-ausfuehren.md).

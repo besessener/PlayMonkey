@@ -1,6 +1,6 @@
-# Report
+# Bericht
 
-`monkey run` writes everything into `report.dir` (default `./monkey-report`, relative to the config file):
+`monkey run` schreibt alles nach `report.dir` (Standard `./monkey-report`, relativ zur Konfigurationsdatei):
 
 ```text
 monkey-report/
@@ -16,12 +16,12 @@ monkey-report/
     downloads/             only with report.keepDownloads
 ```
 
-With `seeds` in the config every run gets its own directory, `<role>/<seed>/`, with the same content
-(`admin/42/actions.json`, `admin/42/trace.zip`, …); `report.json` and `report.html` stay one combined report at the
-top.
+Mit `seeds` in der Konfiguration bekommt jeder Lauf ein eigenes Verzeichnis, `<role>/<seed>/`, mit demselben Inhalt
+(`admin/42/actions.json`, `admin/42/trace.zip`, …); `report.json` und `report.html` bleiben ein gemeinsamer Bericht
+auf oberster Ebene.
 
-At the end of a run the console says how many findings of which severity there are, where the report is, and why
-the exit code is what it is:
+Am Ende eines Laufs sagt die Konsole, wie viele Befunde welches Schweregrads es gibt, wo der Bericht liegt und warum
+der Exit-Code so ist, wie er ist:
 
 ```text
 llm: 14 calls (1 failed), 81234 in / 912 out tokens (60110 cached), 5 handoffs, 12 actions, 1 fallback, p95 2310 ms
@@ -32,77 +32,81 @@ exit 1: findings present
 
 ## `report.html`
 
-A single file with inline CSS and the screenshots embedded as images; it has no scripts and loads nothing from the
-network. It shows:
+Eine einzelne Datei mit eingebettetem CSS und den Screenshots als eingebettete Bilder; sie hat keine Skripte und lädt
+nichts aus dem Netz. Sie zeigt:
 
-- the run (base URL, seed, start time, tool version) and the number of findings per severity;
-- one row per run (role and seed): steps, duration, why it stopped, findings, and links to its action log, trace
-  and video;
-- with `llm`: an **LLM usage** table (total and per role) and notes when the LLM was disabled or its budget ran out;
-- the findings, aggregated across runs: one card per problem, by severity, then the number of runs that found it,
-  then how often it occurred. Each has its oracle, message and page, **found in** (the roles, e.g. "admin, user"),
-  the runs with their per-run finding ids, and, from the first run that found it, the **steps to reproduce** (the last
-  `findings.lastActions` actions, written out with their durable locators), the screenshot and the details the
-  oracle recorded.
+- den Lauf (Basis-URL, Seed, Startzeit, Werkzeugversion) und die Anzahl der Befunde pro Schweregrad;
+- eine Zeile pro Lauf (Rolle und Seed): Schritte, Dauer, warum er endete, Befunde und Links zu seinem
+  Aktionsprotokoll, Trace und Video;
+- mit `llm`: eine Tabelle **LLM usage** (gesamt und pro Rolle) und Hinweise, wenn das LLM abgeschaltet war oder sein
+  Budget aufgebraucht ist;
+- die Befunde, über alle Läufe zusammengefasst: eine Karte pro Problem, sortiert nach Schweregrad, dann nach der Zahl
+  der Läufe, die es gefunden haben, dann danach, wie oft es auftrat. Jede zeigt ihr Orakel, ihre Meldung und Seite,
+  **found in** (die Rollen, z. B. „admin, user“), die Läufe mit ihren Befund-Ids pro Lauf und, aus dem ersten Lauf,
+  der es gefunden hat, die **steps to reproduce** (die letzten `findings.lastActions` Aktionen, ausgeschrieben mit
+  ihren dauerhaften Locatoren), den Screenshot und die Details, die das Orakel festgehalten hat.
 
-Everything shown comes from the page under test or the config, so all of it is HTML-escaped. Links to traces and
-videos are relative, so keep the directory together when you move it.
+Alles, was angezeigt wird, stammt von der getesteten Seite oder aus der Konfiguration, daher ist alles HTML-escaped.
+Links zu Traces und Videos sind relativ; halte das Verzeichnis also zusammen, wenn du es verschiebst.
 
 ## `report.json`
 
-| Field | Meaning |
+| Feld | Bedeutung |
 | --- | --- |
-| `version` | Format version, currently `1`. |
+| `version` | Formatversion, derzeit `1`. |
 | `tool` | `{ "name": "playmonkey", "version": … }`. |
-| `startedAt`, `finishedAt` | ISO timestamps of the run. |
-| `seed` | The seed of the run; with `seeds`, the first of them. |
-| `seeds` | Only with `seeds` in the config: all of them. |
-| `config` | The config with defaults applied and every secret value masked as `***`. |
-| `roles[]` | One entry per run, in config order (roles, then seeds), whatever order they finished in: `role`, `seed`, `steps`, `durationMs`, `stopReason` (`maxSteps`, `maxMinutes`, `aborted`, `error`), `error`, `states`, `failedActions`, `findings` (count), `blockedNavigations`, and the paths `actionLog`, `trace`, `videos`. A run that could not log in or crashed has only `role`, `seed`, `error`, `findings: 0` and empty `videos`. |
-| `findings[]` | Every run's findings, deduplicated per run, as described in [oracles and findings](../explanation/orakel.md#finding-model), plus the run's `seed` and `screenshot` as a path. Sorted by severity, then occurrences, then run order. Ids (`F1`, …) count per run. |
-| `aggregated[]` | The findings across runs, one per dedup key: `key`, `oracle`, `severity`, `message`, `url` (of the first run that found it), `occurrences` (sum), `roles` (distinct, config order) and `runs[]` (`role`, `seed`, `id`). Sorted like the HTML. |
-| `counts` | Aggregated findings per severity: `critical`, `high`, `medium`, `low`. |
-| `llm` | Only with `llm` in the config; see below. |
+| `startedAt`, `finishedAt` | ISO-Zeitstempel des Laufs. |
+| `seed` | Der Seed des Laufs; mit `seeds` der erste davon. |
+| `seeds` | Nur mit `seeds` in der Konfiguration: alle. |
+| `config` | Die Konfiguration mit eingesetzten Standardwerten, jeder geheime Wert als `***` maskiert. |
+| `roles[]` | Ein Eintrag pro Lauf, in der Reihenfolge der Konfiguration (Rollen, dann Seeds), egal in welcher Reihenfolge sie fertig wurden: `role`, `seed`, `steps`, `durationMs`, `stopReason` (`maxSteps`, `maxMinutes`, `aborted`, `error`), `error`, `states`, `failedActions`, `findings` (Anzahl), `blockedNavigations` und die Pfade `actionLog`, `trace`, `videos`. Ein Lauf, der sich nicht anmelden konnte oder abgestürzt ist, hat nur `role`, `seed`, `error`, `findings: 0` und leere `videos`. |
+| `findings[]` | Die Befunde jedes Laufs, pro Lauf dedupliziert, wie in [Orakel und Befunde](../explanation/orakel.md#befundmodell) beschrieben, dazu der `seed` des Laufs und `screenshot` als Pfad. Sortiert nach Schweregrad, dann Vorkommen, dann Reihenfolge der Läufe. Ids (`F1`, …) zählen pro Lauf. |
+| `aggregated[]` | Die Befunde über alle Läufe, einer pro Dedup-Schlüssel: `key`, `oracle`, `severity`, `message`, `url` (des ersten Laufs, der ihn gefunden hat), `occurrences` (Summe), `roles` (eindeutig, Reihenfolge der Konfiguration) und `runs[]` (`role`, `seed`, `id`). Sortiert wie im HTML. |
+| `counts` | Zusammengefasste Befunde pro Schweregrad: `critical`, `high`, `medium`, `low`. |
+| `llm` | Nur mit `llm` in der Konfiguration; siehe unten. |
 
-Paths are relative to the report directory.
+Pfade sind relativ zum Berichtsverzeichnis.
 
 ### `llm`
 
-| Field | Meaning |
+| Feld | Bedeutung |
 | --- | --- |
-| `provider`, `deployment` | The backend and deployment. |
-| `status` | `active`, or `disabled` when the preflight failed with `llm.required: false` (`disabledReason` says why). |
-| `preflight` | `{ ok, latencyMs }` or `{ ok: false, error }`. Its tokens are not counted below. |
-| `budget` | `maxCalls`, `maxTokens` as configured, and `exhausted: { role, step, reason }` once the budget ran out; the rest of the run was a pure monkey. |
-| `pricing` | Echo of `llm.pricing`, when set. |
-| `total`, `roles[]` | Usage of the whole invocation and per run (`roles[].role`: the role, or `role/seed` with `seeds`), see below. |
+| `provider`, `deployment` | Das Backend und das Deployment. |
+| `status` | `active`, oder `disabled`, wenn der Preflight mit `llm.required: false` fehlgeschlagen ist (`disabledReason` sagt, warum). |
+| `preflight` | `{ ok, latencyMs }` oder `{ ok: false, error }`. Seine Tokens werden unten nicht mitgezählt. |
+| `budget` | `maxCalls`, `maxTokens` wie konfiguriert und `exhausted: { role, step, reason }`, sobald das Budget aufgebraucht war; der Rest des Laufs war reiner Monkey. |
+| `pricing` | Wiedergabe von `llm.pricing`, wenn gesetzt. |
+| `total`, `roles[]` | Verbrauch des ganzen Aufrufs und pro Lauf (`roles[].role`: die Rolle, oder `role/seed` mit `seeds`), siehe unten. |
 
-Each usage entry has `calls`, `failedCalls`, `errors` (failed calls by kind, e.g. `{ "rateLimited": 2 }`),
-`inputTokens`, `outputTokens`, `cachedTokens` (cache reads), `cacheWriteTokens`, `retries` (requests the SDK
-repeated; not counted as calls), `handoffs` (by trigger, see [the LLM](../explanation/llm.md#when-the-monkey-hands-over)),
-`actions` (LLM-chosen actions executed), `fallbacks` (steps where the monkey acted because the LLM failed, by
-error kind), `breakerTrips`, `avgLatencyMs`, `p95LatencyMs` and, with `llm.pricing`, `estimatedCost`: an
-**estimate** in the pricing's currency, not a bill.
+Jeder Verbrauchseintrag hat `calls`, `failedCalls`, `errors` (fehlgeschlagene Aufrufe nach Art, z. B.
+`{ "rateLimited": 2 }`), `inputTokens`, `outputTokens`, `cachedTokens` (Cache-Lesezugriffe), `cacheWriteTokens`,
+`retries` (Anfragen, die das SDK wiederholt hat; zählen nicht als Aufrufe), `handoffs` (nach Auslöser, siehe
+[das LLM](../explanation/llm.md#wann-der-monkey-übergibt)), `actions` (ausgeführte Aktionen, die das LLM gewählt
+hat), `fallbacks` (Schritte, in denen der Monkey gehandelt hat, weil das LLM fehlschlug, nach Fehlerart),
+`breakerTrips`, `avgLatencyMs`, `p95LatencyMs` und, mit `llm.pricing`, `estimatedCost`: eine **Schätzung** in der
+Währung der Preise, keine Rechnung.
 
 ## `llm-debug.jsonl`
 
-Written only with `llm.debugLog: true`; otherwise no prompt or response is stored anywhere. One JSON object per LLM
-call: `time`, `role`, `step`, `attempt`, `prompt` (the user message), `input` (its parts), `result` or `error`, and
-`response` (the provider's raw response). Prompts never contain secret values (see
-[placeholders](../explanation/llm.md#secrets-and-placeholders)); every string is masked once more before writing.
+Wird nur mit `llm.debugLog: true` geschrieben; sonst wird nirgends ein Prompt oder eine Antwort gespeichert. Ein
+JSON-Objekt pro LLM-Aufruf: `time`, `role`, `step`, `attempt`, `prompt` (die Benutzernachricht), `input` (ihre
+Teile), `result` oder `error` und `response` (die Rohantwort des Anbieters). Prompts enthalten nie geheime Werte
+(siehe [Platzhalter](../explanation/llm.md#secrets-und-platzhalter)); jede Zeichenkette wird vor dem Schreiben noch
+einmal maskiert.
 
 ## Secrets
 
-`report.json`, `report.html`, `llm-debug.jsonl` and the console mask every value that came from a `${VAR}` placeholder; `actions.json`
-stores the placeholder instead, so the log can be replayed. A test runs the fixture with distinct credentials and
-greps every text file of the report directory for them.
+`report.json`, `report.html`, `llm-debug.jsonl` und die Konsole maskieren jeden Wert, der aus einem
+`${VAR}`-Platzhalter stammt; `actions.json` speichert stattdessen den Platzhalter, damit sich das Protokoll
+wiederholen lässt. Ein Test lässt die Fixture-Seite mit eigenen Zugangsdaten laufen und durchsucht jede Textdatei des
+Berichtsverzeichnisses danach.
 
-**Traces and videos are not masked.** Playwright has no way to redact a trace, and it records:
+**Traces und Videos sind nicht maskiert.** Playwright kann einen Trace nicht schwärzen, und er zeichnet auf:
 
-- the context options, including `baseURL` and the storage state with the logged-in **session cookie**;
-- every request and response with URLs, headers and cookies;
-- every value the monkey typed, including test data from `${VAR}` placeholders;
-- screenshots and DOM snapshots, and the video, of whatever the pages showed.
+- die Kontextoptionen, einschließlich `baseURL` und des Storage State mit dem **Sitzungs-Cookie** der Anmeldung;
+- jede Anfrage und Antwort mit URLs, Headern und Cookies;
+- jeden Wert, den der Monkey eingetippt hat, einschließlich Testdaten aus `${VAR}`-Platzhaltern;
+- Screenshots und DOM-Snapshots sowie das Video von allem, was die Seiten angezeigt haben.
 
-Passwords of a form login are not in them: the login runs in a separate context without trace or video. Treat
-`trace.zip` and the videos like the test environment's session data, and do not publish them.
+Passwörter einer Formularanmeldung sind nicht darin: Die Anmeldung läuft in einem eigenen Kontext ohne Trace und
+Video. Behandle `trace.zip` und die Videos wie die Sitzungsdaten der Testumgebung, und veröffentliche sie nicht.

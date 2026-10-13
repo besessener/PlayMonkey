@@ -1,94 +1,104 @@
-# The random monkey
+# Der Zufalls-Monkey
 
-The monkey is the default source of actions. Each step it takes a [snapshot](snapshot.md), picks an action with a
-seeded random generator, executes it and hands the result on. The same seed and the same site give the same run.
+Der Monkey ist die Standardquelle für Aktionen. In jedem Schritt nimmt er einen [Snapshot](snapshot.md) auf, wählt
+mit einem Zufallsgenerator mit Seed eine Aktion, führt sie aus und reicht das Ergebnis weiter. Derselbe Seed und
+dieselbe Seite ergeben denselben Lauf.
 
-## Determinism
+## Determinismus
 
-- **Generator:** sfc32 seeded through splitmix32 (`src/monkey/random.ts`), 32-bit integer arithmetic only, so the
-  sequence is the same on every platform. `Math.random` is never used. A test pins the first values.
-- **Seed:** `seed` from the config, or a random one that `monkey run` prints so you can put it in the config.
-- **Inputs to every choice** are the snapshot (elements in document order), what the run has explored so far and the
-  generator. As long as the site renders the same, the same seed yields the same sequence of actions, values and
-  durable locators; a test runs the fixture twice and compares.
-- **Answers to the page** (native dialogs, file choosers) come from a second generator seeded from the same seed, so
-  they never shift the monkey's own sequence; see [pages that ask for something](#pages-that-ask-for-something).
-- **With an LLM** the run stays seeded, but each step the LLM takes is one the generator does not, so the sequence
-  differs from a run without `llm` from the first handoff on. Until then it is identical; a test checks this. See
-  [the LLM](llm.md).
+- **Generator:** sfc32 mit Seed über splitmix32 (`src/monkey/random.ts`), nur 32-Bit-Ganzzahlarithmetik, damit die
+  Folge auf jeder Plattform gleich ist. `Math.random` wird nie verwendet. Ein Test hält die ersten Werte fest.
+- **Seed:** `seed` aus der Konfiguration oder ein zufälliger, den `monkey run` ausgibt, damit du ihn in die
+  Konfiguration übernehmen kannst.
+- **Eingaben jeder Wahl** sind der Snapshot (Elemente in Dokumentreihenfolge), was der Lauf bisher erkundet hat, und
+  der Generator. Solange die Seite gleich gerendert wird, ergibt derselbe Seed dieselbe Folge von Aktionen, Werten und
+  dauerhaften Locators; ein Test führt die Fixture zweimal aus und vergleicht.
+- **Antworten an die Seite** (native Dialoge, Dateiauswahlen) kommen aus einem zweiten Generator mit Seed aus
+  demselben Seed, sodass sie die eigene Folge des Monkeys nie verschieben; siehe
+  [Seiten, die etwas wissen wollen](#seiten-die-etwas-wissen-wollen).
+- **Mit LLM** bleibt der Lauf an den Seed gebunden, aber jeder Schritt, den das LLM macht, ist einer, den der
+  Generator nicht macht; deshalb weicht die Folge ab der ersten Übergabe von einem Lauf ohne `llm` ab. Bis dahin ist
+  sie identisch; ein Test prüft das. Siehe [das LLM](llm.md).
 
-## Choosing an action
+## Eine Aktion wählen
 
-1. **Action type** by weight (`monkey.weights`), among the types possible on the current page: `click` (links,
-   buttons, anything clickable), `dblclick`, `rightclick` and `hover` (on the same elements: in-place editing,
-   context menus, hover menus), `longPress` (press and hold; only in viewports narrower than 1024 px), `drag` (an
-   element onto another one, best effort), `fill` (text fields), `select` (dropdowns), `check` (checkboxes, radios,
-   switches; a checked one is unchecked), `press` (Tab, Shift+Tab, Enter, Escape, arrows, Space: keyboard-only
-   navigation), `scroll`, `back`, `navigate` (to a URL seen earlier in the run), `setViewport` (phone, tablet,
-   laptop, desktop sizes) and `switchTab` (only with several tabs). A weight of 0 disables a type.
-2. **Element** within that type, preferring what is new: an element's weight drops with every time it was used in
-   the same state (URL and snapshot hash), and links to a URL the run has not visited yet count three times.
-   Disabled elements are skipped; with `stayOnDomain`, links to other origins are not candidates.
-3. **Blocking UI first:** while a dialog is open, the elements inside it count ten times; while a cookie or consent
-   banner shows, so do its answer buttons ("Accept", "Reject", …). Such overlays usually cover the page, so clicks
-   elsewhere would only time out. The run never stalls on one: a covered element fails after
-   `monkey.actionTimeoutMs`, and with an LLM the open dialog is also a [handoff](llm.md#when-the-monkey-hands-over)
-   trigger.
+1. **Aktionstyp** nach Gewicht (`monkey.weights`), unter den Typen, die auf der aktuellen Seite möglich sind: `click`
+   (Links, Buttons, alles Klickbare), `dblclick`, `rightclick` und `hover` (auf denselben Elementen: Bearbeiten an Ort
+   und Stelle, Kontextmenüs, Hover-Menüs), `longPress` (drücken und halten; nur in Viewports schmaler als 1024 px),
+   `drag` (ein Element auf ein anderes, nach bestem Bemühen), `fill` (Textfelder), `select` (Dropdowns), `check`
+   (Checkboxen, Radiobuttons, Schalter; ein angehakter wird abgehakt), `press` (Tab, Shift+Tab, Enter, Escape,
+   Pfeiltasten, Leertaste: Navigation nur per Tastatur), `scroll`, `back`, `navigate` (zu einer URL, die früher im
+   Lauf gesehen wurde), `setViewport` (Größen für Smartphone, Tablet, Laptop, Desktop) und `switchTab` (nur bei
+   mehreren Tabs). Ein Gewicht von 0 schaltet einen Typ ab.
+2. **Element** innerhalb dieses Typs, bevorzugt Neues: Das Gewicht eines Elements sinkt mit jeder Verwendung im
+   selben Zustand (URL und Snapshot-Hash), und Links zu einer URL, die der Lauf noch nicht besucht hat, zählen
+   dreifach. Deaktivierte Elemente werden übersprungen; mit `stayOnDomain` sind Links zu anderen Origins keine
+   Kandidaten.
+3. **Blockierende Oberfläche zuerst:** Solange ein Dialog offen ist, zählen die Elemente darin zehnfach; solange ein
+   Cookie- oder Consent-Banner zu sehen ist, gilt das auch für seine Antwort-Buttons („Accept“, „Reject“, …). Solche
+   Overlays verdecken meist die Seite, Klicks anderswo liefen also nur in einen Timeout. Der Lauf bleibt nie an einem
+   hängen: Ein verdecktes Element scheitert nach `monkey.actionTimeoutMs`, und mit LLM ist der offene Dialog auch ein
+   Auslöser für eine [Übergabe](llm.md#wann-der-monkey-übergibt).
 
-## Values for text fields
+## Werte für Textfelder
 
-About half the time the monkey types a valid value: test data whose key appears in the field's name or placeholder
-(`email` matches "E-Mail address"), otherwise a plain value such as `Monkey`. The other half it types something
-nasty: empty, whitespace, 10 000 characters, Unicode with emoji and right-to-left text, special characters,
-HTML and script-like strings, SQL-like strings, numbers out of range, an impossible date.
+Etwa die Hälfte der Zeit tippt der Monkey einen gültigen Wert: Testdaten, deren Schlüssel im Namen oder Platzhalter
+des Felds vorkommt (`email` passt zu „E-Mail address“), sonst einen schlichten Wert wie `Monkey`. In der anderen
+Hälfte tippt er etwas Gemeines: leer, Leerraum, 10 000 Zeichen, Unicode mit Emoji und Rechts-nach-links-Text,
+Sonderzeichen, HTML und skriptartige Zeichenketten, SQL-artige Zeichenketten, Zahlen außerhalb des Bereichs, ein
+unmögliches Datum.
 
-## Executing and settling
+## Ausführen und Abwarten
 
-Each action runs with `monkey.actionTimeoutMs` (default 5 s). Element actions resolve the ref first and fail fast
-when it is stale. When the main document changed, the executor waits for its `load` event before the next snapshot.
+Jede Aktion läuft mit `monkey.actionTimeoutMs` (Standard 5 s). Element-Aktionen lösen zuerst die Ref auf und
+scheitern sofort, wenn sie veraltet ist. Hat sich das Hauptdokument geändert, wartet die Ausführung vor dem nächsten
+Snapshot auf dessen `load`-Event.
 
-**A failed action is not a finding:** an element that vanished, is covered or does not respond is recorded with the
-error and the run continues. Problems of the site are the [oracles'](orakel.md) job; a timeout while waiting
-for a navigation or page load is the exception, it is a `hang`.
+**Eine fehlgeschlagene Aktion ist kein Befund:** Ein Element, das verschwunden ist, verdeckt ist oder nicht reagiert,
+wird mit dem Fehler protokolliert, und der Lauf geht weiter. Probleme der Seite sind Sache der [Orakel](orakel.md);
+ein Timeout beim Warten auf eine Navigation oder das Laden einer Seite ist die Ausnahme, es ist ein `hang`.
 
-## Pages that ask for something
+## Seiten, die etwas wissen wollen
 
-Every page of the role's context, popups included, is watched (`src/monkey/events.ts`):
+Jede Seite des Kontexts der Rolle, Popups eingeschlossen, wird beobachtet (`src/monkey/events.ts`):
 
-- **Native dialogs** (`alert`, `confirm`, `prompt`, `beforeunload`) are accepted or dismissed at random, at once; a
-  prompt gets a plain or nasty value. An open dialog would block the page, so none is ever left open, not even one
-  that a page shows while loading.
-- **File choosers**, opened by clicking a file input or a button that opens one, get a generated file: a small text
-  file, a PNG, an empty file, 1 MiB, a wrong extension (`invoice.pdf.exe`), text named `.png`, and a Unicode file
-  name; sometimes two when the input takes several. No file comes from the disk.
-- **Downloads** are saved to `<report.dir>/<role>/downloads/`, measured, and deleted when the role ends unless
-  `report.keepDownloads` is on. A download that fails is a `download` [finding](orakel.md).
+- **Native Dialoge** (`alert`, `confirm`, `prompt`, `beforeunload`) werden zufällig und sofort angenommen oder
+  abgelehnt; ein Prompt bekommt einen schlichten oder gemeinen Wert. Ein offener Dialog würde die Seite blockieren,
+  deshalb bleibt nie einer offen, nicht einmal einer, den eine Seite beim Laden zeigt.
+- **Dateiauswahlen**, geöffnet durch einen Klick auf ein Dateifeld oder einen Button, der eine öffnet, bekommen eine
+  erzeugte Datei: eine kleine Textdatei, ein PNG, eine leere Datei, 1 MiB, eine falsche Endung (`invoice.pdf.exe`),
+  Text unter einem Namen auf `.png` und einen Unicode-Dateinamen; manchmal zwei, wenn das Feld mehrere annimmt.
+  Keine Datei kommt von der Festplatte.
+- **Downloads** werden unter `<report.dir>/<role>/downloads/` gespeichert, gemessen und am Ende der Rolle gelöscht,
+  außer `report.keepDownloads` ist an. Ein fehlgeschlagener Download ist ein `download`-[Befund](orakel.md).
 
-Each step waits up to `monkey.actionTimeoutMs` for these to finish and records them with the step (`events` in the
-[action log](../reference/aktionsprotokoll.md)); replay gives the same answers again.
+Jeder Schritt wartet bis zu `monkey.actionTimeoutMs`, bis diese abgeschlossen sind, und protokolliert sie mit dem
+Schritt (`events` im [Aktionsprotokoll](../reference/aktionsprotokoll.md)); Replay gibt dieselben Antworten noch
+einmal.
 
-## Tabs and popups
+## Tabs und Popups
 
-When an action opens a popup or a new tab, the monkey continues there, as a user would; `switchTab` goes back.
-Oracles watch every tab. With `stayOnDomain`, a popup to another site is blocked and closed, and the monkey goes on
-in the first tab. More than `monkey.maxTabs` open tabs (default 5) are not kept: the oldest ones the monkey left
-behind are closed, never the first tab or the current one.
+Öffnet eine Aktion ein Popup oder einen neuen Tab, macht der Monkey dort weiter, wie es ein Benutzer täte;
+`switchTab` geht zurück. Die Orakel beobachten jeden Tab. Mit `stayOnDomain` wird ein Popup zu einer anderen Seite
+blockiert und geschlossen, und der Monkey macht im ersten Tab weiter. Mehr als `monkey.maxTabs` offene Tabs
+(Standard 5) werden nicht behalten: Die ältesten, die der Monkey zurückgelassen hat, werden geschlossen, nie der
+erste Tab oder der aktuelle.
 
 ## Frames
 
-[Same-origin iframes](snapshot.md) are part of the snapshot, so the monkey acts inside them like anywhere else, and
-the oracles see their errors. Cross-origin iframes are counted, not entered: Playwright could act in them, but their
-content belongs to another site.
+[Same-Origin-Iframes](snapshot.md) gehören zum Snapshot, der Monkey handelt in ihnen also wie überall sonst, und die
+Orakel sehen ihre Fehler. Cross-Origin-Iframes werden gezählt, nicht betreten: Playwright könnte in ihnen handeln,
+aber ihr Inhalt gehört zu einer anderen Seite.
 
 ## Limits
 
-The loop stops at `limits.maxSteps`, at `limits.maxMinutes` (checked before every step) or when interrupted
-(Ctrl+C finishes the current step, then writes the trace). With `stayOnDomain`, a page that ends up on another origin
-or a blank page is sent back to `baseUrl`. A crashed page is closed and the run continues in another tab or a fresh
-page; the `crash` oracle reports it.
+Die Schleife hält bei `limits.maxSteps`, bei `limits.maxMinutes` (vor jedem Schritt geprüft) oder bei einer
+Unterbrechung (Strg+C beendet den aktuellen Schritt und schreibt dann den Trace). Mit `stayOnDomain` wird eine Seite,
+die auf einem anderen Origin oder als leere Seite endet, zurück zu `baseUrl` geschickt. Eine abgestürzte Seite wird
+geschlossen, und der Lauf geht in einem anderen Tab oder einer frischen Seite weiter; das Orakel `crash` meldet es.
 
-## Coverage on the fixture site
+## Abdeckung auf der Fixture-Seite
 
-With seeds 1, 2 and 3, the monkey reaches every page of the fixture and triggers all five seeded bugs (JS error,
-console error, broken link, HTTP 500, overflow) well within the default 500 steps, typically in 100 to 150. The test
-`test/monkey.test.ts` checks this for those three seeds.
+Mit den Seeds 1, 2 und 3 erreicht der Monkey jede Seite der Fixture und löst alle fünf eingebauten Fehler aus
+(JS-Fehler, Konsolenfehler, defekter Link, HTTP 500, Overflow), deutlich innerhalb der standardmäßigen 500 Schritte,
+typischerweise in 100 bis 150. Der Test `test/monkey.test.ts` prüft das für diese drei Seeds.

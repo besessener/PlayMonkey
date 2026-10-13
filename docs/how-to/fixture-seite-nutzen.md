@@ -1,19 +1,19 @@
-# Use the fixture site
+# Die Fixture-Seite nutzen
 
-The fixture site in `fixtures/site/` is a small local site with seeded bugs. Its pages and the findings they must
-produce are listed in [fixtures/README.md](../../fixtures/README.md).
+Die Fixture-Seite in `fixtures/site/` ist eine kleine lokale Seite mit absichtlich eingebauten Fehlern. Ihre Seiten
+und die Befunde, die sie erzeugen müssen, stehen in [fixtures/README.md](../../fixtures/README.md).
 
-## Start it by hand
+## Von Hand starten
 
 ```sh
 npm run fixture             # free port; prints the URL, login and env vars
 PORT=8080 npm run fixture   # fixed port
 ```
 
-Point a config at it with `fixtures/configs/fixture.json`, which reads `FIXTURE_URL`, `FIXTURE_USER` and
+Richte eine Konfiguration mit `fixtures/configs/fixture.json` darauf aus; sie liest `FIXTURE_URL`, `FIXTURE_USER` und
 `FIXTURE_PASS`.
 
-## Start it from a test
+## Aus einem Test starten
 
 ```ts
 import { startFixture } from "../fixtures/site/server.ts";
@@ -26,9 +26,12 @@ try {
 }
 ```
 
-## Add a page
+## Eine Seite hinzufügen
 
-1. Add a route to `createRoutes` in `fixtures/site/pages.ts`; set `link` to list it on the home page.
-2. Escape every echoed input with `escapeHtml`, so monkey input cannot create bugs that are not seeded.
-3. Add the page and any seeded bug, with its click path and expected finding, to `fixtures/README.md`.
-4. Extend `test/fixture-site.test.ts` with the click path.
+1. Füg in `fixtures/site/pages.ts` eine Route zu `createRoutes` hinzu; setz `link`, damit sie auf der Startseite
+   erscheint.
+2. Escape jede Eingabe, die die Seite wieder ausgibt, mit `escapeHtml`, damit Eingaben des Monkeys keine Fehler
+   erzeugen, die nicht absichtlich eingebaut sind.
+3. Trag die Seite und jeden eingebauten Fehler mit seinem Klickpfad und dem erwarteten Befund in `fixtures/README.md`
+   ein.
+4. Erweitere `test/fixture-site.test.ts` um den Klickpfad.

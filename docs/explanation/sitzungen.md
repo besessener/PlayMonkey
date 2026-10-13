@@ -1,40 +1,44 @@
-# Sessions and login
+# Sitzungen und Anmeldung
 
-One browser is launched (`browser.engine`, `browser.headless`). Every role gets its own browser context, so cookies
-and storage never leak between roles. Without `auth` entries there is one anonymous role.
+Es wird ein Browser gestartet (`browser.engine`, `browser.headless`). Jede Rolle bekommt ihren eigenen Browserkontext,
+sodass Cookies und Speicher nie zwischen Rollen übergehen. Ohne Einträge in `auth` gibt es eine anonyme Rolle.
 
-## Form login
+## Formular-Anmeldung
 
-PlayMonkey opens `baseUrl + loginUrl`, fills each field, clicks `submit` and decides whether the login worked:
+PlayMonkey öffnet `baseUrl + loginUrl`, füllt jedes Feld aus, klickt `submit` und entscheidet, ob die Anmeldung
+geklappt hat:
 
-- **Success** when the page left the login URL (compared with where the browser actually landed, in case the login
-  URL itself redirects), or, for single-page apps that log in without navigating, when a cookie changed and the
-  submit button disappeared.
-- **Failure** otherwise. The attempt settles as soon as the next page loads, so a wrong password fails immediately
-  instead of waiting for a timeout. Following Playwright's guidance it waits for the URL and the load event, not for
-  "network idle".
+- **Erfolg**, wenn die Seite die Login-URL verlassen hat (verglichen mit dem Ort, an dem der Browser tatsächlich
+  gelandet ist, falls die Login-URL selbst weiterleitet), oder, bei Single-Page-Apps, die ohne Navigation anmelden,
+  wenn sich ein Cookie geändert hat und der Absende-Button verschwunden ist.
+- **Fehlschlag** sonst. Der Versuch ist entschieden, sobald die nächste Seite lädt, sodass ein falsches Passwort
+  sofort scheitert, statt auf einen Timeout zu warten. Nach der Empfehlung von Playwright wartet er auf die URL und
+  das Load-Event, nicht auf „network idle“.
 
-The login runs in a separate context without trace or video, and the run starts from the resulting storage state, so
-the typed values never end up in a recording. A failed login is a tool error (exit code 2) whose message names the
-role and the reason, never a value.
+Die Anmeldung läuft in einem eigenen Kontext ohne Trace oder Video, und der Lauf startet mit dem dabei entstandenen
+Storage State, sodass die eingetippten Werte nie in einer Aufzeichnung landen. Eine fehlgeschlagene Anmeldung ist
+ein Werkzeugfehler (Exit-Code 2), dessen Meldung die Rolle und den Grund nennt, nie einen Wert.
 
-## Saved sessions
+## Gespeicherte Sitzungen
 
-A `storageState` role loads a Playwright storage state file. The file is checked first (readable, JSON, has a
-`cookies` array), so a mistake gives a clear message instead of a Playwright stack trace. No login request is made.
+Eine Rolle mit `storageState` lädt eine Storage-State-Datei von Playwright. Die Datei wird zuerst geprüft (lesbar,
+JSON, hat ein Array `cookies`), sodass ein Fehler eine klare Meldung ergibt statt eines Stack-Traces von Playwright.
+Es wird keine Anmeldeanfrage gestellt.
 
 ## stayOnDomain
 
-A route on the context aborts top-level navigations to another origin and records a `blocked-navigation` info
-event; this is not a finding. Subresources from other origins (CDNs, fonts, APIs) still load, because blocking them
-would break most real sites.
+Eine Route auf dem Kontext bricht Navigationen der obersten Ebene zu einem anderen Origin ab und hält ein Info-Event
+`blocked-navigation` fest; das ist kein Befund. Subressourcen von anderen Origins (CDNs, Schriften, APIs) laden
+weiterhin, weil ihr Blockieren die meisten echten Seiten kaputtmachen würde.
 
-The request is aborted as `net::ERR_ABORTED`, which leaves the page where it was. Other error codes leave the page on
-the browser's error page, and answering with 204 left Playwright's click waiting for the navigation. Service workers
-are blocked in this mode because they bypass request routing; routing also disables the HTTP cache.
+Die Anfrage wird als `net::ERR_ABORTED` abgebrochen, was die Seite lässt, wo sie war. Andere Fehlercodes lassen die
+Seite auf der Fehlerseite des Browsers, und eine Antwort mit 204 ließ den Klick von Playwright auf die Navigation
+warten. Service Worker sind in diesem Modus blockiert, weil sie das Request-Routing umgehen; das Routing schaltet
+außerdem den HTTP-Cache ab.
 
-## Trace and video
+## Trace und Video
 
-Each role records a Playwright trace with screenshots and DOM snapshots and a video of the page. Closing the session
-writes `trace.zip` (open it with `npx playwright show-trace trace.zip`) and the video under `video/`. Both are
-linked from the [report](../reference/bericht.md) and are not masked; see its section on secrets.
+Jede Rolle zeichnet einen Playwright-Trace mit Screenshots und DOM-Snapshots und ein Video der Seite auf. Beim
+Schließen der Sitzung werden `trace.zip` (öffne ihn mit `npx playwright show-trace trace.zip`) und das Video unter
+`video/` geschrieben. Beide sind im [Bericht](../reference/bericht.md) verlinkt und nicht maskiert; siehe dort den
+Abschnitt über Secrets.

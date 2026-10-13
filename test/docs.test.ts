@@ -142,6 +142,9 @@ describe("documentation", () => {
     const workflow = readFileSync(join(root, ".github/workflows/monkey.yml"), "utf8");
     const doc = readFileSync(join(root, "docs/how-to/in-ci-ausfuehren.md"), "utf8");
     const blocks = [...doc.matchAll(/```yaml\n([\s\S]*?)```/g)].map(([, block]) => block);
-    assert.ok(blocks.includes(workflow), "docs/how-to/in-ci-ausfuehren.md must contain .github/workflows/monkey.yml verbatim");
+    assert.ok(
+      blocks.includes(workflow),
+      "docs/how-to/in-ci-ausfuehren.md must contain .github/workflows/monkey.yml verbatim",
+    );
   });
 });

@@ -1,9 +1,9 @@
-# Configure login
+# Anmeldung einrichten
 
-Each entry in `auth` is a role. PlayMonkey runs every role in its own browser context; see
-[sessions and login](../explanation/sitzungen.md) for how that works.
+Jeder Eintrag in `auth` ist eine Rolle. PlayMonkey führt jede Rolle in einem eigenen Browserkontext aus; wie das
+funktioniert, steht unter [Sitzungen und Anmeldung](../explanation/sitzungen.md).
 
-## Log in through the form
+## Über das Formular anmelden
 
 ```json
 {
@@ -18,15 +18,16 @@ Each entry in `auth` is a role. PlayMonkey runs every role in its own browser co
 }
 ```
 
-- `loginUrl` is relative to `baseUrl`.
-- Each key in `fields` finds one input: a CSS selector if it looks like one (`input[name=user]`, `#pass`), otherwise
-  the `name` attribute, then the `id`, then the visible label. It must match exactly one element.
-- `submit` is a selector for the button that sends the form; it must match exactly one element.
+- `loginUrl` ist relativ zu `baseUrl`.
+- Jeder Schlüssel in `fields` findet genau ein Eingabefeld: als CSS-Selektor, wenn er wie einer aussieht
+  (`input[name=user]`, `#pass`), sonst über das Attribut `name`, dann die `id`, dann die sichtbare Beschriftung. Er muss
+  genau ein Element treffen.
+- `submit` ist ein Selektor für den Button, der das Formular absendet; er muss genau ein Element treffen.
 
-## Reuse a saved session
+## Gespeicherte Sitzung wiederverwenden
 
-When the login cannot be scripted (single sign-on, a one-time code), log in once by hand and save Playwright's
-storage state, for example with a short script:
+Lässt sich die Anmeldung nicht skripten (Single Sign-on, ein Einmalcode), meldest du dich einmal von Hand an und
+speicherst den Storage State von Playwright, zum Beispiel mit einem kurzen Skript:
 
 ```ts
 import { chromium } from "playwright";
@@ -40,16 +41,16 @@ await context.storageState({ path: "states/user.json" });
 await browser.close();
 ```
 
-Then reference the file. The path is relative to the config file; `states/*.json` is in `.gitignore` because the
-file contains session cookies.
+Dann verweist du auf die Datei. Der Pfad ist relativ zur Konfigurationsdatei; `states/*.json` steht in `.gitignore`,
+weil die Datei Sitzungscookies enthält.
 
 ```json
 { "auth": [{ "name": "user", "storageState": "./states/user.json" }] }
 ```
 
-## Several roles
+## Mehrere Rollen
 
-List them all; names must be unique. Each role runs separately, with its own cookies:
+Führ alle auf; die Namen müssen eindeutig sein. Jede Rolle läuft für sich, mit eigenen Cookies:
 
 ```json
 {
@@ -60,23 +61,23 @@ List them all; names must be unique. Each role runs separately, with its own coo
 }
 ```
 
-Without `auth`, PlayMonkey runs one anonymous role. To run the roles at the same time instead of one after the
-other, set `parallel`; see [run in parallel](parallel-ausfuehren.md).
+Ohne `auth` führt PlayMonkey eine anonyme Rolle aus. Damit die Rollen gleichzeitig statt nacheinander laufen, setz
+`parallel`; siehe [Parallel ausführen](parallel-ausfuehren.md).
 
-## Keep secrets out of the file
+## Secrets aus der Datei heraushalten
 
-Write `${VAR}` wherever a secret goes and set the variable in the environment (in CI, from the secret store).
-Substituted values are masked as `***` in all output. An unset variable stops the run with exit code 2 and names the
-config path and the variable.
+Schreib `${VAR}` überall dort, wo ein Secret hingehört, und setz die Variable in der Umgebung (in der CI aus dem
+Secret-Speicher). Eingesetzte Werte werden in jeder Ausgabe als `***` maskiert. Eine nicht gesetzte Variable beendet
+den Lauf mit Exit-Code 2 und nennt den Konfigurationspfad und die Variable.
 
-## When the login fails
+## Wenn die Anmeldung scheitert
 
-The error names the role and the reason, never a value:
+Der Fehler nennt die Rolle und den Grund, nie einen Wert:
 
-| Message | Check |
+| Meldung | Prüfen |
 | --- | --- |
-| `login field "x" not found on /login` | The key matches no element (or several). Use a CSS selector. |
-| `submit selector "…" must match exactly one element` | Make the selector more specific. |
-| `login did not succeed: still on /login after submitting` | Credentials, field keys, or a captcha. |
-| `cannot read storageState file … (ENOENT)` | Path, relative to the config file. |
-| `… is not a Playwright storage state` | The file must be JSON with a `cookies` array. |
+| `login field "x" not found on /login` | Der Schlüssel trifft kein Element (oder mehrere). Nimm einen CSS-Selektor. |
+| `submit selector "…" must match exactly one element` | Mach den Selektor genauer. |
+| `login did not succeed: still on /login after submitting` | Zugangsdaten, Feldschlüssel oder ein Captcha. |
+| `cannot read storageState file … (ENOENT)` | Den Pfad, relativ zur Konfigurationsdatei. |
+| `… is not a Playwright storage state` | Die Datei muss JSON mit einem Array `cookies` sein. |

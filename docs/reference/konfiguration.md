@@ -1,10 +1,10 @@
-# Configuration
+# Konfiguration
 
-`monkey run <config.json>` reads one JSON file. The schema, with the same descriptions and defaults, is
-`src/config/schema.ts` (the `llm` section in `src/config/llm-schema.ts`); `test/docs.test.ts` fails when a key
-there is missing from this page.
+`monkey run <config.json>` liest eine JSON-Datei. Das Schema, mit denselben Beschreibungen und Standardwerten, ist
+`src/config/schema.ts` (der Abschnitt `llm` in `src/config/llm-schema.ts`); `test/docs.test.ts` schlägt fehl, wenn
+dort ein Schlüssel steht, der auf dieser Seite fehlt.
 
-## Example
+## Beispiel
 
 ```json
 {
@@ -37,116 +37,119 @@ there is missing from this page.
 }
 ```
 
-## Keys
+## Schlüssel
 
-| Key | Type | Default | Meaning |
+| Schlüssel | Typ | Standard | Bedeutung |
 | --- | --- | --- | --- |
-| `$schema` | string | – | Optional JSON Schema reference for editors; ignored. |
-| `baseUrl` | string, required | – | Absolute `http(s)` URL of the site under test. |
-| `seed` | integer 0 … 4294967295 | random, printed | Seed of the random monkey. Set it to reproduce a run. |
-| `seeds` | array of distinct integers 0 … 4294967295, at least one | absent | One run per seed and role instead of `seed`; each run writes to `<role>/<seed>/` in the report directory. See [run in parallel](../how-to/parallel-ausfuehren.md). |
-| `parallel` | integer 1 … 64 | `1` | Runs (roles × seeds) at the same time, each in its own browser context of one browser. `1` runs them one after the other. |
-| `limits.maxSteps` | integer ≥ 1 | `500` | Maximum number of actions per run (role and seed). |
-| `limits.maxMinutes` | number > 0 | `20` | Maximum wall-clock minutes per run (role and seed). |
-| `browser.engine` | `chromium` \| `firefox` \| `webkit` | `chromium` | Playwright browser engine. |
-| `browser.viewport` | `[width, height]`, integers ≥ 1 | `[1280, 800]` | Viewport in CSS pixels. |
-| `browser.headless` | boolean | `true` | Run the browser without a window. |
-| `stayOnDomain` | boolean | `true` | Do not follow navigations to other origins than `baseUrl`'s. |
-| `auth` | array | `[]` (one anonymous role) | Roles to run as; see below. |
-| `auth[].name` | string, required | – | Unique role name. |
-| `auth[].loginUrl` | string | – | Login page path, relative to `baseUrl`. Required with `fields`. |
-| `auth[].fields` | object of strings | – | Login form fields to fill: key → value. |
-| `auth[].submit` | string | – | Selector of the login submit button. Required with `fields`. |
-| `auth[].storageState` | string | – | Playwright storage state file, relative to the config file. |
-| `testData` | object of strings | `{}` | Valid values the monkey may use when filling fields (keys are free). |
-| `llm` | object | absent | LLM used when the monkey is stuck. Absent means pure random monkey. |
-| `llm.provider` | `anthropic-foundry` \| `openai` | – | Backend. Required in `llm`. |
-| `llm.baseUrl` | string | – | Endpoint base URL: up to `/anthropic` for `anthropic-foundry`, the full OpenAI-compatible base URL (e.g. `…/openai/v1`) for `openai`. Required in `llm`. |
-| `llm.deployment` | string | – | Deployment name, used as the model. Required in `llm`. |
-| `llm.apiKey` | string | – | API key; use a `${VAR}` placeholder. Required in `llm`. |
-| `llm.required` | boolean | `true` | A failed [preflight](../how-to/llm-einrichten.md#troubleshooting) exits with code `2`; `false` warns and runs as pure random monkey. |
-| `llm.timeoutMs` | integer ≥ 1000 | `60000` | Timeout of one LLM request in milliseconds. |
-| `llm.maxRetries` | integer 0 … 10 | `2` | Retries of one request after a rate limit (429), server or connection error, with exponential backoff. Other errors are not retried. |
-| `llm.maxCalls` | integer ≥ 0 | unlimited | Budget: LLM calls per `monkey run`, over all roles and seeds, also when they run in parallel (calls in flight count). When spent, the runs continue as pure monkey and the report says so. |
-| `llm.maxTokens` | integer ≥ 0 | unlimited | Budget: tokens per `monkey run`, over all roles and seeds (input, output, cache reads and writes). Parallel calls already in flight can exceed it by their own tokens. |
-| `llm.debugLog` | boolean | `false` | Write every prompt and response, sanitized, to `llm-debug.jsonl` in the report directory. Off: no prompt content is written anywhere. |
-| `llm.historyActions` | integer ≥ 0 | `10` | Number of recent actions shown to the LLM. |
-| `llm.snapshotChars` | integer ≥ 500 | `8000` | Character budget of the page snapshot in the prompt (roughly four characters per token). |
-| `llm.handoff.noStateChange` | integer ≥ 1 | `5` | Hand over after this many steps in a row without any change of the page. |
-| `llm.handoff.noProgress` | integer ≥ 1 | `25` | Hand over after this many steps in a row without a new (URL, snapshot hash) state. |
-| `llm.handoff.failedActions` | integer ≥ 1 | `5` | Hand over after this many failed monkey actions in a row. |
-| `llm.handoff.invalidForm` | integer ≥ 1 | `3` | Hand over after this many form submissions in a row that end on validation errors. |
-| `llm.handoff.blockingUi` | boolean | `true` | Hand over when a dialog or a cookie or consent banner is open. |
-| `llm.handoff.loginWall` | boolean | `true` | Hand over when a role that logged in arrives on a login page (expired session). |
-| `llm.handoff.maxDecisions` | integer ≥ 1 | `3` | Consecutive LLM decisions per handoff; then the monkey takes over again. |
-| `llm.handoff.cooldownSteps` | integer ≥ 0 | `5` | Monkey steps after a handoff before the next one can start. |
-| `llm.breaker.failures` | integer ≥ 1 | `3` | Failed LLM decisions in a row, over all runs, that open the circuit breaker. |
-| `llm.breaker.pauseSteps` | integer ≥ 1 | `20` | Steps without LLM while the breaker is open, counted in each run's own steps; a trip pauses every run. |
-| `llm.pricing` | object | absent | Prices per million tokens for an **estimated** cost in the report. There are no built-in prices. |
-| `llm.pricing.inputPerMTok` | number ≥ 0 | – | Price per million input tokens. Required in `pricing`. |
-| `llm.pricing.outputPerMTok` | number ≥ 0 | – | Price per million output tokens (thinking included). Required in `pricing`. |
-| `llm.pricing.cacheReadPerMTok` | number ≥ 0 | `inputPerMTok` | Price per million tokens read from the prompt cache. |
-| `llm.pricing.cacheWritePerMTok` | number ≥ 0 | `inputPerMTok` | Price per million tokens written to the prompt cache. |
-| `llm.options.maxOutputTokens` | integer ≥ 16 | `4096` | Output token limit of a request (`max_tokens`, `max_output_tokens` or `max_completion_tokens`). Thinking and reasoning tokens count against it. |
-| `llm.options.thinking` | `adaptive` \| `disabled` \| `between_tools` | model default | `anthropic-foundry` only. Thinking mode sent to the model. Absent sends nothing; which values a model accepts differs, see [configure the LLM](../how-to/llm-einrichten.md#thinking-and-effort). |
-| `llm.options.effort` | `low` \| `medium` \| `high` \| `xhigh` \| `max` | model default | Effort level sent to the model: Anthropic's effort, OpenAI's reasoning effort. |
-| `llm.options.api` | `responses` \| `chat` | `responses` | `openai` only. The Responses API, or Chat Completions for models that only offer that; see [configure the LLM](../how-to/llm-einrichten.md#openai-models-and-other-openai-compatible-endpoints). |
-| `oracles.pageerror` | boolean | `true` | Report uncaught exceptions. |
-| `oracles.console` | boolean | `true` | Report `console.error` messages. |
-| `oracles.http5xx` | boolean | `true` | Report responses with status ≥ 500. |
-| `oracles.http4xx` | boolean | `true` | Report responses with status 400 … 499. |
-| `oracles.crash` | boolean | `true` | Report page or browser crashes. |
-| `oracles.hang` | boolean | `true` | Report actions or navigations that exceed their timeout. |
-| `oracles.errorPage` | boolean | `true` | Report navigations that land on an error page. |
-| `oracles.overflow` | boolean | `true` | Report horizontal overflow. |
-| `oracles.download` | boolean | `true` | Report downloads that fail (e.g. the connection drops). |
-| `findings.lastActions` | integer ≥ 0 | `10` | Number of actions before a finding that it records, for reproduction. |
-| `findings.ignoreStatus` | array of integers 400 … 599 | `[]` | HTTP statuses that are never findings, e.g. `[401, 403]`. |
-| `findings.ignore` | array | `[]` | Rules that drop known noise; see [ignore rules](../explanation/orakel.md#ignore-rules). |
-| `findings.ignore[].oracle` | oracle name | any | Only signals of this oracle. |
-| `findings.ignore[].url` | regular expression | – | Matched against the request URL (HTTP findings) or the page URL. |
-| `findings.ignore[].message` | regular expression | – | Matched against the finding message. Each rule needs `url` or `message`. |
-| `report.dir` | string | `./monkey-report` | Report output directory, relative to the config file. |
-| `report.keepDownloads` | boolean | `false` | Keep the files the site downloaded, in `<role>/downloads/` of the report directory. Off: they are measured (name, size) and deleted when the role ends. |
-| `monkey.actionTimeoutMs` | integer ≥ 100 | `5000` | Timeout of one action in milliseconds; a slower action fails and the run continues. Also how long a step waits for dialogs, uploads and downloads to finish. |
-| `monkey.maxTabs` | integer ≥ 1 | `5` | Open tabs per role. When popups open more, the oldest ones the monkey left behind are closed (never the first tab or the current one). |
-| `monkey.weights.click` | number ≥ 0 | `10` | Relative weight of clicking links, buttons and other clickable elements. |
-| `monkey.weights.dblclick` | number ≥ 0 | `0.5` | Relative weight of double-clicking a clickable element. |
-| `monkey.weights.rightclick` | number ≥ 0 | `0.5` | Relative weight of right-clicking a clickable element (context menus). |
-| `monkey.weights.hover` | number ≥ 0 | `1` | Relative weight of moving the mouse over a clickable element (hover menus, tooltips). |
-| `monkey.weights.longPress` | number ≥ 0 | `0.3` | Relative weight of pressing and holding a clickable element; only in viewports narrower than 1024 px. |
-| `monkey.weights.drag` | number ≥ 0 | `0.3` | Relative weight of dragging a clickable element onto another element (best effort). |
-| `monkey.weights.fill` | number ≥ 0 | `6` | Relative weight of typing into text fields. |
-| `monkey.weights.select` | number ≥ 0 | `3` | Relative weight of choosing a dropdown option. |
-| `monkey.weights.check` | number ≥ 0 | `3` | Relative weight of toggling checkboxes, radios and switches. |
-| `monkey.weights.press` | number ≥ 0 | `1` | Relative weight of pressing a key (Tab, Enter, Escape, arrows). |
-| `monkey.weights.scroll` | number ≥ 0 | `1` | Relative weight of scrolling. |
-| `monkey.weights.back` | number ≥ 0 | `1.5` | Relative weight of going back in the history. |
-| `monkey.weights.navigate` | number ≥ 0 | `1` | Relative weight of opening a URL seen earlier in the run. |
-| `monkey.weights.setViewport` | number ≥ 0 | `0.2` | Relative weight of resizing the viewport. |
-| `monkey.weights.switchTab` | number ≥ 0 | `1` | Relative weight of switching to another open tab. |
+| `$schema` | string | – | Optionaler Verweis auf ein JSON Schema für Editoren; wird ignoriert. |
+| `baseUrl` | string, Pflicht | – | Absolute `http(s)`-URL der getesteten Seite. |
+| `seed` | integer 0 … 4294967295 | zufällig, wird ausgegeben | Seed des Zufalls-Monkeys. Setze ihn, um einen Lauf zu reproduzieren. |
+| `seeds` | Array unterschiedlicher Integer 0 … 4294967295, mindestens einer | fehlt | Ein Lauf pro Seed und Rolle statt `seed`; jeder Lauf schreibt nach `<role>/<seed>/` im Berichtsverzeichnis. Siehe [parallel ausführen](../how-to/parallel-ausfuehren.md). |
+| `parallel` | integer 1 … 64 | `1` | Läufe (Rollen × Seeds), die gleichzeitig laufen, jeder in einem eigenen Browserkontext desselben Browsers. `1` führt sie nacheinander aus. |
+| `limits.maxSteps` | integer ≥ 1 | `500` | Höchstzahl an Aktionen pro Lauf (Rolle und Seed). |
+| `limits.maxMinutes` | number > 0 | `20` | Höchstdauer pro Lauf (Rolle und Seed) in Minuten echter Zeit. |
+| `browser.engine` | `chromium` \| `firefox` \| `webkit` | `chromium` | Browser-Engine von Playwright. |
+| `browser.viewport` | `[width, height]`, Integer ≥ 1 | `[1280, 800]` | Viewport in CSS-Pixeln. |
+| `browser.headless` | boolean | `true` | Den Browser ohne Fenster ausführen. |
+| `stayOnDomain` | boolean | `true` | Navigationen zu anderen Origins als dem von `baseUrl` nicht folgen. |
+| `auth` | Array | `[]` (eine anonyme Rolle) | Rollen, unter denen gelaufen wird; siehe unten. |
+| `auth[].name` | string, Pflicht | – | Eindeutiger Rollenname. |
+| `auth[].loginUrl` | string | – | Pfad der Anmeldeseite, relativ zu `baseUrl`. Pflicht mit `fields`. |
+| `auth[].fields` | Objekt aus Strings | – | Felder des Anmeldeformulars, die ausgefüllt werden: Schlüssel → Wert. |
+| `auth[].submit` | string | – | Selektor des Absende-Buttons der Anmeldung. Pflicht mit `fields`. |
+| `auth[].storageState` | string | – | Storage-State-Datei von Playwright, relativ zur Konfigurationsdatei. |
+| `testData` | Objekt aus Strings | `{}` | Gültige Werte, die der Monkey beim Ausfüllen von Feldern nutzen darf (Schlüssel frei wählbar). |
+| `llm` | Objekt | fehlt | LLM, das genutzt wird, wenn der Monkey feststeckt. Fehlt es, läuft der reine Zufalls-Monkey. |
+| `llm.provider` | `anthropic-foundry` \| `openai` | – | Backend. Pflicht in `llm`. |
+| `llm.baseUrl` | string | – | Basis-URL des Endpunkts: bis einschließlich `/anthropic` für `anthropic-foundry`, die vollständige OpenAI-kompatible Basis-URL (z. B. `…/openai/v1`) für `openai`. Pflicht in `llm`. |
+| `llm.deployment` | string | – | Name des Deployments, wird als Modell genutzt. Pflicht in `llm`. |
+| `llm.apiKey` | string | – | API-Key; nutze einen `${VAR}`-Platzhalter. Pflicht in `llm`. |
+| `llm.required` | boolean | `true` | Ein fehlgeschlagener [Preflight](../how-to/llm-einrichten.md#fehlerbehebung) endet mit Code `2`; `false` warnt und läuft als reiner Zufalls-Monkey. |
+| `llm.timeoutMs` | integer ≥ 1000 | `60000` | Zeitlimit einer LLM-Anfrage in Millisekunden. |
+| `llm.maxRetries` | integer 0 … 10 | `2` | Wiederholungen einer Anfrage nach einem Rate Limit (429), einem Server- oder Verbindungsfehler, mit exponentiellem Backoff. Andere Fehler werden nicht wiederholt. |
+| `llm.maxCalls` | integer ≥ 0 | unbegrenzt | Budget: LLM-Aufrufe pro `monkey run`, über alle Rollen und Seeds, auch wenn sie parallel laufen (laufende Aufrufe zählen mit). Ist es aufgebraucht, laufen die Läufe als reiner Monkey weiter, und der Bericht sagt das. |
+| `llm.maxTokens` | integer ≥ 0 | unbegrenzt | Budget: Tokens pro `monkey run`, über alle Rollen und Seeds (Eingabe, Ausgabe, Cache-Lese- und -Schreibzugriffe). Parallel bereits laufende Aufrufe können es um ihre eigenen Tokens überschreiten. |
+| `llm.debugLog` | boolean | `false` | Jeden Prompt und jede Antwort bereinigt in `llm-debug.jsonl` im Berichtsverzeichnis schreiben. Aus: Kein Prompt-Inhalt wird irgendwo geschrieben. |
+| `llm.historyActions` | integer ≥ 0 | `10` | Anzahl der letzten Aktionen, die das LLM zu sehen bekommt. |
+| `llm.snapshotChars` | integer ≥ 500 | `8000` | Zeichenbudget des Seiten-Snapshots im Prompt (grob vier Zeichen pro Token). |
+| `llm.handoff.noStateChange` | integer ≥ 1 | `5` | Übergeben nach so vielen Schritten in Folge ohne jede Änderung der Seite. |
+| `llm.handoff.noProgress` | integer ≥ 1 | `25` | Übergeben nach so vielen Schritten in Folge ohne neuen Zustand (URL, Snapshot-Hash). |
+| `llm.handoff.failedActions` | integer ≥ 1 | `5` | Übergeben nach so vielen fehlgeschlagenen Monkey-Aktionen in Folge. |
+| `llm.handoff.invalidForm` | integer ≥ 1 | `3` | Übergeben nach so vielen Formularabsendungen in Folge, die mit Validierungsfehlern enden. |
+| `llm.handoff.blockingUi` | boolean | `true` | Übergeben, wenn ein Dialog oder ein Cookie- oder Einwilligungsbanner offen ist. |
+| `llm.handoff.loginWall` | boolean | `true` | Übergeben, wenn eine angemeldete Rolle auf einer Anmeldeseite landet (abgelaufene Sitzung). |
+| `llm.handoff.maxDecisions` | integer ≥ 1 | `3` | Aufeinanderfolgende LLM-Entscheidungen pro Übergabe; danach übernimmt wieder der Monkey. |
+| `llm.handoff.cooldownSteps` | integer ≥ 0 | `5` | Monkey-Schritte nach einer Übergabe, bevor die nächste beginnen kann. |
+| `llm.breaker.failures` | integer ≥ 1 | `3` | Fehlgeschlagene LLM-Entscheidungen in Folge, über alle Läufe, die den Circuit Breaker öffnen. |
+| `llm.breaker.pauseSteps` | integer ≥ 1 | `20` | Schritte ohne LLM, solange der Breaker offen ist, gezählt in den eigenen Schritten jedes Laufs; ein Auslösen pausiert jeden Lauf. |
+| `llm.pricing` | Objekt | fehlt | Preise pro Million Tokens für **geschätzte** Kosten im Bericht. Es gibt keine eingebauten Preise. |
+| `llm.pricing.inputPerMTok` | number ≥ 0 | – | Preis pro Million Eingabe-Tokens. Pflicht in `pricing`. |
+| `llm.pricing.outputPerMTok` | number ≥ 0 | – | Preis pro Million Ausgabe-Tokens (Thinking eingeschlossen). Pflicht in `pricing`. |
+| `llm.pricing.cacheReadPerMTok` | number ≥ 0 | `inputPerMTok` | Preis pro Million Tokens, die aus dem Prompt-Cache gelesen werden. |
+| `llm.pricing.cacheWritePerMTok` | number ≥ 0 | `inputPerMTok` | Preis pro Million Tokens, die in den Prompt-Cache geschrieben werden. |
+| `llm.options.maxOutputTokens` | integer ≥ 16 | `4096` | Limit der Ausgabe-Tokens einer Anfrage (`max_tokens`, `max_output_tokens` oder `max_completion_tokens`). Thinking- und Reasoning-Tokens zählen mit. |
+| `llm.options.thinking` | `adaptive` \| `disabled` \| `between_tools` | Standard des Modells | Nur `anthropic-foundry`. Thinking-Modus, der an das Modell geschickt wird. Fehlt er, wird nichts geschickt; welche Werte ein Modell akzeptiert, ist unterschiedlich, siehe [LLM einrichten](../how-to/llm-einrichten.md#thinking-und-effort). |
+| `llm.options.effort` | `low` \| `medium` \| `high` \| `xhigh` \| `max` | Standard des Modells | Effort-Stufe, die an das Modell geschickt wird: Anthropics Effort, OpenAIs Reasoning Effort. |
+| `llm.options.api` | `responses` \| `chat` | `responses` | Nur `openai`. Die Responses API, oder Chat Completions für Modelle, die nur das anbieten; siehe [LLM einrichten](../how-to/llm-einrichten.md#openai-modelle-und-andere-openai-kompatible-endpunkte). |
+| `oracles.pageerror` | boolean | `true` | Nicht abgefangene Exceptions melden. |
+| `oracles.console` | boolean | `true` | `console.error`-Meldungen melden. |
+| `oracles.http5xx` | boolean | `true` | Antworten mit Status ≥ 500 melden. |
+| `oracles.http4xx` | boolean | `true` | Antworten mit Status 400 … 499 melden. |
+| `oracles.crash` | boolean | `true` | Abstürze der Seite oder des Browsers melden. |
+| `oracles.hang` | boolean | `true` | Aktionen oder Navigationen melden, die ihr Zeitlimit überschreiten. |
+| `oracles.errorPage` | boolean | `true` | Navigationen melden, die auf einer Fehlerseite landen. |
+| `oracles.overflow` | boolean | `true` | Horizontalen Überlauf melden. |
+| `oracles.download` | boolean | `true` | Downloads melden, die fehlschlagen (z. B. weil die Verbindung abbricht). |
+| `findings.lastActions` | integer ≥ 0 | `10` | Anzahl der Aktionen vor einem Befund, die er zur Reproduktion festhält. |
+| `findings.ignoreStatus` | Array von Integern 400 … 599 | `[]` | HTTP-Status, die nie Befunde sind, z. B. `[401, 403]`. |
+| `findings.ignore` | Array | `[]` | Regeln, die bekanntes Rauschen verwerfen; siehe [Ignorierregeln](../explanation/orakel.md#ignorierregeln). |
+| `findings.ignore[].oracle` | Orakelname | alle | Nur Signale dieses Orakels. |
+| `findings.ignore[].url` | regulärer Ausdruck | – | Wird gegen die Anfrage-URL (HTTP-Befunde) oder die Seiten-URL geprüft. |
+| `findings.ignore[].message` | regulärer Ausdruck | – | Wird gegen die Meldung des Befunds geprüft. Jede Regel braucht `url` oder `message`. |
+| `report.dir` | string | `./monkey-report` | Ausgabeverzeichnis des Berichts, relativ zur Konfigurationsdatei. |
+| `report.keepDownloads` | boolean | `false` | Die Dateien, die die Seite heruntergeladen hat, in `<role>/downloads/` des Berichtsverzeichnisses behalten. Aus: Sie werden vermessen (Name, Größe) und gelöscht, wenn die Rolle endet. |
+| `monkey.actionTimeoutMs` | integer ≥ 100 | `5000` | Zeitlimit einer Aktion in Millisekunden; eine langsamere Aktion schlägt fehl, und der Lauf geht weiter. Auch so lange wartet ein Schritt darauf, dass Dialoge, Uploads und Downloads fertig werden. |
+| `monkey.maxTabs` | integer ≥ 1 | `5` | Offene Tabs pro Rolle. Öffnen Popups mehr, werden die ältesten geschlossen, die der Monkey zurückgelassen hat (nie der erste Tab oder der aktuelle). |
+| `monkey.weights.click` | number ≥ 0 | `10` | Relatives Gewicht für Klicks auf Links, Buttons und andere klickbare Elemente. |
+| `monkey.weights.dblclick` | number ≥ 0 | `0.5` | Relatives Gewicht für Doppelklicks auf ein klickbares Element. |
+| `monkey.weights.rightclick` | number ≥ 0 | `0.5` | Relatives Gewicht für Rechtsklicks auf ein klickbares Element (Kontextmenüs). |
+| `monkey.weights.hover` | number ≥ 0 | `1` | Relatives Gewicht dafür, die Maus über ein klickbares Element zu bewegen (Hover-Menüs, Tooltips). |
+| `monkey.weights.longPress` | number ≥ 0 | `0.3` | Relatives Gewicht für langes Drücken eines klickbaren Elements; nur in Viewports schmaler als 1024 px. |
+| `monkey.weights.drag` | number ≥ 0 | `0.3` | Relatives Gewicht dafür, ein klickbares Element auf ein anderes Element zu ziehen (nach bestem Bemühen). |
+| `monkey.weights.fill` | number ≥ 0 | `6` | Relatives Gewicht für Eingaben in Textfelder. |
+| `monkey.weights.select` | number ≥ 0 | `3` | Relatives Gewicht für die Auswahl einer Option in einem Dropdown. |
+| `monkey.weights.check` | number ≥ 0 | `3` | Relatives Gewicht für das Umschalten von Checkboxen, Radio-Buttons und Schaltern. |
+| `monkey.weights.press` | number ≥ 0 | `1` | Relatives Gewicht für einen Tastendruck (Tab, Enter, Escape, Pfeiltasten). |
+| `monkey.weights.scroll` | number ≥ 0 | `1` | Relatives Gewicht fürs Scrollen. |
+| `monkey.weights.back` | number ≥ 0 | `1.5` | Relatives Gewicht für einen Schritt zurück im Verlauf. |
+| `monkey.weights.navigate` | number ≥ 0 | `1` | Relatives Gewicht dafür, eine URL zu öffnen, die früher im Lauf vorkam. |
+| `monkey.weights.setViewport` | number ≥ 0 | `0.2` | Relatives Gewicht für eine Änderung der Viewport-Größe. |
+| `monkey.weights.switchTab` | number ≥ 0 | `1` | Relatives Gewicht für den Wechsel in einen anderen offenen Tab. |
 
-How the LLM is used is explained in [the LLM](../explanation/llm.md); setting up a backend in
-[configure the LLM](../how-to/llm-einrichten.md). What each oracle reports is explained in [oracles and findings](../explanation/orakel.md).
+Wie das LLM eingesetzt wird, erklärt [Das LLM](../explanation/llm.md); wie du ein Backend einrichtest, [LLM
+einrichten](../how-to/llm-einrichten.md). Was jedes Orakel meldet, erklärt [Orakel und
+Befunde](../explanation/orakel.md).
 
-## Rules
+## Regeln
 
-- **`seed` or `seeds`**, not both. Without either, a random seed is generated and printed.
-- **Auth roles:** each uses either `fields` with `loginUrl` and `submit`, or `storageState`, never both.
-- **Unknown keys are rejected**, not warned about: a typo such as `maxStep` would otherwise silently fall back to a
-  default. Only `testData` and `auth[].fields` take arbitrary keys.
-- **`null` is rejected**; omit a key to get its default.
-- **Ignore rules** need `url` or `message`, and both must be valid JavaScript regular expressions; to switch an
-  oracle off entirely, use `oracles.<name>: false`.
-- **Relative paths** (`auth[].storageState`, `report.dir`) are resolved against the directory of the config file.
-- **Errors** are all listed at once, each with its path (e.g. `auth[0].fields.password`); the exit code is `2`.
+- **`seed` oder `seeds`**, nicht beides. Ohne beide wird ein zufälliger Seed erzeugt und ausgegeben.
+- **Rollen in `auth`:** Jede nutzt entweder `fields` mit `loginUrl` und `submit` oder `storageState`, nie beides.
+- **Unbekannte Schlüssel werden abgelehnt**, nicht nur mit einer Warnung bedacht: Ein Tippfehler wie `maxStep` fiele
+  sonst stillschweigend auf einen Standardwert zurück. Nur `testData` und `auth[].fields` nehmen beliebige Schlüssel.
+- **`null` wird abgelehnt**; lass einen Schlüssel weg, um seinen Standardwert zu bekommen.
+- **Ignorierregeln** brauchen `url` oder `message`, und beide müssen gültige reguläre Ausdrücke von JavaScript sein;
+  um ein Orakel ganz abzuschalten, nutze `oracles.<name>: false`.
+- **Relative Pfade** (`auth[].storageState`, `report.dir`) werden gegen das Verzeichnis der Konfigurationsdatei
+  aufgelöst.
+- **Fehler** werden alle auf einmal aufgelistet, jeder mit seinem Pfad (z. B. `auth[0].fields.password`); der
+  Exit-Code ist `2`.
 
 ## Secrets: `${VAR}`
 
-`${VAR}` in any string value is replaced with the environment variable `VAR`, also inside longer strings
-(`"https://${HOST}/app"`). Names match `[A-Za-z_][A-Za-z0-9_]*`. Substituted values are not expanded again and there
-is no escape syntax. An unset variable is an error naming the config path and the variable; an empty one is used as
-empty.
+`${VAR}` in einem beliebigen String-Wert wird durch die Umgebungsvariable `VAR` ersetzt, auch innerhalb längerer
+Strings (`"https://${HOST}/app"`). Namen entsprechen `[A-Za-z_][A-Za-z0-9_]*`. Eingesetzte Werte werden nicht erneut
+ersetzt, und es gibt keine Escape-Syntax. Eine nicht gesetzte Variable ist ein Fehler, der den Pfad in der
+Konfiguration und die Variable nennt; eine leere wird als leer verwendet.
 
-Every substituted value is masked as `***` in console output, error messages and reports. Secrets come only from
-the environment, never from files.
+Jeder eingesetzte Wert wird in Konsolenausgabe, Fehlermeldungen und Berichten als `***` maskiert. Secrets kommen nur
+aus der Umgebung, nie aus Dateien.

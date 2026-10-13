@@ -1,84 +1,87 @@
-# Quality gates
+# Qualitätsprüfungen
 
-Every gate below runs in CI on each pull request and push to `main`. `npm run check` runs the local ones in one go;
-see [development setup](../tutorials/entwicklungsumgebung.md).
+Jede Prüfung unten läuft in CI bei jedem Pull Request und jedem Push auf `main`. `npm run check` führt die lokalen in
+einem Rutsch aus; siehe [Entwicklungsumgebung aufsetzen](../tutorials/entwicklungsumgebung.md).
 
-| Gate | Command | Checks | Workflow |
+| Prüfung | Befehl | Prüft | Workflow |
 | --- | --- | --- | --- |
-| Format and lint | `npm run lint` (`biome ci .`) | Formatting, Biome's recommended rules plus the stricter rules and import boundaries below | `ci.yml` |
-| Types | `npm run typecheck` (part of `lint`) | `tsc` strict over `src`, `test` and `fixtures` | `ci.yml` |
-| Dead code | `npm run knip` | Unused files, exports, types and dependencies ([`knip.json`](../../knip.json)) | `ci.yml` |
-| Tests and coverage | `npm run test:coverage` | All tests, plus line, branch and function coverage of `src/` above the thresholds | `ci.yml` |
-| Secrets | `gitleaks git` | The whole git history ([`.gitleaks.toml`](../../.gitleaks.toml)) | `ci.yml`, hygiene job |
-| File hygiene and workflows | `prek run --all-files` | Merge markers, YAML/JSON syntax, files over 1 MB, private keys, trailing whitespace, final newline, line endings; zizmor audits the workflows | `ci.yml`, hygiene job |
-| Code scanning | CodeQL `security-extended` | JavaScript/TypeScript and the workflows; results under Security → Code scanning | `codeql.yml`, also weekly |
-| Dependency updates | Dependabot | npm packages, actions and hook revisions, weekly with a 7-day cooldown | `dependabot.yml` |
+| Formatierung und Lint | `npm run lint` (`biome ci .`) | Formatierung, Biomes empfohlene Regeln plus die strengeren Regeln und Importgrenzen unten | `ci.yml` |
+| Typen | `npm run typecheck` (Teil von `lint`) | `tsc` strict über `src`, `test` und `fixtures` | `ci.yml` |
+| Toter Code | `npm run knip` | Unbenutzte Dateien, Exporte, Typen und Abhängigkeiten ([`knip.json`](../../knip.json)) | `ci.yml` |
+| Tests und Abdeckung | `npm run test:coverage` | Alle Tests, dazu Zeilen-, Zweig- und Funktionsabdeckung von `src/` über den Schwellen | `ci.yml` |
+| Secrets | `gitleaks git` | Die ganze Git-Historie ([`.gitleaks.toml`](../../.gitleaks.toml)) | `ci.yml`, Job hygiene |
+| Dateihygiene und Workflows | `prek run --all-files` | Merge-Marker, YAML/JSON-Syntax, Dateien über 1 MB, private Schlüssel, Leerzeichen am Zeilenende, abschließender Zeilenumbruch, Zeilenenden; zizmor prüft die Workflows | `ci.yml`, Job hygiene |
+| Code-Scanning | CodeQL `security-extended` | JavaScript/TypeScript und die Workflows; Ergebnisse unter Security → Code scanning | `codeql.yml`, auch wöchentlich |
+| Abhängigkeitsupdates | Dependabot | npm-Pakete, Actions und Hook-Revisionen, wöchentlich mit 7 Tagen Wartezeit | `dependabot.yml` |
 
-## Coverage thresholds
+## Abdeckungsschwellen
 
-`npm run test:coverage` uses Node's built-in coverage (`--experimental-test-coverage`) and fails below:
+`npm run test:coverage` nutzt Nodes eingebaute Abdeckungsmessung (`--experimental-test-coverage`) und schlägt fehl
+unter:
 
-| Metric | Threshold | Measured (2026-10) |
+| Metrik | Schwelle | Gemessen (2026-10) |
 | --- | --- | --- |
-| Lines | 97 % | 98.2 % |
-| Branches | 88 % | 90.1 % |
-| Functions | 93 % | 96.4 % |
+| Zeilen | 97 % | 98,2 % |
+| Zweige | 88 % | 90,1 % |
+| Funktionen | 93 % | 96,4 % |
 
-The thresholds sit just below the measured values and are only ever raised, never lowered. The run also writes
-`lcov.info`; CI puts its totals in the job summary.
+Die Schwellen liegen knapp unter den gemessenen Werten und werden nur angehoben, nie gesenkt. Der Lauf schreibt
+außerdem `lcov.info`; CI übernimmt dessen Summen in die Job-Zusammenfassung.
 
-## Stricter Biome rules
+## Strengere Biome-Regeln
 
-On top of the recommended set, [`biome.json`](../../biome.json) sets about 140 rules to error. The main
-groups:
+Zusätzlich zum empfohlenen Satz stellt [`biome.json`](../../biome.json) etwa 140 Regeln auf Fehler. Die wichtigsten
+Gruppen:
 
-- **Size and complexity:**
+- **Größe und Komplexität:**
 
-  | Limit | Value | Applies to |
+  | Limit | Wert | Gilt für |
   | --- | --- | --- |
-  | Cognitive complexity per function | 15 | everything |
-  | Parameters per function | 4, else a named options object | everything |
-  | Lines per function (blank lines not counted) | 50 | `src/`, `fixtures/` (not test suites) |
-  | Lines per file (blank lines not counted) | 350 in `src/` and `fixtures/`, 600 in `test/` | everything |
+  | Kognitive Komplexität pro Funktion | 15 | alles |
+  | Parameter pro Funktion | 4, sonst ein benanntes Optionsobjekt | alles |
+  | Zeilen pro Funktion (Leerzeilen nicht mitgezählt) | 50 | `src/`, `fixtures/` (keine Test-Suites) |
+  | Zeilen pro Datei (Leerzeilen nicht mitgezählt) | 350 in `src/` und `fixtures/`, 600 in `test/` | alles |
 
-- **Correctness:** unused imports, variables, parameters, labels and private members; imports of undeclared
-  dependencies; relative imports without their file extension; no shadowed names; no `== null`.
-- **Promises:** floating promises, promises used where a value is expected, `await` on non-thenables, `async`
-  functions without `await`, rejections with non-`Error` values.
-- **Types:** no `any`, no implicit `any` in `let`, no evolving types, strict boolean conditions, no `@ts-ignore`, no
-  non-null assertions.
-- **Tests:** no `.only`, no `.skip`, no identical test titles, no deeply nested suites.
-- **Playwright:** no `waitForTimeout`, element handles, `force: true`, `networkidle` or un-awaited Playwright calls.
-- **Modern, unambiguous code:** `node:` imports, `node:assert/strict`, `for…of` over `forEach`, `at()`, `includes()`,
-  `startsWith()`, `??`, template literals, numeric separators, no nested ternaries, no implicit coercions, no
-  `delete`, no barrel files or `export *`, consistent array and type definitions, readonly class fields where possible.
-- **Environment:** `process.env` is read only in `src/config/`, `src/cli/` and `src/auth/browser.ts`, so values reach
-  the code through the config, where they are masked.
-- **Output:** no `console` (the CLI writes through its `io`).
-- **Import cycles:** no module imports itself through a chain of imports (type-only imports excepted).
+- **Korrektheit:** unbenutzte Imports, Variablen, Parameter, Labels und private Member; Imports nicht deklarierter
+  Abhängigkeiten; relative Imports ohne Dateiendung; keine verdeckten Namen; kein `== null`.
+- **Promises:** nicht abgewartete Promises, Promises, wo ein Wert erwartet wird, `await` auf Nicht-Thenables,
+  `async`-Funktionen ohne `await`, Rejections mit Werten, die kein `Error` sind.
+- **Typen:** kein `any`, kein implizites `any` in `let`, keine sich entwickelnden Typen, strikte boolesche
+  Bedingungen, kein `@ts-ignore`, keine Non-Null-Assertions.
+- **Tests:** kein `.only`, kein `.skip`, keine gleichen Testtitel, keine tief verschachtelten Suites.
+- **Playwright:** kein `waitForTimeout`, keine Element-Handles, kein `force: true`, kein `networkidle` und keine
+  nicht abgewarteten Playwright-Aufrufe.
+- **Moderner, eindeutiger Code:** `node:`-Imports, `node:assert/strict`, `for…of` statt `forEach`, `at()`,
+  `includes()`, `startsWith()`, `??`, Template-Literale, Zifferntrenner, keine verschachtelten ternären Ausdrücke,
+  keine impliziten Typumwandlungen, kein `delete`, keine Barrel-Dateien oder `export *`, einheitliche Array- und
+  Typdefinitionen, `readonly`-Klassenfelder, wo möglich.
+- **Umgebung:** `process.env` wird nur in `src/config/`, `src/cli/` und `src/auth/browser.ts` gelesen, damit Werte
+  über die Konfiguration in den Code gelangen, wo sie maskiert werden.
+- **Ausgabe:** kein `console` (die CLI schreibt über ihr `io`).
+- **Importzyklen:** Kein Modul importiert sich selbst über eine Kette von Imports (reine Typ-Imports ausgenommen).
 
-Deliberately off:
+Bewusst abgeschaltet:
 
-| Rule | Why |
+| Regel | Warum |
 | --- | --- |
-| `useErrorCause` | A caught error can carry an unmasked secret (for example a `TypeError` from `new URL()` keeps the filled-in URL in its `input`); a rethrown error says what failed without it. |
-| `noAwaitInLoops` | Browser steps run one after another on purpose. |
-| `useDefaultSwitchClause` | Exhaustive `switch` over a union (`useExhaustiveSwitchCases`) catches a new member at compile time; a `default` would hide it. |
-| `noVoid` | `void` marks the fire-and-forget promises that `noFloatingPromises` requires to be explicit. |
-| `noSecrets` | Entropy-based and noisy on test data; gitleaks is the secret gate. |
-| `noMagicNumbers`, `useBlockStatements`, `useNamingConvention`, `useExplicitReturnType` | Style that would churn hundreds of lines; `useNamingConvention` would also reject the LLM APIs' wire names (`max_tokens`). |
+| `useErrorCause` | Ein abgefangener Fehler kann ein unmaskiertes Secret tragen (zum Beispiel behält ein `TypeError` aus `new URL()` die ausgefüllte URL in seinem `input`); ein neu geworfener Fehler sagt ohne ihn, was fehlgeschlagen ist. |
+| `noAwaitInLoops` | Browserschritte laufen absichtlich nacheinander. |
+| `useDefaultSwitchClause` | Ein vollständiges `switch` über eine Union (`useExhaustiveSwitchCases`) fängt ein neues Element schon beim Kompilieren ab; ein `default` würde es verstecken. |
+| `noVoid` | `void` kennzeichnet die Fire-and-forget-Promises, die `noFloatingPromises` ausdrücklich verlangt. |
+| `noSecrets` | Entropiebasiert und auf Testdaten zu laut; gitleaks ist die Prüfung für Secrets. |
+| `noMagicNumbers`, `useBlockStatements`, `useNamingConvention`, `useExplicitReturnType` | Stilregeln, die Hunderte Zeilen umwälzen würden; `useNamingConvention` würde außerdem die Feldnamen der LLM-APIs ablehnen (`max_tokens`). |
 
-## Import boundaries
+## Importgrenzen
 
-Enforced with `noRestrictedImports` overrides in `biome.json`:
+Erzwungen mit `noRestrictedImports`-Overrides in `biome.json`:
 
-- The LLM SDKs (`@anthropic-ai/sdk`, `@anthropic-ai/foundry-sdk`, `openai`) are imported only in `src/llm/`, behind
-  the provider interface.
-- Only `src/cli/` imports `src/cli/`.
-- `src/config/` and `src/snapshot/` are leaves: they import no other `src/` module.
+- Die LLM-SDKs (`@anthropic-ai/sdk`, `@anthropic-ai/foundry-sdk`, `openai`) werden nur in `src/llm/` importiert,
+  hinter der Anbieter-Schnittstelle.
+- Nur `src/cli/` importiert `src/cli/`.
+- `src/config/` und `src/snapshot/` sind Blätter: Sie importieren kein anderes `src/`-Modul.
 
 ## Pinning
 
-Workflow actions and hook revisions are pinned to commit SHAs with the tag in a comment; zizmor fails on an unpinned
-`uses:`. Workflows start from `permissions: {}` and grant each job only what it needs, and checkouts do not persist
-credentials. Dependabot updates the SHAs and comments.
+Workflow-Actions und Hook-Revisionen sind auf Commit-SHAs festgelegt, mit dem Tag in einem Kommentar; zizmor schlägt
+bei einem nicht festgelegten `uses:` fehl. Workflows beginnen mit `permissions: {}` und geben jedem Job nur, was er
+braucht, und Checkouts speichern keine Zugangsdaten. Dependabot aktualisiert die SHAs und Kommentare.

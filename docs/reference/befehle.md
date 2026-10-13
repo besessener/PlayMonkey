@@ -1,4 +1,4 @@
-# Commands
+# Befehle
 
 ## `monkey`
 
@@ -13,51 +13,52 @@ monkey --help | -h
 monkey --version | -v
 ```
 
-| Command | Today |
+| Befehl | Stand heute |
 | --- | --- |
-| `run` | Validates the config, prints the seed, runs the [LLM preflight](../how-to/llm-einrichten.md#troubleshooting) when `llm` is set (before any browser work), then runs the random monkey with the [oracles](../explanation/orakel.md) for every role and seed, `parallel` at a time ([run in parallel](../how-to/parallel-ausfuehren.md)). Prints a summary per run (log lines are prefixed `[role]`, or `[role/seed]` with `seeds`), one line per finding, the trace path and the total number of distinct findings; screenshots go to `<report.dir>/<role>/screenshots/`, the [action log](aktionsprotokoll.md) to `<report.dir>/<role>/actions.json` (with `seeds`: `<report.dir>/<role>/<seed>/…`). Writes the [report](bericht.md) (`report.json`, self-contained `report.html`) and ends with the LLM usage (with `llm`), the counts per severity, the report path and the reason for the exit code. |
-| `replay` | Executes an action log again in a fresh context for its role, without an LLM, runs the oracles and prints for each recorded finding whether it was `reproduced`, plus `new` findings. `--config` (`-c`) supplies login, browser and oracle settings and is required for roles that log in; `--strict` aborts at the first element that cannot be found instead of skipping it. Output goes to `replay/` next to the log. See [replay](../explanation/replay.md). |
-| `preflight` | Validates the config and sends one probe request to the configured LLM that must come back as a tool call. Prints `llm preflight ok: …` and exits `0`, or the provider, sanitized URL, HTTP status, cause and a hint, and exits `2`, also with `llm.required: false`. A config without `llm` exits `2`. |
+| `run` | Prüft die Konfiguration, gibt den Seed aus, führt den [LLM-Preflight](../how-to/llm-einrichten.md#fehlerbehebung) aus, wenn `llm` gesetzt ist (vor jeder Browserarbeit), und lässt dann den Zufalls-Monkey mit den [Orakeln](../explanation/orakel.md) für jede Rolle und jeden Seed laufen, `parallel` gleichzeitig ([parallel ausführen](../how-to/parallel-ausfuehren.md)). Gibt pro Lauf eine Zusammenfassung aus (Logzeilen beginnen mit `[role]`, mit `seeds` mit `[role/seed]`), eine Zeile pro Befund, den Trace-Pfad und die Gesamtzahl unterschiedlicher Befunde; Screenshots landen in `<report.dir>/<role>/screenshots/`, das [Aktionsprotokoll](aktionsprotokoll.md) in `<report.dir>/<role>/actions.json` (mit `seeds`: `<report.dir>/<role>/<seed>/…`). Schreibt den [Bericht](bericht.md) (`report.json`, eigenständiges `report.html`) und endet mit dem LLM-Verbrauch (mit `llm`), der Anzahl pro Schweregrad, dem Berichtspfad und dem Grund für den Exit-Code. |
+| `replay` | Führt ein Aktionsprotokoll in einem frischen Kontext für seine Rolle erneut aus, ohne LLM, lässt die Orakel laufen und gibt für jeden aufgezeichneten Befund aus, ob er `reproduced` wurde, dazu `new` Befunde. `--config` (`-c`) liefert Anmelde-, Browser- und Orakeleinstellungen und ist für Rollen nötig, die sich anmelden; `--strict` bricht beim ersten Element ab, das nicht gefunden wird, statt es zu überspringen. Die Ausgabe landet in `replay/` neben dem Protokoll. Siehe [Replay](../explanation/replay.md). |
+| `preflight` | Prüft die Konfiguration und schickt eine Testanfrage an das konfigurierte LLM, die als Tool-Aufruf zurückkommen muss. Gibt `llm preflight ok: …` aus und endet mit `0`, oder gibt Anbieter, bereinigte URL, HTTP-Status, Ursache und einen Hinweis aus und endet mit `2`, auch bei `llm.required: false`. Eine Konfiguration ohne `llm` endet mit `2`. |
 
-`--watch` (`-w`) on `run` and `replay` is [spectator mode](../how-to/lauf-beobachten.md): a visible, slowed-down browser
-that outlines each element before acting and prints one line per step; it never changes which actions are taken.
-`--slow-mo <ms>` (0 … 99999, default 250) sets the delay per browser operation and implies `--watch`.
+`--watch` (`-w`) bei `run` und `replay` ist der [Zuschauermodus](../how-to/lauf-beobachten.md): ein sichtbarer,
+verlangsamter Browser, der jedes Element vor der Aktion umrandet und pro Schritt eine Zeile ausgibt; er ändert nie,
+welche Aktionen ausgeführt werden. `--slow-mo <ms>` (0 … 99999, Standard 250) setzt die Verzögerung pro
+Browseroperation und schließt `--watch` ein.
 
-### Exit codes
+### Exit-Codes
 
-| Code | Meaning |
+| Code | Bedeutung |
 | --- | --- |
-| `0` | No findings (also `--help`, `--version`). Replay: none of the recorded findings recurred. |
-| `1` | Findings present. Replay: at least one recorded finding recurred. |
-| `2` | Tool or config error: bad usage, unknown command or option, invalid config, a run that failed to log in or crashed (the other runs still run, and the report is written), a run that lost its browser, a failed LLM preflight (unless `llm.required` is `false`), an unavailable `llm.provider`, `--watch` without a display. Replay: also an unreadable action log, an unsupported log version, an unset variable the log needs, a role missing from `--config`, or a `--strict` replay that could not find an element. |
+| `0` | Keine Befunde (auch `--help`, `--version`). Replay: Keiner der aufgezeichneten Befunde trat wieder auf. |
+| `1` | Befunde vorhanden. Replay: Mindestens ein aufgezeichneter Befund trat wieder auf. |
+| `2` | Werkzeug- oder Konfigurationsfehler: falsche Verwendung, unbekannter Befehl oder unbekannte Option, ungültige Konfiguration, ein Lauf, dessen Anmeldung scheiterte oder der abstürzte (die anderen Läufe laufen trotzdem, und der Bericht wird geschrieben), ein Lauf, der seinen Browser verloren hat, ein fehlgeschlagener LLM-Preflight (außer `llm.required` ist `false`), ein nicht verfügbarer `llm.provider`, `--watch` ohne Display. Replay: außerdem ein unlesbares Aktionsprotokoll, eine nicht unterstützte Protokollversion, eine nicht gesetzte Variable, die das Protokoll braucht, eine Rolle, die in `--config` fehlt, oder ein `--strict`-Replay, das ein Element nicht finden konnte. |
 
-Precedence for `run`: `2` when any run did not complete, even if others found something; otherwise `1` when there
-are findings; otherwise `0`. The last line of the output names the reason, e.g. `exit 2: run broken/4 did not
-complete`.
+Vorrang bei `run`: `2`, wenn irgendein Lauf nicht abgeschlossen wurde, auch wenn andere etwas gefunden haben; sonst
+`1`, wenn es Befunde gibt; sonst `0`. Die letzte Zeile der Ausgabe nennt den Grund, z. B.
+`exit 2: run broken/4 did not complete`.
 
-## npm scripts
+## npm-Skripte
 
-| Script | Does |
+| Skript | Macht |
 | --- | --- |
-| `npm run build` | `tsc` from `src/` to `dist/`, and makes the `monkey` bin executable. |
-| `npm test` | Builds, then `node --test "test/**/*.test.ts"`. |
-| `npm run test:coverage` | Builds, runs the tests with coverage of `src/`, fails below the [thresholds](qualitaetssicherung.md#coverage-thresholds), writes `lcov.info`. |
-| `npm run lint` | `biome ci .` and typechecks `src` and `test`. |
-| `npm run typecheck` | Typechecks only. |
-| `npm run knip` | Unused files, exports and dependencies. |
-| `npm run check` | `lint`, `knip` and `test:coverage`: every local [quality gate](qualitaetssicherung.md). |
-| `npm run format` | `biome check --write .`: formatting and safe fixes. |
-| `npm run fixture` | Starts the fixture site until interrupted. |
-| `npm run prepare` | Runs `build`; npm runs it on `npm ci` and when PlayMonkey is installed from git. |
+| `npm run build` | `tsc` von `src/` nach `dist/`, und macht das `monkey`-Bin ausführbar. |
+| `npm test` | Baut, dann `node --test "test/**/*.test.ts"`. |
+| `npm run test:coverage` | Baut, führt die Tests mit Abdeckungsmessung von `src/` aus, schlägt unter den [Schwellen](qualitaetssicherung.md#abdeckungsschwellen) fehl, schreibt `lcov.info`. |
+| `npm run lint` | `biome ci .` und Typprüfung von `src` und `test`. |
+| `npm run typecheck` | Nur die Typprüfung. |
+| `npm run knip` | Unbenutzte Dateien, Exporte und Abhängigkeiten. |
+| `npm run check` | `lint`, `knip` und `test:coverage`: jede lokale [Qualitätsprüfung](qualitaetssicherung.md). |
+| `npm run format` | `biome check --write .`: Formatierung und sichere Korrekturen. |
+| `npm run fixture` | Startet die Fixture-Seite, bis sie unterbrochen wird. |
+| `npm run prepare` | Führt `build` aus; npm führt es bei `npm ci` aus und wenn PlayMonkey aus Git installiert wird. |
 
-## Environment variables
+## Umgebungsvariablen
 
-| Variable | Used by | Meaning |
+| Variable | Genutzt von | Bedeutung |
 | --- | --- | --- |
-| any `${VAR}` in the config | `monkey run` | Secrets and other values substituted into the config. |
-| `PORT` | `npm run fixture` | Fixed port for the fixture site; default is a free one. |
-| `CHROMIUM_EXECUTABLE_PATH` | `monkey run`, tests | Launch this Chromium instead of the one installed for Playwright (engine `chromium` only). |
-| `FOUNDRY_API_KEY`, `FOUNDRY_BASE_URL`, `FOUNDRY_DEPLOYMENT` | tests | Opt-in: run one real `decide` call against a Foundry deployment in `test/foundry.test.ts`; skipped unless the first two are set. |
+| jedes `${VAR}` in der Konfiguration | `monkey run` | Secrets und andere Werte, die in die Konfiguration eingesetzt werden. |
+| `PORT` | `npm run fixture` | Fester Port für die Fixture-Seite; standardmäßig ein freier. |
+| `CHROMIUM_EXECUTABLE_PATH` | `monkey run`, Tests | Startet dieses Chromium statt des für Playwright installierten (nur Engine `chromium`). |
+| `FOUNDRY_API_KEY`, `FOUNDRY_BASE_URL`, `FOUNDRY_DEPLOYMENT` | Tests | Opt-in: führt in `test/foundry.test.ts` einen echten `decide`-Aufruf gegen ein Foundry-Deployment aus; wird übersprungen, solange die ersten beiden nicht gesetzt sind. |
 
-`ANTHROPIC_FOUNDRY_API_KEY`, `ANTHROPIC_FOUNDRY_BASE_URL` and `ANTHROPIC_FOUNDRY_RESOURCE`, which the Foundry SDK
-reads on its own, are ignored: the endpoint and key come only from the config.
+`ANTHROPIC_FOUNDRY_API_KEY`, `ANTHROPIC_FOUNDRY_BASE_URL` und `ANTHROPIC_FOUNDRY_RESOURCE`, die das Foundry-SDK von
+sich aus liest, werden ignoriert: Endpunkt und Schlüssel kommen nur aus der Konfiguration.

@@ -1,10 +1,11 @@
-# Action log (`actions.json`)
+# Aktionsprotokoll (`actions.json`)
 
-`monkey run` writes one action log per role to `<report.dir>/<role>/actions.json`. It lists every executed action in
-order, so `monkey replay` can repeat the run without randomness and without an LLM. The file is rewritten after
-every step (to a temporary file, then renamed), so it is always complete JSON, also when a run is interrupted.
+`monkey run` schreibt pro Rolle ein Aktionsprotokoll nach `<report.dir>/<role>/actions.json`. Es listet jede
+ausgeführte Aktion in ihrer Reihenfolge, damit `monkey replay` den Lauf ohne Zufall und ohne LLM wiederholen kann.
+Die Datei wird nach jedem Schritt neu geschrieben (in eine temporäre Datei, die dann umbenannt wird), sie ist also
+immer vollständiges JSON, auch wenn ein Lauf abgebrochen wird.
 
-## Example
+## Beispiel
 
 ```json
 {
@@ -54,32 +55,32 @@ every step (to a temporary file, then renamed), so it is always complete JSON, a
 }
 ```
 
-## Fields
+## Felder
 
-| Field | Meaning |
+| Feld | Bedeutung |
 | --- | --- |
-| `version` | Format version, currently `2`. Version 1 logs (before the actions `dblclick`, `rightclick`, `hover`, `longPress`, `drag` and `events`) are still read; `monkey replay` rejects other versions with a clear message. |
-| `seed`, `baseUrl`, `role`, `viewport` | The run's settings; replay uses them instead of the config's. |
-| `placeholders` | Variables whose values the log stores as `${VAR}`; see below. |
-| `actions[].step` | 1, 2, … in execution order. |
-| `actions[].source` | `monkey`, or `llm` for an action the LLM chose. Replay executes both alike. |
-| `actions[].type` and its fields | The action: `click`, `dblclick`, `rightclick`, `hover`, `longPress`, `check`, `uncheck` (`ref`); `drag` (`ref`, `toRef`); `fill`, `select` (`ref`, `value`); `press` (`key`); `scroll` (`deltaY`); `back`; `navigate` (`url`); `setViewport` (`width`, `height`); `switchTab` (`index`). |
-| `actions[].ref` | The element's ref in that step's snapshot. Informational: refs do not survive page loads. |
-| `actions[].locator` | **Durable locator** of the element, as Playwright's `codegen` writes it. Replay finds the element by it. |
-| `actions[].toLocator` | `drag` only: durable locator of the drop target. |
-| `actions[].events` | What the page asked for or handed out during the step, in order: `{ "kind": "dialog", "dialog", "message", "accepted", "text"? }` (`text`: what was typed into a prompt), `{ "kind": "upload", "files": [names] }` (generated files, see [the monkey](../explanation/monkey.md#pages-that-ask-for-something)) and `{ "kind": "download", "name", "url", "size"? , "failure"? }`. Replay answers dialogs and file choosers the same way. Absent when nothing happened. |
-| `actions[].pageUrl`, `snapshotHash` | The state the action was chosen in. |
-| `actions[].ok`, `error` | Whether the action succeeded, and why not. A failed action is still replayed. |
-| `findings` | The run's findings (id, oracle, severity, dedup key, message, step), what replay compares against. |
+| `version` | Formatversion, derzeit `2`. Protokolle der Version 1 (vor den Aktionen `dblclick`, `rightclick`, `hover`, `longPress`, `drag` und `events`) werden weiterhin gelesen; andere Versionen lehnt `monkey replay` mit einer klaren Meldung ab. |
+| `seed`, `baseUrl`, `role`, `viewport` | Die Einstellungen des Laufs; Replay nutzt sie statt der aus der Konfiguration. |
+| `placeholders` | Variablen, deren Werte das Protokoll als `${VAR}` speichert; siehe unten. |
+| `actions[].step` | 1, 2, … in Ausführungsreihenfolge. |
+| `actions[].source` | `monkey`, oder `llm` für eine Aktion, die das LLM gewählt hat. Replay führt beide gleich aus. |
+| `actions[].type` und seine Felder | Die Aktion: `click`, `dblclick`, `rightclick`, `hover`, `longPress`, `check`, `uncheck` (`ref`); `drag` (`ref`, `toRef`); `fill`, `select` (`ref`, `value`); `press` (`key`); `scroll` (`deltaY`); `back`; `navigate` (`url`); `setViewport` (`width`, `height`); `switchTab` (`index`). |
+| `actions[].ref` | Die Ref des Elements im Snapshot dieses Schritts. Nur zur Information: Refs überleben keinen Seitenwechsel. |
+| `actions[].locator` | **Dauerhafter Locator** des Elements, so wie Playwrights `codegen` ihn schreibt. Replay findet das Element darüber. |
+| `actions[].toLocator` | Nur bei `drag`: dauerhafter Locator des Ablageziels. |
+| `actions[].events` | Was die Seite während des Schritts verlangt oder ausgegeben hat, in Reihenfolge: `{ "kind": "dialog", "dialog", "message", "accepted", "text"? }` (`text`: was in einen Prompt getippt wurde), `{ "kind": "upload", "files": [names] }` (erzeugte Dateien, siehe [den Monkey](../explanation/monkey.md#seiten-die-etwas-wissen-wollen)) und `{ "kind": "download", "name", "url", "size"? , "failure"? }`. Replay beantwortet Dialoge und Dateiauswahlen genauso. Fehlt, wenn nichts passiert ist. |
+| `actions[].pageUrl`, `snapshotHash` | Der Zustand, in dem die Aktion gewählt wurde. |
+| `actions[].ok`, `error` | Ob die Aktion gelungen ist, und wenn nicht, warum. Eine fehlgeschlagene Aktion wird trotzdem wiederholt. |
+| `findings` | Die Befunde des Laufs (Id, Orakel, Schweregrad, Dedup-Schlüssel, Meldung, Schritt), mit denen Replay vergleicht. |
 
-## Secrets and placeholders
+## Secrets und Platzhalter
 
-Every value that came from a `${VAR}` placeholder in the config (passwords, the base URL of the test environment,
-test data) is written back as the placeholder in the log's free-text fields (`baseUrl`, `role`, `value`, `url`,
-`key`, `locator`, `toLocator`, `pageUrl`, `error`, dialog messages and prompt text, download names and URLs, finding
-messages and keys). `monkey replay` resolves them from the environment
-again, and fails naming the variable when one is not set.
+Jeder Wert, der aus einem `${VAR}`-Platzhalter in der Konfiguration stammt (Passwörter, die Basis-URL der
+Testumgebung, Testdaten), wird in den Freitextfeldern des Protokolls wieder als Platzhalter geschrieben (`baseUrl`,
+`role`, `value`, `url`, `key`, `locator`, `toLocator`, `pageUrl`, `error`, Dialogmeldungen und Prompt-Text, Namen
+und URLs von Downloads, Meldungen und Schlüssel von Befunden). `monkey replay` löst sie wieder aus der Umgebung auf
+und bricht mit dem Namen der Variable ab, wenn eine nicht gesetzt ist.
 
-So the log contains no secret values, and the same log replays against another host or port when only the variable
-changes. Passwords typed during the login are never logged at all: the login runs before the monkey, in its own
-context.
+Das Protokoll enthält also keine geheimen Werte, und dasselbe Protokoll lässt sich gegen einen anderen Host oder Port
+wiederholen, wenn sich nur die Variable ändert. Passwörter, die bei der Anmeldung eingetippt werden, landen überhaupt
+nicht im Protokoll: Die Anmeldung läuft vor dem Monkey, in einem eigenen Kontext.

@@ -8,7 +8,7 @@ writing anything.
 **PlayMonkey** (`monkey`) is a command line tool that drives a real browser with Playwright against a website in a
 throwaway test environment, clicks, types and submits with seeded randomness, and reports what breaks with the steps
 to reproduce it. An LLM steps in only when the random monkey is stuck. Full docs: [docs/README.md](docs/README.md)
-(English, Diátaxis).
+(German, Diátaxis).
 
 - **Entry point:** `src/cli/main.ts`; modules and responsibilities in
   [architektur.md](docs/explanation/architektur.md).
@@ -72,7 +72,8 @@ quietly. Reasoning lives in `docs/explanation/`, not here.
   narrate code or record a decision (that goes in the commit or PR).
 - **Fail fast; measure, don't assume.** Errors carry a cause and a next step and are never swallowed. Performance and
   coverage are numbers a tool prints.
-- **Language:** English everywhere — CLI output, reports, prompts, docs, identifiers, logs.
+- **Language:** the website, the READMEs, `CONTRIBUTING.md` and `docs/` are German and address the reader as „du“;
+  everything else is English — CLI output, reports, prompts, identifiers, comments, logs and this file.
 - **Tests:** assert behaviour, not implementation. A new kind of bug gets a fixture page first, then the code, then a
   test that it is reported exactly once.
 - **Docs sync:** a change to behaviour, configuration or a design decision updates the matching `docs/` file in the
