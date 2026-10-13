@@ -15,6 +15,8 @@ to reproduce it. An LLM steps in only when the random monkey is stuck. Full docs
 - **Runtime:** Node.js 22, TypeScript run through Node's type stripping, few dependencies
   ([tooling.md](docs/explanation/tooling.md)).
 - **Ground truth:** the [fixture site](fixtures/README.md) with seeded bugs.
+- **Siblings:** [flakipype](https://github.com/besessener/flakipype) and [Archivist](https://github.com/besessener/Archivist)
+  share these rules, the docs layout and the `site/` layout; a change to a shared rule or layout is mirrored there.
 
 ## Read before you touch
 
@@ -57,19 +59,36 @@ quietly. Reasoning lives in `docs/explanation/`, not here.
 
 - **Ask, don't bury.** A decision that is the user's (a design choice, a rule that seems to need reversing, scope
   beyond the request) is asked with the question tool as soon as it comes up, with options and a recommendation. A
-  note in a PR description does not count as asking.
-- **Smallest necessary change.** Preserve behaviour unless changing it is what was asked.
-- **When principles collide:** correctness and security, then KISS/YAGNI, then clean code, then DRY.
+  note in a PR description or summary does not count as asking. Without that tool, put the question first in your
+  reply and wait for the answer.
+- **Smallest necessary change.** Preserve behaviour unless changing it is what was asked. Boy-scout fixes stay inside
+  the function or file you are already editing.
+- **When principles collide:** correctness and security, then KISS/YAGNI, then clean code, then DRY. No abstraction
+  for a requirement nobody has; extract on the third occurrence.
 - **Small units:** cognitive complexity at most 15, at most 4 parameters (else a named options object), functions
   under 50 lines, files under 350 lines (tests under 600); Biome enforces it. Hard-to-reach coverage or a function
   over a limit means extract the logic, not suppress the rule.
-- **Comments:** one line, only for a non-obvious constraint, workaround, invariant or external behaviour.
+- **Comments:** one line, only for a non-obvious constraint, workaround, invariant or external behaviour — never to
+  narrate code or record a decision (that goes in the commit or PR).
+- **Fail fast; measure, don't assume.** Errors carry a cause and a next step and are never swallowed. Performance and
+  coverage are numbers a tool prints.
+- **Language:** English everywhere — CLI output, reports, prompts, docs, identifiers, logs.
 - **Tests:** assert behaviour, not implementation. A new kind of bug gets a fixture page first, then the code, then a
   test that it is reported exactly once.
 - **Docs sync:** a change to behaviour, configuration or a design decision updates the matching `docs/` file in the
   same change. A new config key goes into `src/config/schema.ts` (`llm.*` keys into `src/config/llm-schema.ts`, defaults
   into `src/config/defaults.ts`) and [configuration.md](docs/reference/configuration.md); `test/docs.test.ts` fails
   otherwise. The root `README.md` stays short.
+
+## Development commands
+
+```sh
+npm ci                            # install and build
+npx playwright install chromium   # the browser
+npm run check                     # every local quality gate
+```
+
+All commands: [commands.md](docs/reference/commands.md).
 
 ## Definition of done
 
