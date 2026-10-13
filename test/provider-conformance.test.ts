@@ -14,7 +14,7 @@ interface Backend {
   llm: Record<string, unknown>;
   create(llm: LlmConfig, fetch: typeof globalThis.fetch): LlmProvider;
   /** A successful answer calling one tool; the usage is 1000 input, 30 output, 600 cached tokens. */
-  toolCall(name: string, input: unknown): Response;
+  toolCall(name: string, args: unknown): Response;
   textOnly(text: string): Response;
   error(status: number, message: string): Response;
 }
@@ -24,7 +24,7 @@ const BACKENDS: Backend[] = [
     name: "anthropic-foundry",
     llm: { provider: "anthropic-foundry", baseUrl: "https://res.services.ai.azure.com/anthropic" },
     create: (llm, fetch) => new AnthropicFoundryProvider(llm, { fetch }),
-    toolCall: (name, input) => anthropicMessage([{ type: "tool_use", id: "toolu_1", name, input }], "tool_use"),
+    toolCall: (name, args) => anthropicMessage([{ type: "tool_use", id: "toolu_1", name, input: args }], "tool_use"),
     textOnly: (text) => anthropicMessage([{ type: "text", text }], "end_turn"),
     error: (status, message) => json(status, { type: "error", error: { type: "api_error", message } }),
   },
@@ -32,9 +32,9 @@ const BACKENDS: Backend[] = [
     name: "openai (responses)",
     llm: { provider: "openai", baseUrl: "https://res.openai.azure.com/openai/v1" },
     create: (llm, fetch) => new OpenAiProvider(llm, { fetch }),
-    toolCall: (name, input) =>
+    toolCall: (name, args) =>
       openAiResponse([
-        { type: "function_call", id: "fc", call_id: "c", name, arguments: JSON.stringify(input), status: "completed" },
+        { type: "function_call", id: "fc", call_id: "c", name, arguments: JSON.stringify(args), status: "completed" },
       ]),
     textOnly: (text) =>
       openAiResponse([
@@ -52,9 +52,9 @@ const BACKENDS: Backend[] = [
     name: "openai (chat)",
     llm: { provider: "openai", baseUrl: "https://res.openai.azure.com/openai/v1", options: { api: "chat" } },
     create: (llm, fetch) => new OpenAiProvider(llm, { fetch }),
-    toolCall: (name, input) =>
+    toolCall: (name, args) =>
       chatCompletion(
-        { tool_calls: [{ id: "c", type: "function", function: { name, arguments: JSON.stringify(input) } }] },
+        { tool_calls: [{ id: "c", type: "function", function: { name, arguments: JSON.stringify(args) } }] },
         "tool_calls",
       ),
     textOnly: (text) => chatCompletion({ content: text }, "stop"),

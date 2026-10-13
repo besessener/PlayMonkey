@@ -1,5 +1,5 @@
 import type { IgnoreRule } from "../config/config.ts";
-import type { OracleName } from "../config/schema.ts";
+import type { OracleName } from "../config/values.ts";
 import type { Action } from "../monkey/actions.ts";
 
 export const SEVERITIES = ["critical", "high", "medium", "low"] as const;

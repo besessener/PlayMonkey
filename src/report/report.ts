@@ -1,7 +1,7 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { join, relative, sep } from "node:path";
 import type { LoadedConfig } from "../config/config.ts";
-import { maskSecrets } from "../config/secrets.ts";
+import { maskSecrets, type Secrets } from "../config/secrets.ts";
 import type { LlmReport } from "../llm/usage.ts";
 import type { StopReason } from "../monkey/loop.ts";
 import { type Finding, SEVERITIES, type Severity } from "../oracles/finding.ts";
@@ -92,6 +92,36 @@ export function buildReport(input: ReportInput): Report {
       ...(screenshotPath === undefined ? {} : { screenshot: path(screenshotPath) }),
     })),
   );
+  const aggregated = aggregate(findings);
+  const order = (finding: { severity: Severity }) => SEVERITIES.indexOf(finding.severity);
+  findings.sort((a, b) => order(a) - order(b) || b.occurrences - a.occurrences);
+  const groups = aggregated.sort(
+    (a, b) => order(a) - order(b) || b.runs.length - a.runs.length || b.occurrences - a.occurrences,
+  );
+
+  const counts = Object.fromEntries(SEVERITIES.map((severity) => [severity, 0])) as Record<Severity, number>;
+  for (const finding of groups) counts[finding.severity]++;
+
+  const roles = input.outcomes.map((outcome) => summarizeRun(outcome, secrets, path));
+
+  return {
+    version: REPORT_VERSION,
+    tool: { name: "playmonkey", version: input.version },
+    startedAt: input.startedAt.toISOString(),
+    finishedAt: input.finishedAt.toISOString(),
+    seed: config.seed,
+    ...(config.seeds === undefined ? {} : { seeds: [...config.seeds] }),
+    config: maskSecrets(config, secrets),
+    roles,
+    findings,
+    aggregated: groups,
+    counts,
+    ...(input.llm === undefined ? {} : { llm: maskSecrets(input.llm, secrets) }),
+  };
+}
+
+/** The findings across runs, one entry per dedup key, in order of first appearance. */
+function aggregate(findings: ReportFinding[]): AggregatedFinding[] {
   const aggregated = new Map<string, AggregatedFinding>();
   for (const finding of findings) {
     let entry = aggregated.get(finding.key);
@@ -112,52 +142,30 @@ export function buildReport(input: ReportInput): Report {
     if (!entry.roles.includes(finding.role)) entry.roles.push(finding.role);
     entry.runs.push({ role: finding.role, seed: finding.seed, id: finding.id });
   }
-  const order = (finding: { severity: Severity }) => SEVERITIES.indexOf(finding.severity);
-  findings.sort((a, b) => order(a) - order(b) || b.occurrences - a.occurrences);
-  const groups = [...aggregated.values()].sort(
-    (a, b) => order(a) - order(b) || b.runs.length - a.runs.length || b.occurrences - a.occurrences,
-  );
+  return [...aggregated.values()];
+}
 
-  const counts = Object.fromEntries(SEVERITIES.map((severity) => [severity, 0])) as Record<Severity, number>;
-  for (const finding of groups) counts[finding.severity]++;
-
-  const roles = input.outcomes.map((outcome): RoleSummary => {
-    const result = outcome.result;
-    const error = result?.error ?? outcome.error;
-    return {
-      role: secrets.mask(outcome.role),
-      seed: outcome.seed,
-      ...(result === undefined
-        ? {}
-        : {
-            steps: result.steps,
-            durationMs: result.durationMs,
-            stopReason: result.stopReason,
-            states: result.states,
-            failedActions: result.failedActions,
-          }),
-      ...(error === undefined ? {} : { error: secrets.mask(error) }),
-      findings: outcome.findings.length,
-      blockedNavigations: outcome.blockedNavigations,
-      ...(outcome.actionLog === undefined ? {} : { actionLog: path(outcome.actionLog) }),
-      ...(outcome.tracePath === undefined ? {} : { trace: path(outcome.tracePath) }),
-      videos: (outcome.videoPaths ?? []).map(path),
-    };
-  });
-
+function summarizeRun(outcome: RoleOutcome, secrets: Secrets, path: (file: string) => string): RoleSummary {
+  const result = outcome.result;
+  const error = result?.error ?? outcome.error;
   return {
-    version: REPORT_VERSION,
-    tool: { name: "playmonkey", version: input.version },
-    startedAt: input.startedAt.toISOString(),
-    finishedAt: input.finishedAt.toISOString(),
-    seed: config.seed,
-    ...(config.seeds === undefined ? {} : { seeds: [...config.seeds] }),
-    config: maskSecrets(config, secrets),
-    roles,
-    findings,
-    aggregated: groups,
-    counts,
-    ...(input.llm === undefined ? {} : { llm: maskSecrets(input.llm, secrets) }),
+    role: secrets.mask(outcome.role),
+    seed: outcome.seed,
+    ...(result === undefined
+      ? {}
+      : {
+          steps: result.steps,
+          durationMs: result.durationMs,
+          stopReason: result.stopReason,
+          states: result.states,
+          failedActions: result.failedActions,
+        }),
+    ...(error === undefined ? {} : { error: secrets.mask(error) }),
+    findings: outcome.findings.length,
+    blockedNavigations: outcome.blockedNavigations,
+    ...(outcome.actionLog === undefined ? {} : { actionLog: path(outcome.actionLog) }),
+    ...(outcome.tracePath === undefined ? {} : { trace: path(outcome.tracePath) }),
+    videos: (outcome.videoPaths ?? []).map(path),
   };
 }
 

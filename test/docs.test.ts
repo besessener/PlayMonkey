@@ -65,6 +65,61 @@ const ANY_ENV = new Proxy(
   { get: (_, name) => (typeof name === "string" ? "https://test.example.org" : undefined) },
 ) as NodeJS.ProcessEnv;
 
+/** Why the link `target` in `file` is broken, or undefined when it resolves. External links are not checked. */
+function linkProblem(file: string, target: string): string | undefined {
+  if (/^[a-z]+:/i.test(target)) return undefined;
+  const [pathPart = "", anchor] = target.split("#");
+  const path = pathPart === "" ? file : join(dirname(file), decodeURIComponent(pathPart));
+  if (!existsSync(path)) return `${relative(root, file)} -> ${target}`;
+  if (anchor !== undefined && path.endsWith(".md") && !anchors(readFileSync(path, "utf8")).has(anchor)) {
+    return `${relative(root, file)} -> ${target} (no such heading)`;
+  }
+  return undefined;
+}
+
+/** Broken relative links and anchors of one markdown file, ignoring code. */
+function brokenLinks(file: string): string[] {
+  const markdown = readFileSync(file, "utf8");
+  const text = markdown.replace(/```[\s\S]*?```/g, "").replace(/`[^`\n]*`/g, "");
+  return [...text.matchAll(/\]\(([^)\s]+)\)/g)].flatMap(([, target]) => {
+    const problem = target === undefined ? undefined : linkProblem(file, target);
+    return problem === undefined ? [] : [problem];
+  });
+}
+
+interface Sample {
+  where: string;
+  json: string;
+}
+
+/** Whole sample configs in the json blocks of a markdown file, with placeholders like `<host>` filled in. */
+function documentedSamples(file: string): Sample[] {
+  return [...readFileSync(file, "utf8").matchAll(/```json\n([\s\S]*?)```/g)].flatMap(([, json]) => {
+    // Whole configs only; snippets of one section have no baseUrl.
+    if (json === undefined || !/^\{\s*"(\$schema|baseUrl)"/.test(json.trim())) return [];
+    return [{ where: relative(root, file), json: json.replace(/<[a-z-]+>/g, "x") }];
+  });
+}
+
+/** The sample configs under fixtures/configs, then those in the documentation. */
+function sampleConfigs(): Sample[] {
+  const configs = join(root, "fixtures/configs");
+  const fixtures = readdirSync(configs)
+    .filter((n) => n.endsWith(".json"))
+    .map((name) => ({ where: `fixtures/configs/${name}`, json: readFileSync(join(configs, name), "utf8") }));
+  return [...fixtures, ...documentationFiles().flatMap(documentedSamples)];
+}
+
+/** The validation error of a sample, if it has one. */
+function validationErrors({ where, json }: Sample): string[] {
+  try {
+    parseConfig(json, { env: ANY_ENV, source: where });
+    return [];
+  } catch (error) {
+    return [(error as Error).message];
+  }
+}
+
 describe("documentation", () => {
   it("documents every config key in docs/reference/configuration.md", () => {
     const doc = readFileSync(join(root, "docs/reference/configuration.md"), "utf8");
@@ -75,47 +130,13 @@ describe("documentation", () => {
   });
 
   it("has no broken relative links or anchors", () => {
-    const broken: string[] = [];
-    for (const file of documentationFiles()) {
-      const markdown = readFileSync(file, "utf8");
-      const text = markdown.replace(/```[\s\S]*?```/g, "").replace(/`[^`\n]*`/g, "");
-      for (const [, target] of text.matchAll(/\]\(([^)\s]+)\)/g)) {
-        if (target === undefined || /^[a-z]+:/i.test(target)) continue;
-        const [pathPart = "", anchor] = target.split("#");
-        const path = pathPart === "" ? file : join(dirname(file), decodeURIComponent(pathPart));
-        if (!existsSync(path)) {
-          broken.push(`${relative(root, file)} -> ${target}`);
-        } else if (anchor !== undefined && path.endsWith(".md") && !anchors(readFileSync(path, "utf8")).has(anchor)) {
-          broken.push(`${relative(root, file)} -> ${target} (no such heading)`);
-        }
-      }
-    }
-    assert.deepEqual(broken, []);
+    assert.deepEqual(documentationFiles().flatMap(brokenLinks), []);
   });
 
   it("has sample configs that pass validation", () => {
-    const samples: { where: string; json: string }[] = [];
-    const configs = join(root, "fixtures/configs");
-    for (const name of readdirSync(configs).filter((n) => n.endsWith(".json"))) {
-      samples.push({ where: `fixtures/configs/${name}`, json: readFileSync(join(configs, name), "utf8") });
-    }
-    for (const file of documentationFiles()) {
-      for (const [, json] of readFileSync(file, "utf8").matchAll(/```json\n([\s\S]*?)```/g)) {
-        // Whole configs only; snippets of one section have no baseUrl.
-        if (json === undefined || !/^\{\s*"(\$schema|baseUrl)"/.test(json.trim())) continue;
-        samples.push({ where: relative(root, file), json: json.replace(/<[a-z-]+>/g, "x") });
-      }
-    }
+    const samples = sampleConfigs();
     assert.ok(samples.length >= 5, `only ${samples.length} samples found`);
-    const invalid: string[] = [];
-    for (const { where, json } of samples) {
-      try {
-        parseConfig(json, { env: ANY_ENV, source: where });
-      } catch (error) {
-        invalid.push((error as Error).message);
-      }
-    }
-    assert.deepEqual(invalid, []);
+    assert.deepEqual(samples.flatMap(validationErrors), []);
   });
 
   it("has a changelog section for the package version, as the release workflow needs", () => {

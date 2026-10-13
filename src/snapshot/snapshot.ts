@@ -100,46 +100,19 @@ export async function snapshot(page: Page): Promise<Snapshot> {
     (await page.evaluate<{ width: number; height: number }>("({ width: innerWidth, height: innerHeight })"));
   const origin = new URL(page.url()).origin;
 
-  const elements: SnapshotElement[] = [];
-  const texts: string[] = [];
-  const dialogs: string[] = [];
-  let crossOriginFrames = 0;
-
-  const visit = async (node: AriaNode | string, inFrame: boolean, inDialog: boolean): Promise<void> => {
-    if (typeof node === "string") {
-      texts.push(node);
-      return;
-    }
-    if (node.role === "iframe") {
-      if (node.ref !== undefined && !(await isSameOrigin(page, node.ref, origin))) {
-        crossOriginFrames++;
-        return;
-      }
-      for (const child of node.children ?? []) await visit(child, true, inDialog);
-      return;
-    }
-    const isDialog = DIALOG_ROLES.has(node.role);
-    if (isDialog) dialogs.push(node.name ?? "");
-    const actionable = node.ref !== undefined && isActionable(node);
-    if (actionable) elements.push(toElement(node, node.ref as string, viewport, inFrame, inDialog));
-    // Headings and other named landmarks carry their text as the name.
-    else if (node.name !== undefined && node.role !== "option") texts.push(node.name);
-    if (node.text !== undefined && node.role !== "option") texts.push(node.text);
-    if (node.role === "combobox" || node.role === "listbox") return; // options belong to the element
-    for (const child of node.children ?? []) await visit(child, inFrame, inDialog || isDialog);
-  };
-  for (const root of roots) await visit(root, false, false);
+  const walk: Walk = { page, origin, viewport, elements: [], texts: [], dialogs: [], crossOriginFrames: 0 };
+  for (const root of roots) await visit(walk, root, { inFrame: false, inDialog: false });
 
   return {
     url: page.url(),
     title: await page.title(),
-    elements,
-    text: texts
+    elements: walk.elements,
+    text: walk.texts
       .map((t) => t.trim())
       .filter((t) => t !== "")
       .join("\n"),
-    crossOriginFrames,
-    dialogs,
+    crossOriginFrames: walk.crossOriginFrames,
+    dialogs: walk.dialogs,
     hash: hashTree(roots),
   };
 }
@@ -162,6 +135,58 @@ export async function durableLocator(page: Page, ref: string): Promise<string> {
   return (await (await resolve(page, ref)).normalize()).toString();
 }
 
+/** What a snapshot collects while it walks the aria tree. */
+interface Walk {
+  page: Page;
+  origin: string;
+  viewport: { width: number; height: number };
+  elements: SnapshotElement[];
+  texts: string[];
+  dialogs: string[];
+  crossOriginFrames: number;
+}
+
+/** Where a node sits: inside a same-origin iframe, inside an open dialog. */
+interface Placement {
+  inFrame: boolean;
+  inDialog: boolean;
+}
+
+async function visit(walk: Walk, node: AriaNode | string, placement: Placement): Promise<void> {
+  if (typeof node === "string") {
+    walk.texts.push(node);
+    return;
+  }
+  if (node.role === "iframe") {
+    await visitFrame(walk, node, placement);
+    return;
+  }
+  const isDialog = DIALOG_ROLES.has(node.role);
+  if (isDialog) walk.dialogs.push(node.name ?? "");
+  collect(walk, node, placement);
+  if (node.role === "combobox" || node.role === "listbox") return; // options belong to the element
+  const inDialog = placement.inDialog || isDialog;
+  for (const child of node.children ?? []) await visit(walk, child, { inFrame: placement.inFrame, inDialog });
+}
+
+/** Enters a same-origin iframe; a cross-origin one is only counted. */
+async function visitFrame(walk: Walk, node: AriaNode, placement: Placement): Promise<void> {
+  if (node.ref !== undefined && !(await isSameOrigin(walk.page, node.ref, walk.origin))) {
+    walk.crossOriginFrames++;
+    return;
+  }
+  for (const child of node.children ?? []) await visit(walk, child, { inFrame: true, inDialog: placement.inDialog });
+}
+
+/** Records the node as an element when it is actionable, and its text. */
+function collect(walk: Walk, node: AriaNode, placement: Placement): void {
+  if (node.ref !== undefined && isActionable(node))
+    walk.elements.push(toElement(node, node.ref, walk.viewport, placement));
+  // Headings and other named landmarks carry their text as the name.
+  else if (node.name !== undefined && node.role !== "option") walk.texts.push(node.name);
+  if (node.text !== undefined && node.role !== "option") walk.texts.push(node.text);
+}
+
 function isActionable(node: AriaNode): boolean {
   if (node.role === "option") return false; // reached through its combobox or listbox
   return INTERACTIVE_ROLES.has(node.role) || node.cursor === "pointer";
@@ -171,8 +196,7 @@ function toElement(
   node: AriaNode,
   ref: string,
   viewport: { width: number; height: number },
-  inFrame: boolean,
-  inDialog: boolean,
+  { inFrame, inDialog }: Placement,
 ): SnapshotElement {
   const element: SnapshotElement = {
     ref,
@@ -215,7 +239,7 @@ async function isSameOrigin(page: Page, iframeRef: string, origin: string): Prom
 
 function hashTree(roots: (AriaNode | string)[]): string {
   const canonical = JSON.stringify(roots, (key, value: unknown) => {
-    if (VOLATILE_KEYS.has(key)) return undefined;
+    if (VOLATILE_KEYS.has(key)) return;
     return typeof value === "string" ? value.replace(/\s+/g, " ").trim() : value;
   });
   return createHash("sha256").update(canonical).digest("hex").slice(0, 16);

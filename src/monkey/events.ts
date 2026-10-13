@@ -55,7 +55,7 @@ export const UPLOAD_FILES: readonly UploadFile[] = [
 const PROMPT_VALUES = ["monkey", "42", ""];
 
 /** Mixed into the seed, so answering pages does not shift the monkey's own action sequence. */
-const EVENT_SEED_SALT = 0x5eed_d1a1;
+const EVENT_SEED_SALT = 0x5e_ed_d1_a1;
 
 export interface PageEventOptions {
   seed: number;
@@ -173,16 +173,16 @@ export class PageEvents {
   readonly #onFileChooser = (chooser: FileChooser): void => {
     const recorded = this.#replayed("upload");
     let files: UploadFile[];
-    if (recorded !== undefined) {
-      files = recorded.files.map(
-        (name) => UPLOAD_FILES.find((file) => file.name === name) ?? (UPLOAD_FILES[0] as UploadFile),
-      );
-    } else {
+    if (recorded === undefined) {
       files = [this.#random.pick(UPLOAD_FILES)];
       if (chooser.isMultiple() && this.#random.chance(0.3)) {
         const second = this.#random.pick(UPLOAD_FILES);
         if (second !== files[0]) files.push(second);
       }
+    } else {
+      files = recorded.files.map(
+        (name) => UPLOAD_FILES.find((file) => file.name === name) ?? (UPLOAD_FILES[0] as UploadFile),
+      );
     }
     this.#push({ kind: "upload", files: files.map((file) => file.name) });
     this.#track(

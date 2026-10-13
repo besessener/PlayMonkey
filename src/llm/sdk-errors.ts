@@ -40,11 +40,7 @@ export function mapSdkError(
   if (error instanceof C.APIConnectionTimeoutError) {
     return new LlmError("timeout", `no response within ${context.timeoutMs} ms`, { retries });
   }
-  if (error instanceof C.APIConnectionError) {
-    const code = causeCode(error);
-    const kind = code !== undefined && TLS_CODES.test(code) ? "tls" : "unreachable";
-    return new LlmError(kind, `connection failed${code === undefined ? "" : ` (${code})`}`, { retries });
-  }
+  if (error instanceof C.APIConnectionError) return connectionError(error, retries);
   if (error instanceof C.AuthenticationError) return http("auth", error);
   if (error instanceof C.PermissionDeniedError) return http("forbidden", error);
   if (error instanceof C.NotFoundError) return http("notFound", error);
@@ -55,6 +51,13 @@ export function mapSdkError(
   if (error instanceof C.InternalServerError) return http("server", error);
   if (error instanceof C.APIError) return http("other", error);
   return new LlmError("other", scrub(error instanceof Error ? error.message : String(error)), { retries });
+}
+
+/** A failed connection: `tls` when the cause chain names a TLS code, `unreachable` otherwise. */
+function connectionError(error: Error, retries: number): LlmError {
+  const code = causeCode(error);
+  const kind = code !== undefined && TLS_CODES.test(code) ? "tls" : "unreachable";
+  return new LlmError(kind, `connection failed${code === undefined ? "" : ` (${code})`}`, { retries });
 }
 
 /** The first `code` in an error's cause chain, e.g. `ENOTFOUND` or `CERT_HAS_EXPIRED`. */

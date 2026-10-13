@@ -1,7 +1,8 @@
 # Configuration
 
 `monkey run <config.json>` reads one JSON file. The schema, with the same descriptions and defaults, is
-`src/config/schema.ts`; `test/docs.test.ts` fails when a key there is missing from this page.
+`src/config/schema.ts` (the `llm` section in `src/config/llm-schema.ts`); `test/docs.test.ts` fails when a key
+there is missing from this page.
 
 ## Example
 

@@ -124,7 +124,7 @@ describe("monkey run with an LLM against the fixture site", () => {
 
     // No secret ever reached the provider.
     const sent = JSON.stringify(provider.inputs.map(({ refs, ...rest }) => rest));
-    assert.ok(!sent.includes(PASSWORD) && !sent.includes(KEY));
+    assert.ok(!(sent.includes(PASSWORD) || sent.includes(KEY)));
     assert.ok(
       provider.inputs.every((input) => input.role === "user" && input.placeholders.includes("{{user.password}}")),
     );
@@ -153,7 +153,7 @@ describe("monkey run with an LLM against the fixture site", () => {
     assert.equal(lines.length, provider.inputs.length);
     assert.match(JSON.parse(lines[0] as string).prompt, /Current page:/);
     for (const text of [debug, html, JSON.stringify(report), JSON.stringify(log), result.stdout]) {
-      assert.ok(!text.includes(PASSWORD) && !text.includes(KEY));
+      assert.ok(!(text.includes(PASSWORD) || text.includes(KEY)));
     }
   });
 

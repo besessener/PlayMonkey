@@ -20,9 +20,13 @@ describe("fixture site over HTTP", () => {
   });
   after(() => site.close());
 
+  function get(path: string): Promise<Response> {
+    return fetch(site.url + path);
+  }
+
   for (const path of ["/", "/login", "/form", "/js-error", "/console-error", "/overflow", "/clean"]) {
     it(`serves ${path}`, async () => {
-      const response = await fetch(site.url + path);
+      const response = await get(path);
       assert.equal(response.status, 200);
       assert.match(response.headers.get("content-type") ?? "", /text\/html/);
       assert.match(await response.text(), /<a href="\/">Home<\/a>/);
@@ -143,7 +147,7 @@ describe("fixture site in a browser (click paths to each seeded bug)", () => {
     return { page, events };
   }
 
-  async function hasHorizontalOverflow(page: Page): Promise<boolean> {
+  function hasHorizontalOverflow(page: Page): Promise<boolean> {
     return page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth);
   }
 

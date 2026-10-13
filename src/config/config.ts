@@ -1,14 +1,16 @@
 import { randomInt } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
-import { Ajv, type ErrorObject } from "ajv";
-import { formatPath, type PathSegment, pointerToSegments } from "./path.ts";
+import { DEFAULTS } from "./defaults.ts";
+import type { RawHandoff, RawLlm } from "./llm-schema.ts";
+import { formatPath } from "./path.ts";
 import { resolvePlaceholders } from "./placeholders.ts";
+import type { RawAuth, RawConfig } from "./schema.ts";
+import { Secrets } from "./secrets.ts";
+import { findIssues, type Issue } from "./validate.ts";
 import {
   ACTION_TYPES,
   type ActionType,
-  configSchema,
-  DEFAULTS,
   type EffortLevel,
   type Engine,
   type LlmProvider,
@@ -16,13 +18,8 @@ import {
   type OpenAiApi,
   ORACLES,
   type OracleName,
-  type RawAuth,
-  type RawConfig,
-  type RawHandoff,
-  type RawLlm,
   type ThinkingType,
-} from "./schema.ts";
-import { Secrets } from "./secrets.ts";
+} from "./values.ts";
 
 /** The validated config with all defaults applied and relative paths resolved against the config file. */
 export interface Config {
@@ -126,8 +123,6 @@ export interface LoadOptions {
   env?: NodeJS.ProcessEnv;
 }
 
-const validateSchema = new Ajv({ allErrors: true, strict: true }).compile(configSchema);
-
 /** Reads, resolves and validates a config file. Throws `ConfigError` on any problem. */
 export async function loadConfig(file: string, options: LoadOptions = {}): Promise<LoadedConfig> {
   let text: string;
@@ -160,20 +155,7 @@ export function parseConfig(text: string, options: ParseOptions = {}): LoadedCon
 
   const { value: raw, secrets: secretValues, missing } = resolvePlaceholders(json, env);
   const secrets = new Secrets(secretValues);
-  const issues: { path: PathSegment[]; message: string }[] = [];
-
-  for (const { path, name } of missing) {
-    issues.push({ path, message: `environment variable ${name} is not set` });
-  }
-  for (const path of findNulls(raw, [])) {
-    issues.push({ path, message: "null is not allowed; omit the key to use the default" });
-  }
-  if (!validateSchema(raw)) {
-    for (const error of validateSchema.errors ?? []) issues.push(schemaIssue(error));
-  }
-  const unresolved = new Set(missing.map(({ path }) => formatPath(path)));
-  issues.push(...semanticIssues(raw).filter(({ path }) => !unresolved.has(formatPath(path))));
-
+  const issues = findIssues(raw, missing);
   if (issues.length > 0) {
     throw new ConfigError(source, dedupe(issues, secrets));
   }
@@ -197,11 +179,7 @@ function normalize(raw: RawConfig, seed: number, baseDir: string): Config {
       maxSteps: raw.limits?.maxSteps ?? DEFAULTS.limits.maxSteps,
       maxMinutes: raw.limits?.maxMinutes ?? DEFAULTS.limits.maxMinutes,
     },
-    browser: {
-      engine: raw.browser?.engine ?? DEFAULTS.browser.engine,
-      viewport: [...(raw.browser?.viewport ?? DEFAULTS.browser.viewport)],
-      headless: raw.browser?.headless ?? DEFAULTS.browser.headless,
-    },
+    browser: normalizeBrowser(raw.browser),
     stayOnDomain: raw.stayOnDomain ?? DEFAULTS.stayOnDomain,
     auth: (raw.auth ?? []).map((role) => normalizeRole(role, baseDir)),
     testData: { ...raw.testData },
@@ -209,26 +187,42 @@ function normalize(raw: RawConfig, seed: number, baseDir: string): Config {
       OracleName,
       boolean
     >,
-    findings: {
-      lastActions: raw.findings?.lastActions ?? DEFAULTS.findings.lastActions,
-      ignoreStatus: [...(raw.findings?.ignoreStatus ?? DEFAULTS.findings.ignoreStatus)],
-      ignore: (raw.findings?.ignore ?? []).map((rule) => ({ ...rule })),
-    },
+    findings: normalizeFindings(raw.findings),
     report: {
       dir: resolve(baseDir, raw.report?.dir ?? DEFAULTS.report.dir),
       keepDownloads: raw.report?.keepDownloads ?? DEFAULTS.report.keepDownloads,
     },
-    monkey: {
-      actionTimeoutMs: raw.monkey?.actionTimeoutMs ?? DEFAULTS.monkey.actionTimeoutMs,
-      maxTabs: raw.monkey?.maxTabs ?? DEFAULTS.monkey.maxTabs,
-      weights: Object.fromEntries(
-        ACTION_TYPES.map((type) => [type, raw.monkey?.weights?.[type] ?? DEFAULTS.monkey.weights[type]]),
-      ) as Record<ActionType, number>,
-    },
+    monkey: normalizeMonkey(raw.monkey),
   };
   if (raw.seeds !== undefined) config.seeds = [...raw.seeds];
   if (raw.llm !== undefined) config.llm = normalizeLlm(raw.llm);
   return config;
+}
+
+function normalizeBrowser(raw: RawConfig["browser"]): Config["browser"] {
+  return {
+    engine: raw?.engine ?? DEFAULTS.browser.engine,
+    viewport: [...(raw?.viewport ?? DEFAULTS.browser.viewport)],
+    headless: raw?.headless ?? DEFAULTS.browser.headless,
+  };
+}
+
+function normalizeFindings(raw: RawConfig["findings"]): Config["findings"] {
+  return {
+    lastActions: raw?.lastActions ?? DEFAULTS.findings.lastActions,
+    ignoreStatus: [...(raw?.ignoreStatus ?? DEFAULTS.findings.ignoreStatus)],
+    ignore: (raw?.ignore ?? []).map((rule) => ({ ...rule })),
+  };
+}
+
+function normalizeMonkey(raw: RawConfig["monkey"]): Config["monkey"] {
+  return {
+    actionTimeoutMs: raw?.actionTimeoutMs ?? DEFAULTS.monkey.actionTimeoutMs,
+    maxTabs: raw?.maxTabs ?? DEFAULTS.monkey.maxTabs,
+    weights: Object.fromEntries(
+      ACTION_TYPES.map((type) => [type, raw?.weights?.[type] ?? DEFAULTS.monkey.weights[type]]),
+    ) as Record<ActionType, number>,
+  };
 }
 
 function normalizeLlm(raw: RawLlm): LlmConfig {
@@ -277,106 +271,7 @@ function normalizeRole(role: RawAuth, baseDir: string): AuthRole {
   };
 }
 
-/** Rules JSON Schema cannot express clearly. Written defensively: runs even when the schema check failed. */
-function semanticIssues(raw: unknown): { path: PathSegment[]; message: string }[] {
-  const issues: { path: PathSegment[]; message: string }[] = [];
-  if (!isObject(raw)) return issues;
-
-  if (raw.seed !== undefined && raw.seeds !== undefined) {
-    issues.push({ path: ["seeds"], message: "use either seed or seeds, not both" });
-  }
-  if (typeof raw.baseUrl === "string" && !isHttpUrl(raw.baseUrl)) {
-    issues.push({ path: ["baseUrl"], message: "must be an absolute http(s) URL" });
-  }
-  if (isObject(raw.llm) && typeof raw.llm.baseUrl === "string" && !isHttpUrl(raw.llm.baseUrl)) {
-    issues.push({ path: ["llm", "baseUrl"], message: "must be an absolute http(s) URL" });
-  }
-  if (isObject(raw.llm) && isObject(raw.llm.options)) {
-    const { provider, options } = raw.llm;
-    if (options.thinking !== undefined && provider === "openai") {
-      issues.push({
-        path: ["llm", "options", "thinking"],
-        message: "is only for anthropic-foundry; use effort instead",
-      });
-    }
-    if (options.api !== undefined && provider === "anthropic-foundry") {
-      issues.push({ path: ["llm", "options", "api"], message: "is only for the openai provider" });
-    }
-  }
-
-  if (isObject(raw.findings) && Array.isArray(raw.findings.ignore)) {
-    raw.findings.ignore.forEach((rule: unknown, index) => {
-      if (!isObject(rule)) return;
-      const path = ["findings", "ignore", index];
-      if (rule.url === undefined && rule.message === undefined) {
-        issues.push({ path, message: "needs url or message; use oracles.<name>: false to switch an oracle off" });
-      }
-      for (const key of ["url", "message"]) {
-        const pattern = rule[key];
-        if (typeof pattern !== "string") continue;
-        try {
-          new RegExp(pattern);
-        } catch {
-          issues.push({ path: [...path, key], message: "is not a valid regular expression" });
-        }
-      }
-    });
-  }
-
-  if (Array.isArray(raw.auth)) {
-    const seen = new Map<string, number>();
-    raw.auth.forEach((role: unknown, index) => {
-      if (!isObject(role)) return;
-      const path = ["auth", index];
-      const hasFields = role.fields !== undefined;
-      const hasState = role.storageState !== undefined;
-      if (hasFields && hasState) {
-        issues.push({ path, message: "use either fields (with loginUrl and submit) or storageState, not both" });
-      } else if (!hasFields && !hasState) {
-        issues.push({ path, message: "needs either fields (with loginUrl and submit) or storageState" });
-      } else if (hasFields) {
-        for (const key of ["loginUrl", "submit"]) {
-          if (role[key] === undefined) issues.push({ path: [...path, key], message: "is required with fields" });
-        }
-      } else {
-        for (const key of ["loginUrl", "submit"]) {
-          if (role[key] !== undefined) {
-            issues.push({ path: [...path, key], message: "is only allowed with fields, not with storageState" });
-          }
-        }
-      }
-      if (typeof role.name === "string") {
-        const first = seen.get(role.name);
-        if (first === undefined) seen.set(role.name, index);
-        else issues.push({ path: [...path, "name"], message: `duplicate role name, already used by auth[${first}]` });
-      }
-    });
-  }
-  return issues;
-}
-
-function schemaIssue(error: ErrorObject): { path: PathSegment[]; message: string } {
-  const path = pointerToSegments(error.instancePath);
-  switch (error.keyword) {
-    case "additionalProperties":
-      return { path: [...path, error.params.additionalProperty as string], message: "unknown key" };
-    case "required":
-      return { path: [...path, error.params.missingProperty as string], message: "is required" };
-    case "enum":
-      return { path, message: `must be one of: ${(error.params.allowedValues as string[]).join(", ")}` };
-    default:
-      return { path, message: error.message ?? `failed ${error.keyword} check` };
-  }
-}
-
-function findNulls(node: unknown, path: PathSegment[]): PathSegment[][] {
-  if (node === null) return [path];
-  if (Array.isArray(node)) return node.flatMap((item, index) => findNulls(item, [...path, index]));
-  if (isObject(node)) return Object.entries(node).flatMap(([key, item]) => findNulls(item, [...path, key]));
-  return [];
-}
-
-function dedupe(issues: { path: PathSegment[]; message: string }[], secrets: Secrets): ConfigIssue[] {
+function dedupe(issues: Issue[], secrets: Secrets): ConfigIssue[] {
   const seen = new Set<string>();
   const out: ConfigIssue[] = [];
   for (const issue of issues) {
@@ -389,17 +284,4 @@ function dedupe(issues: { path: PathSegment[]; message: string }[], secrets: Sec
     }
   }
   return out;
-}
-
-function isHttpUrl(value: string): boolean {
-  try {
-    const url = new URL(value);
-    return url.protocol === "http:" || url.protocol === "https:";
-  } catch {
-    return false;
-  }
-}
-
-function isObject(value: unknown): value is Record<string, unknown> {
-  return value !== null && typeof value === "object" && !Array.isArray(value);
 }

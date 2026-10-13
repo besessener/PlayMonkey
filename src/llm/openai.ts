@@ -11,7 +11,7 @@ import type {
   ResponseFunctionToolCall,
 } from "openai/resources/responses/responses";
 import type { LlmConfig } from "../config/config.ts";
-import type { OpenAiApi } from "../config/schema.ts";
+import type { OpenAiApi } from "../config/values.ts";
 import { buildUserMessage, pingMessage, SYSTEM_PROMPT } from "./prompt.ts";
 import {
   type DecideInput,
@@ -87,9 +87,12 @@ export class OpenAiProvider implements LlmProvider {
       maxRetries: config.maxRetries,
       timeout: config.timeoutMs,
       logLevel: "off",
-      fetch: (async (...args: Parameters<typeof fetch>) => {
+      fetch: ((...args: Parameters<typeof fetch>) => {
         this.#requests++;
-        return send(...args);
+        // The executor turns a synchronous throw from `send` into a rejection, as an async function would.
+        return new Promise<Response>((resolve) => {
+          resolve(send(...args));
+        });
       }) as typeof fetch,
     });
   }
@@ -219,13 +222,24 @@ function toChatTool(definition: ToolDefinition): ChatCompletionFunctionTool {
   };
 }
 
+/** The cache token counts the API reported; a missing or null count is left out. */
+function cacheUsage(
+  details: { cached_tokens?: number | null; cache_write_tokens?: number | null } | undefined,
+): Pick<LlmUsage, "cachedTokens" | "cacheWriteTokens"> {
+  const cached = details?.cached_tokens;
+  const written = details?.cache_write_tokens;
+  return {
+    ...(cached === null || cached === undefined ? {} : { cachedTokens: cached }),
+    ...(written === null || written === undefined ? {} : { cacheWriteTokens: written }),
+  };
+}
+
 function fromResponses(response: OpenAiResponse): Answer {
   const details = response.usage?.input_tokens_details;
   const usage: LlmUsage = {
     inputTokens: response.usage?.input_tokens ?? 0,
     outputTokens: response.usage?.output_tokens ?? 0,
-    ...(details?.cached_tokens == null ? {} : { cachedTokens: details.cached_tokens }),
-    ...(details?.cache_write_tokens == null ? {} : { cacheWriteTokens: details.cache_write_tokens }),
+    ...cacheUsage(details),
   };
   const answer: Answer = { usage, raw: response };
   const call = response.output.find((item): item is ResponseFunctionToolCall => item.type === "function_call");
@@ -257,8 +271,7 @@ function fromChat(completion: ChatCompletion): Answer {
   const usage: LlmUsage = {
     inputTokens: completion.usage?.prompt_tokens ?? 0,
     outputTokens: completion.usage?.completion_tokens ?? 0,
-    ...(details?.cached_tokens == null ? {} : { cachedTokens: details.cached_tokens }),
-    ...(details?.cache_write_tokens == null ? {} : { cacheWriteTokens: details.cache_write_tokens }),
+    ...cacheUsage(details),
   };
   const answer: Answer = { usage, raw: completion };
   const choice = completion.choices[0];
@@ -266,7 +279,7 @@ function fromChat(completion: ChatCompletion): Answer {
   if (call !== undefined && call.type === "function") {
     answer.call = { name: call.function.name, arguments: call.function.arguments };
   }
-  if (choice?.message.refusal != null) {
+  if (choice?.message.refusal !== null && choice?.message.refusal !== undefined) {
     answer.problem = { kind: "refusal", reason: `the model refused: ${firstLine(choice.message.refusal)}` };
   } else if (choice?.finish_reason === "content_filter") {
     answer.problem = { kind: "refusal", reason: "the response was filtered (content_filter)" };

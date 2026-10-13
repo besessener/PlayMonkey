@@ -3,7 +3,7 @@ import { after, before, describe, it } from "node:test";
 import type { Browser, BrowserContext } from "playwright";
 import { type Fixture, startFixture } from "../fixtures/site/server.ts";
 import { type Config, parseConfig } from "../src/config/config.ts";
-import { ACTION_TYPES, type ActionType } from "../src/config/schema.ts";
+import { ACTION_TYPES, type ActionType } from "../src/config/values.ts";
 import { describeAction } from "../src/monkey/actions.ts";
 import { chooseAction, Exploration } from "../src/monkey/chooser.ts";
 import { executeAction, installPopupProbe } from "../src/monkey/executor.ts";
@@ -24,8 +24,8 @@ describe("Random", () => {
     );
     // Pinned values: a change here changes every recorded run.
     assert.deepEqual(
-      [0, 1, 42, 4294967295].map((seed) => new Random(seed).int(1_000_000)),
-      [979145, 425649, 239553, 329163],
+      [0, 1, 42, 4_294_967_295].map((seed) => new Random(seed).int(1_000_000)),
+      [979_145, 425_649, 239_553, 329_163],
     );
     assert.ok(first.every((value) => value >= 0 && value < 1));
   });
@@ -190,7 +190,7 @@ describe("the monkey against the fixture site", () => {
     }
   }
 
-  async function record(seed: number, maxSteps: number): Promise<string[]> {
+  function record(seed: number, maxSteps: number): Promise<string[]> {
     return withContext(async (context) => {
       const steps: string[] = [];
       const result = await runMonkey(context, {
@@ -326,7 +326,7 @@ describe("the monkey against the fixture site", () => {
       const count = () => page.evaluate("globalThis.__monkeyPopups");
       const click = async (name: string) => {
         const result = await executeAction({ context, current: 0 }, { type: "click", ref: "x" }, 5000, {
-          element: page.getByText(name, { exact: true }),
+          targets: { element: page.getByText(name, { exact: true }) },
         });
         assert.equal(result.ok, true, result.error);
         return result;

@@ -1,4 +1,4 @@
-import type { ActionType } from "../config/schema.ts";
+import type { ActionType } from "../config/values.ts";
 import { unblockingElements } from "../snapshot/blocking.ts";
 import type { Snapshot, SnapshotElement } from "../snapshot/snapshot.ts";
 import type { Action } from "./actions.ts";
@@ -79,63 +79,95 @@ export function chooseAction(
   random: Random,
   options: ChooseOptions,
 ): { action: Action; elementKey?: string } {
-  const stateKey = `${snapshot.url}#${snapshot.hash}`;
-  const keys = elementKeys(snapshot.elements);
-  const byType = new Map<ActionType, Candidate[]>();
-  const add = (candidate: Candidate) => byType.set(candidate.type, [...(byType.get(candidate.type) ?? []), candidate]);
-
-  for (const element of snapshot.elements) {
-    if (!element.enabled) continue;
-    if (CHECK_ROLES.has(element.role)) add({ type: "check", element });
-    else if (FILL_ROLES.has(element.role)) add({ type: "fill", element });
-    else if (SELECT_ROLES.has(element.role)) {
-      if ((element.options?.length ?? 0) > 0) add({ type: "select", element });
-    } else {
-      // Buttons, links and anything the page marks clickable.
-      if (element.role === "link" && !staysOnOrigin(element, snapshot.url, options.origin)) continue;
-      add({ type: "click", element });
-      for (const type of POINTER_TYPES) add({ type, element });
-      if (options.viewport.width < TOUCH_WIDTH) add({ type: "longPress", element });
-    }
-  }
-  for (const type of ["press", "scroll", "back", "setViewport"] as const) add({ type });
-  if (exploration.urls.length > 0) add({ type: "navigate" });
-  if (options.tabCount > 1) add({ type: "switchTab" });
-
-  const types = [...byType.keys()].filter((type) => options.weights[type] > 0);
+  const byType = candidatesByType(snapshot, exploration, options);
+  const types = [...byType.keys()].filter((candidateType) => options.weights[candidateType] > 0);
   if (types.length === 0) return { action: { type: "scroll", deltaY: random.pick(SCROLL_STEPS) } };
   const type = random.weighted(types, (t) => options.weights[t]);
   const candidates = byType.get(type) ?? [];
 
   const withElement = candidates.filter((candidate) => candidate.element !== undefined);
-  if (withElement.length > 0) {
-    const unblocking = unblockingElements(snapshot);
-    const chosen = random.weighted(withElement, (candidate) => {
-      const element = candidate.element as SnapshotElement;
-      const weight = elementWeight(element, keys, stateKey, exploration, snapshot.url);
-      return unblocking.has(element) ? weight * UNBLOCKING_BONUS : weight;
-    });
-    const element = chosen.element as SnapshotElement;
-    if (type === "drag") {
-      // Best effort: drop onto another element; real drop zones are often not actionable themselves.
-      const others = snapshot.elements.filter((other) => other !== element && other.enabled);
-      if (others.length === 0)
-        return { action: { type: "hover", ref: element.ref }, elementKey: keys.get(element) as string };
-      const to = random.pick(others);
-      return { action: { type: "drag", ref: element.ref, toRef: to.ref }, elementKey: keys.get(element) as string };
-    }
-    return { action: elementAction(type, element, random, options), elementKey: keys.get(element) as string };
-  }
+  if (withElement.length > 0) return chooseElementAction(type, withElement, { snapshot, exploration, random, options });
   return { action: globalAction(type, exploration, random, options) };
 }
 
-function elementWeight(
-  element: SnapshotElement,
-  keys: Map<SnapshotElement, string>,
-  stateKey: string,
+/** The action types possible on this page, each with its candidates (elements, or none for global actions). */
+function candidatesByType(
+  snapshot: Snapshot,
   exploration: Exploration,
-  pageUrl: string,
-): number {
+  options: ChooseOptions,
+): Map<ActionType, Candidate[]> {
+  const byType = new Map<ActionType, Candidate[]>();
+  const add = (candidate: Candidate) => byType.set(candidate.type, [...(byType.get(candidate.type) ?? []), candidate]);
+
+  for (const element of snapshot.elements) {
+    for (const candidate of elementCandidates(element, snapshot.url, options)) add(candidate);
+  }
+  for (const type of ["press", "scroll", "back", "setViewport"] as const) add({ type });
+  if (exploration.urls.length > 0) add({ type: "navigate" });
+  if (options.tabCount > 1) add({ type: "switchTab" });
+  return byType;
+}
+
+/** The candidates for one element, in the order they are offered. */
+function elementCandidates(element: SnapshotElement, pageUrl: string, options: ChooseOptions): Candidate[] {
+  if (!element.enabled) return [];
+  if (CHECK_ROLES.has(element.role)) return [{ type: "check", element }];
+  if (FILL_ROLES.has(element.role)) return [{ type: "fill", element }];
+  if (SELECT_ROLES.has(element.role)) return (element.options?.length ?? 0) > 0 ? [{ type: "select", element }] : [];
+  // Buttons, links and anything the page marks clickable.
+  if (element.role === "link" && !staysOnOrigin(element, pageUrl, options.origin)) return [];
+  const candidates: Candidate[] = [{ type: "click", element }];
+  for (const type of POINTER_TYPES) candidates.push({ type, element });
+  if (options.viewport.width < TOUCH_WIDTH) candidates.push({ type: "longPress", element });
+  return candidates;
+}
+
+interface ChooseContext {
+  snapshot: Snapshot;
+  exploration: Exploration;
+  random: Random;
+  options: ChooseOptions;
+}
+
+/** Picks an element among the candidates of `type`, weighted by `elementWeight`, and the action on it. */
+function chooseElementAction(
+  type: ActionType,
+  withElement: Candidate[],
+  { snapshot, exploration, random, options }: ChooseContext,
+): { action: Action; elementKey: string } {
+  const keys = elementKeys(snapshot.elements);
+  const weighing: WeightContext = {
+    keys,
+    stateKey: `${snapshot.url}#${snapshot.hash}`,
+    exploration,
+    pageUrl: snapshot.url,
+  };
+  const unblocking = unblockingElements(snapshot);
+  const chosen = random.weighted(withElement, (candidate) => {
+    const element = candidate.element as SnapshotElement;
+    const weight = elementWeight(element, weighing);
+    return unblocking.has(element) ? weight * UNBLOCKING_BONUS : weight;
+  });
+  const element = chosen.element as SnapshotElement;
+  if (type === "drag") {
+    // Best effort: drop onto another element; real drop zones are often not actionable themselves.
+    const others = snapshot.elements.filter((other) => other !== element && other.enabled);
+    if (others.length === 0)
+      return { action: { type: "hover", ref: element.ref }, elementKey: keys.get(element) as string };
+    const to = random.pick(others);
+    return { action: { type: "drag", ref: element.ref, toRef: to.ref }, elementKey: keys.get(element) as string };
+  }
+  return { action: elementAction(type, element, random, options), elementKey: keys.get(element) as string };
+}
+
+interface WeightContext {
+  keys: Map<SnapshotElement, string>;
+  stateKey: string;
+  exploration: Exploration;
+  pageUrl: string;
+}
+
+function elementWeight(element: SnapshotElement, { keys, stateKey, exploration, pageUrl }: WeightContext): number {
   let weight = 1 / (1 + exploration.actedOn(stateKey, keys.get(element) as string));
   if (element.role === "link" && element.url !== undefined) {
     const target = new URL(element.url, pageUrl).href;

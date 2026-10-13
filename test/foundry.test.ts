@@ -6,6 +6,7 @@ import { runPreflight } from "../src/llm/preflight.ts";
 import type { DecideInput, LlmError, LlmErrorKind } from "../src/llm/provider.ts";
 import { serializeSnapshot } from "../src/snapshot/serialize.ts";
 import type { Snapshot } from "../src/snapshot/snapshot.ts";
+import { type CapturedRequest, json, mockFetch } from "./helpers/http.ts";
 
 const KEY = "sk-foundry-0123456789abcdef";
 
@@ -28,36 +29,6 @@ function llmConfig(llm: Record<string, unknown> = {}): {
     { env: { FOUNDRY_API_KEY: KEY } },
   );
   return { llm: config.llm as LlmConfig, secrets };
-}
-
-interface Captured {
-  url: string;
-  headers: Headers;
-  body: Record<string, unknown>;
-}
-
-/** A fetch that answers with the given responses in turn and records every request. */
-function mockFetch(...responses: (Response | Error | ((init?: RequestInit) => Promise<Response>))[]) {
-  const requests: Captured[] = [];
-  const fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
-    requests.push({
-      url: String(input),
-      headers: new Headers(init?.headers),
-      body: JSON.parse(String(init?.body ?? "{}")),
-    });
-    const next = responses.shift();
-    if (next === undefined) throw new Error("unexpected request");
-    if (next instanceof Error) throw next;
-    return typeof next === "function" ? next(init) : next;
-  }) as typeof globalThis.fetch;
-  return { fetch, requests };
-}
-
-function json(status: number, body: unknown, headers: Record<string, string> = {}): Response {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { "content-type": "application/json", "retry-after-ms": "1", ...headers },
-  });
 }
 
 function message(content: unknown[], extra: Record<string, unknown> = {}) {
@@ -135,7 +106,7 @@ describe("anthropic-foundry provider", () => {
     assert.equal(result.retries, 0);
     assert.match(notices.join("\n"), /removed "\/v1" from llm\.baseUrl/);
 
-    const [request] = requests as [Captured];
+    const [request] = requests as [CapturedRequest];
     assert.equal(request.url, "https://res.services.ai.azure.com/anthropic/v1/messages");
     assert.equal(request.headers.get("x-api-key"), KEY);
     assert.equal(request.body.model, "my-claude-deployment");
@@ -309,7 +280,7 @@ describe("preflight", () => {
         /^llm preflight failed: anthropic-foundry at https:\/\/res\.services\.ai\.azure\.com\/anthropic, deployment my-claude-deployment/,
       );
       if (status !== undefined) assert.match(text, new RegExp(`HTTP ${status}`));
-      assert.ok(!text.includes(KEY) && !text.includes("pw@") && !text.includes("code=abc"), text);
+      assert.ok(!(text.includes(KEY) || text.includes("pw@") || text.includes("code=abc")), text);
     });
   }
 

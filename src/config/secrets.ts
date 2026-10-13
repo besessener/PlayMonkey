@@ -55,11 +55,6 @@ export function maskSecrets<T>(value: T, secrets: Secrets): T {
   return mapStrings(value, (text) => secrets.mask(text)) as T;
 }
 
-/** Returns a deep copy of `value` in which every string has its secret parts replaced by their placeholders. */
-export function toPlaceholders<T>(value: T, secrets: Secrets): T {
-  return mapStrings(value, (text) => secrets.toPlaceholders(text)) as T;
-}
-
 function mapStrings(value: unknown, map: (text: string) => string): unknown {
   if (typeof value === "string") return map(value);
   if (Array.isArray(value)) return value.map((item) => mapStrings(item, map));

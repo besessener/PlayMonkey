@@ -24,7 +24,7 @@ export async function startFixture(options: FixtureOptions = {}): Promise<Fixtur
   const routes = createRoutes({ credentials: options.credentials ?? FIXTURE_CREDENTIALS, sessions: new Map() });
 
   const server = createServer((req, res) => {
-    toRequest(req)
+    void toRequest(req)
       .then((request) => {
         const route = routes.find((r) => r.method === request.method && r.path === request.url.pathname);
         return route === undefined ? notFound() : route.handle(request);

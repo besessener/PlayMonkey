@@ -9,17 +9,19 @@ export type MockAnswer = Response | Error | ((init?: RequestInit) => Promise<Res
 /** A fetch that answers with the given responses in turn and records every request. */
 export function mockFetch(...responses: MockAnswer[]): { fetch: typeof fetch; requests: CapturedRequest[] } {
   const requests: CapturedRequest[] = [];
-  const fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
-    requests.push({
-      url: String(input),
-      headers: new Headers(init?.headers),
-      body: JSON.parse(String(init?.body ?? "{}")),
-    });
-    const next = responses.shift();
-    if (next === undefined) throw new Error("unexpected request");
-    if (next instanceof Error) throw next;
-    return typeof next === "function" ? next(init) : next;
-  }) as typeof globalThis.fetch;
+  // A throw inside the executor rejects the promise, as a real fetch does.
+  const fetch = ((resource: RequestInfo | URL, init?: RequestInit) =>
+    new Promise<Response>((resolve) => {
+      requests.push({
+        url: String(resource),
+        headers: new Headers(init?.headers),
+        body: JSON.parse(String(init?.body ?? "{}")),
+      });
+      const next = responses.shift();
+      if (next === undefined) throw new Error("unexpected request");
+      if (next instanceof Error) throw next;
+      resolve(typeof next === "function" ? next(init) : next);
+    })) as typeof globalThis.fetch;
   return { fetch, requests };
 }
 

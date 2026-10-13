@@ -1,0 +1,8 @@
+title = "PlayMonkey"
+
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "Fake keys and passwords in tests, no real credentials"
+paths = ['''^test/''']

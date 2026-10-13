@@ -60,9 +60,12 @@ export class AnthropicFoundryProvider implements LlmProvider {
       maxRetries: config.maxRetries,
       timeout: config.timeoutMs,
       logLevel: "off",
-      fetch: (async (...args: Parameters<typeof fetch>) => {
+      fetch: ((...args: Parameters<typeof fetch>) => {
         this.#requests++;
-        return send(...args);
+        // The executor turns a synchronous throw from `send` into a rejection, as an async function would.
+        return new Promise<Response>((resolve) => {
+          resolve(send(...args));
+        });
       }) as typeof fetch,
     });
     this.#tools = ACTION_TOOLS.map(toAnthropicTool);
@@ -188,7 +191,11 @@ function mapUsage(message: Message): LlmUsage {
   return {
     inputTokens: usage.input_tokens,
     outputTokens: usage.output_tokens,
-    ...(usage.cache_read_input_tokens == null ? {} : { cachedTokens: usage.cache_read_input_tokens }),
-    ...(usage.cache_creation_input_tokens == null ? {} : { cacheWriteTokens: usage.cache_creation_input_tokens }),
+    ...(usage.cache_read_input_tokens === null || usage.cache_read_input_tokens === undefined
+      ? {}
+      : { cachedTokens: usage.cache_read_input_tokens }),
+    ...(usage.cache_creation_input_tokens === null || usage.cache_creation_input_tokens === undefined
+      ? {}
+      : { cacheWriteTokens: usage.cache_creation_input_tokens }),
   };
 }

@@ -63,9 +63,10 @@ export function firstStackFrame(stack: string | undefined, origin?: string): str
   for (const line of (stack ?? "").split("\n")) {
     const trimmed = line.trim();
     if (!/^at\s|@/.test(trimmed)) continue;
-    return trimmed.replace(/(https?:\/\/[^\s)]+?)(:\d+:\d+)?(?=\)|$)/, (_, url: string, position = "") => {
-      return `${normalizeUrl(url, origin)}${position}`;
-    });
+    return trimmed.replace(
+      /(https?:\/\/[^\s)]+?)(:\d+:\d+)?(?=\)|$)/,
+      (_, url: string, position = "") => `${normalizeUrl(url, origin)}${position}`,
+    );
   }
   return "";
 }

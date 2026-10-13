@@ -7,8 +7,8 @@ import type { Browser } from "playwright";
 import { FIXTURE_CREDENTIALS, type Fixture, startFixture } from "../fixtures/site/server.ts";
 import { runCli } from "../src/cli/cli.ts";
 import { loadConfig } from "../src/config/config.ts";
-import { ACTION_TYPES } from "../src/config/schema.ts";
 import { Secrets } from "../src/config/secrets.ts";
+import { ACTION_TYPES } from "../src/config/values.ts";
 import { LocatorSyntaxError, parseLocator } from "../src/replay/locator.ts";
 import { type ActionLog, ActionLogError, readActionLog } from "../src/replay/log.ts";
 import { ReplayError, replayActionLog } from "../src/replay/replay.ts";
@@ -223,7 +223,7 @@ describe("action log and replay against the fixture site", () => {
     assert.deepEqual(log.findings.map((f) => f.key).sort(), keys);
     assert.ok(log.actions.every((a) => a.source === "monkey" && a.pageUrl.startsWith("${FIXTURE_URL}")));
     assert.ok(log.actions.filter((a) => "ref" in a).every((a) => a.locator !== undefined));
-    assert.ok(!text.includes(site.url) && !text.includes(FIXTURE_CREDENTIALS.password));
+    assert.ok(!(text.includes(site.url) || text.includes(FIXTURE_CREDENTIALS.password)));
 
     // Replay on a second fixture instance: only FIXTURE_URL changes.
     const { code, stdout } = await cli(["replay", "--config", configFile, logFile], moved.url);

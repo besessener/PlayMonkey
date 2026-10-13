@@ -22,6 +22,7 @@ Details, also for sandboxes without a Playwright browser: [development setup](do
 | Run all tests (builds first) | `npm test` |
 | One test file | `node --test test/report.test.ts` |
 | Lint and typecheck | `npm run lint` |
+| Every local quality gate | `npm run check` |
 | Format and safe fixes | `npm run format` |
 | Fixture site with seeded bugs | `npm run fixture` |
 | Try the CLI | `npx monkey run fixtures/configs/fixture.json` |
@@ -34,20 +35,22 @@ test that it is reported exactly once.
 
 ```sh
 npm run format
-npm run lint
-npm test
+npm run check          # lint, types, dead code, tests with coverage thresholds
+prek run --all-files   # gitleaks, zizmor, file hygiene
 ```
 
 - Keep changes focused; one topic per pull request, its milestone in the title when it belongs to one
   ([roadmap](docs/explanation/roadmap.md)).
-- Update the docs with the code. A new config key goes into `src/config/schema.ts` **and**
+- Update the docs with the code. A new config key goes into `src/config/schema.ts` (`llm.*` keys into
+  `src/config/llm-schema.ts`, defaults into `src/config/defaults.ts`) **and**
   [configuration](docs/reference/configuration.md); `test/docs.test.ts` fails otherwise. It also checks relative
   links and anchors, that every sample config parses, and that the [CI example](docs/how-to/run-in-ci.md) matches
   `.github/workflows/monkey.yml`.
 - Never let a secret reach output: values from `${VAR}` placeholders are masked everywhere, see the
   [ground rules](docs/explanation/ground-rules.md).
 
-CI runs build, lint and tests (`ci.yml`) and the CI example against the fixture site (`monkey.yml`).
+CI runs every [quality gate](docs/reference/quality.md) (`ci.yml`, `codeql.yml`) and the CI example against the
+fixture site (`monkey.yml`).
 
 ## Releasing
 

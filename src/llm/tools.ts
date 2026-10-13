@@ -99,7 +99,7 @@ const validators = new Map<string, ValidateFunction>(
 export function parseToolCall(name: string, input: unknown, refs: ReadonlySet<string>): Decision {
   const validate = validators.get(name);
   if (validate === undefined || name === PING_TOOL.name) throw new LlmError("invalid", `unknown tool ${quote(name)}`);
-  if (!validate(input)) {
+  if (validate(input) !== true) {
     const error = validate.errors?.[0];
     const where = error?.instancePath === "" || error === undefined ? "input" : error.instancePath.slice(1);
     throw new LlmError("invalid", `tool ${name}: ${where} ${error?.message ?? "is invalid"}`);

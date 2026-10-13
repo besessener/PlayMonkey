@@ -2,7 +2,7 @@ import { mkdir } from "node:fs/promises";
 import { join } from "node:path";
 import type { BrowserContext, ConsoleMessage, Page, Response } from "playwright";
 import type { Config } from "../config/config.ts";
-import type { OracleName } from "../config/schema.ts";
+import type { OracleName } from "../config/values.ts";
 import type { StepRecord } from "../monkey/loop.ts";
 import { type ActionContext, type Finding, IgnoreRules, type Signal } from "./finding.ts";
 import { firstStackFrame, normalizeMessage, normalizeUrl } from "./keys.ts";
@@ -177,7 +177,7 @@ export class Oracles {
     const method = request.method();
     const path = normalizeUrl(url, this.#origin);
     this.#add(oracle, {
-      severity: status >= 500 ? "high" : isDocument ? "medium" : "low",
+      severity: httpSeverity(status, isDocument),
       key: `${method} ${path} ${status}`,
       message: `${method} ${path} responded ${status}${response.statusText() === "" ? "" : ` ${response.statusText()}`}`,
       url,
@@ -348,4 +348,9 @@ function safeUrl(page: Page): string {
   } catch {
     return "";
   }
+}
+
+function httpSeverity(status: number, isDocument: boolean): Signal["severity"] {
+  if (status >= 500) return "high";
+  return isDocument ? "medium" : "low";
 }
