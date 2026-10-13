@@ -304,7 +304,7 @@ describe("the monkey against the fixture site", () => {
         config: config({ seed: 7, limits: { maxSteps: 4 }, monkey: { weights } }),
       });
       assert.equal(reads, 2);
-      assert.equal(result.stopReason, "maxSteps", result.error);
+      assert.equal(result.stopReason, "maxSteps", result.error ?? "no error");
       assert.equal(result.steps, 4);
     });
   });
@@ -328,7 +328,7 @@ describe("the monkey against the fixture site", () => {
         const result = await executeAction({ context, current: 0 }, { type: "click", ref: "x" }, 5000, {
           targets: { element: page.getByText(name, { exact: true }) },
         });
-        assert.equal(result.ok, true, result.error);
+        assert.equal(result.ok, true, result.error ?? "no error");
         return result;
       };
       assert.equal((await click("New tab")).tab, 1);

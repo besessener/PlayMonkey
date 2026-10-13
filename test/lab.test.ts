@@ -94,7 +94,7 @@ describe("the lab: hard parts of real pages", () => {
       step({ type: "scroll", deltaY: 300 }),
     ]);
     try {
-      assert.equal(run.result.stopReason, "end", run.result.error);
+      assert.equal(run.result.stopReason, "end", run.result.error ?? "no error");
       assert.deepEqual(
         run.records.map((r) => [r.step, r.result.ok]),
         [
@@ -133,7 +133,7 @@ describe("the lab: hard parts of real pages", () => {
       click("getByTitle('Inline frame').contentFrame().getByRole('button', { name: 'Press me' })"),
     ]);
     try {
-      assert.equal(run.result.stopReason, "end", run.result.error);
+      assert.equal(run.result.stopReason, "end", run.result.error ?? "no error");
       assert.ok(run.records.every((r) => r.result.ok));
       assert.deepEqual(
         run.findings.map((f) => [f.oracle, f.message, f.step]),
@@ -167,7 +167,7 @@ describe("the lab: hard parts of real pages", () => {
       { monkey: { actionTimeoutMs: 2000, maxTabs: 3 } },
     );
     try {
-      assert.equal(run.result.stopReason, "end", run.result.error);
+      assert.equal(run.result.stopReason, "end", run.result.error ?? "no error");
       const [first, , external] = run.records;
       // The monkey continues in the popup it opened.
       assert.equal(first?.result.tab, 1);
@@ -189,7 +189,7 @@ describe("the lab: hard parts of real pages", () => {
     const actions = [click(button("Document")), click(button("Attachments")), click(button("Upload avatar"))];
     const run = await drive("/lab/upload", actions);
     try {
-      assert.equal(run.result.stopReason, "end", run.result.error);
+      assert.equal(run.result.stopReason, "end", run.result.error ?? "no error");
       const uploads = run.records.map((r) => r.events?.find((e) => e.kind === "upload"));
       assert.ok(
         uploads.every((u) => u !== undefined && u.files.length > 0),
@@ -211,7 +211,7 @@ describe("the lab: hard parts of real pages", () => {
   it("saves downloads and reports a broken one", async () => {
     const run = await drive("/lab/download", [click(link("Download the report")), click(link("Download the export"))]);
     try {
-      assert.equal(run.result.stopReason, "end", run.result.error);
+      assert.equal(run.result.stopReason, "end", run.result.error ?? "no error");
       const downloads = run.events.filter((e) => e.kind === "download");
       assert.deepEqual(downloads, [
         { kind: "download", name: "report.csv", url: `${site.url}/lab/files/report.csv`, size: 29 },
@@ -244,7 +244,7 @@ describe("the lab: hard parts of real pages", () => {
       step({ type: "longPress", ref: "x" }, button("Hold to confirm")),
     ]);
     try {
-      assert.equal(run.result.stopReason, "end", run.result.error);
+      assert.equal(run.result.stopReason, "end", run.result.error ?? "no error");
       assert.deepEqual(
         run.records.filter((r) => !r.result.ok).map((r) => [r.step, r.result.error]),
         [],
