@@ -1,6 +1,11 @@
 # PlayMonkey documentation
 
-Organised by [Diátaxis](https://diataxis.fr/).
+Organised by [Diátaxis](https://diataxis.fr/): by what you need right now.
+
+|  | For learning | For working |
+| --- | --- | --- |
+| **Practice** | [Tutorials](#tutorials) – step by step to a first success | [How-to guides](#how-to-guides) – reach one concrete goal |
+| **Knowledge** | [Explanation](#explanation) – understand why it is so | [Reference](#reference) – look up exactly how it is |
 
 ## Tutorials
 
@@ -9,16 +14,20 @@ Organised by [Diátaxis](https://diataxis.fr/).
 
 ## How-to guides
 
+**Using PlayMonkey**
+
 - [Configure login](how-to/configure-login.md) – form login, saved sessions, several roles, secrets.
 - [Configure the LLM](how-to/configure-llm.md) – Claude on Microsoft Foundry, preflight, budget, troubleshooting.
 - [Run in parallel](how-to/run-in-parallel.md) – several roles and seeds at the same time, one combined report.
 - [Run in CI](how-to/run-in-ci.md) – a GitHub Actions workflow with secrets, the report as artifact and exit codes.
 - [Reproduce a finding](how-to/reproduce-a-finding.md) – steps in the report, trace viewer, replay, seed.
 - [Watch a run](how-to/watch-a-run.md) – spectator mode for watching and demos: visible, slowed down, outlined.
+
+**Developing PlayMonkey**
+
+- [Contributing](../CONTRIBUTING.md) – set up, work, open a pull request, release.
 - [Use the fixture site](how-to/use-the-fixture-site.md) – start it, point a config at it, add a page.
 - [Maintain the website](how-to/maintain-the-website.md) – `site/` and the Pages workflow.
-
-Contributing: [CONTRIBUTING.md](../CONTRIBUTING.md).
 
 ## Reference
 
@@ -41,3 +50,7 @@ Contributing: [CONTRIBUTING.md](../CONTRIBUTING.md).
 - [Replay](explanation/replay.md) – how a run is repeated without randomness or LLM, drift, the result.
 - [Tooling choices](explanation/tooling.md) – why `node:test`, Biome, Knip, these TypeScript settings and so few dependencies.
 - [Roadmap](explanation/roadmap.md) – milestones and status.
+
+Related projects with the same idea and the same documentation layout:
+[flakipype](https://github.com/besessener/flakipype/blob/main/docs/README.md) and
+[Archivist](https://github.com/besessener/Archivist/blob/main/docs/README.md) (in German).

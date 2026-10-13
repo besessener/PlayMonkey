@@ -8,6 +8,14 @@
       name="description"
       content="PlayMonkey is a command line tool that drives a real browser against a website in a test environment, clicks around with seeded randomness and reports reproducible bugs. An LLM steps in only when the monkey is stuck."
     />
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://besessener.github.io/PlayMonkey/" />
+    <meta property="og:title" content="PlayMonkey – monkey testing for websites, built on Playwright" />
+    <meta
+      property="og:description"
+      content="A command line tool that drives a real browser against a website in a test environment, clicks around with seeded randomness and reports reproducible bugs."
+    />
+    <meta property="og:image" content="https://besessener.github.io/PlayMonkey/img/report-light.png" />
     <link rel="icon" href="favicon.svg" type="image/svg+xml" />
     <link rel="stylesheet" href="style.css" />
   </head>
@@ -35,24 +43,23 @@
           <a href="https://github.com/besessener/PlayMonkey/blob/main/docs/explanation/roadmap.md">roadmap</a>.
         </p>
         <p class="actions">
-          <a class="button primary" href="https://github.com/besessener/PlayMonkey">View on GitHub</a>
+          <a class="button primary" href="#start">Install</a>
           <a class="button" href="https://github.com/besessener/PlayMonkey/blob/main/docs/tutorials/getting-started.md">Getting started</a>
         </p>
-        <pre class="terminal"><code>$ monkey --help
-Usage: monkey &lt;command&gt; [options]
-
-Commands:
-  run &lt;config.json&gt;      Explore the site described by the config and report findings.
-  replay &lt;actions.json&gt;  Re-execute a recorded action log and check which findings recur.
-
-Options:
-  -h, --help             Show this help.
-  -v, --version          Show the version.
-
-Exit codes:
-  0  no findings
-  1  findings present
-  2  tool or config error</code></pre>
+        <pre class="terminal"><code>$ npx monkey run fixtures/configs/fixture.json
+seed: 42
+[user] starting
+[user] 300 steps in 46.9s, 45 states, 0 failed actions, stopped: maxSteps, 5 findings
+[user]   F1 medium console: Seeded bug: console error on load (step 1, 10×)
+[user]   F2 high pageerror: Error: Seeded bug: click handler crashed (step 19, 8×)
+[user]   F3 medium http4xx: GET /missing-page responded 404 Not Found (step 21, 9×)
+[user]   F4 low overflow: horizontal overflow on /overflow: div makes the page 1664px wide in a 1280px viewport (step 24, 9×)
+[user]   F5 high http5xx: POST /form responded 500 Internal Server Error (step 42, 2×)
+[user] actions: fixtures/configs/monkey-report/user/actions.json
+[user] trace: fixtures/configs/monkey-report/user/trace.zip
+findings: 5 (2 high, 2 medium, 1 low)
+report: fixtures/configs/monkey-report/report.html
+exit 1: findings present</code></pre>
       </section>
 
       <section id="features">
@@ -75,9 +82,20 @@ Exit codes:
             <p>Every action is logged with a durable locator. <code>monkey replay</code> runs the log again without an LLM; traces and videos show what happened.</p>
           </article>
         </div>
+        <picture>
+          <source srcset="img/report-dark.png" media="(prefers-color-scheme: dark)" />
+          <img
+            class="shot"
+            src="img/report-light.png"
+            width="1120"
+            height="858"
+            loading="lazy"
+            alt="The PlayMonkey report of a run against the fixture site: five findings by severity, and the first one with the steps to reproduce it and a screenshot."
+          />
+        </picture>
       </section>
 
-      <section id="rules">
+      <section id="rules" class="panel">
         <h2>Built for test environments</h2>
         <p class="section-lead">PlayMonkey clicks, deletes and submits anything it finds. Point it only at environments you can reset.</p>
         <ul class="checks">
@@ -94,7 +112,7 @@ Exit codes:
 
       <section id="start">
         <h2>Get started</h2>
-        <p class="section-lead">Requires Node.js 22 and a Playwright browser. Describe the site in a JSON config; secrets stay in environment variables.</p>
+        <p class="section-lead">Requires Node.js 22.18 or newer and a Playwright browser. Describe the site in a JSON config; secrets stay in environment variables.</p>
         <pre><code>{
   "baseUrl": "https://test.example.org",
   "auth": [
@@ -107,7 +125,10 @@ Exit codes:
   ]
 }</code></pre>
         <ol class="steps">
-          <li><strong>Install.</strong> Clone the repository, run <code>npm ci</code>, <code>npx playwright install chromium</code> and <code>npm run build</code>.</li>
+          <li>
+            <strong>Install.</strong> <code>npm install --save-dev github:besessener/PlayMonkey#v0.4.0</code> in your project, then
+            <code>npx playwright install chromium</code>.
+          </li>
           <li><strong>Configure.</strong> Write a config like the one above and export the variables it references.</li>
           <li><strong>Run.</strong> <code>npx monkey run config.json</code> logs in, explores every role and lists the findings, each with a screenshot and the steps that led to it.</li>
         </ol>
@@ -122,21 +143,36 @@ Exit codes:
         <h2>Documentation</h2>
         <p class="section-lead">Organised by what you need right now (<a href="https://diataxis.fr/">Diátaxis</a>).</p>
         <div class="cards">
-          <a class="card-link" href="https://github.com/besessener/PlayMonkey/tree/main/docs/tutorials">
+          <a class="card-link" href="https://github.com/besessener/PlayMonkey/blob/main/docs/README.md#tutorials">
             <strong>Tutorials</strong>
             <span>Step by step to a first success</span>
           </a>
-          <a class="card-link" href="https://github.com/besessener/PlayMonkey/tree/main/docs/how-to">
+          <a class="card-link" href="https://github.com/besessener/PlayMonkey/blob/main/docs/README.md#how-to-guides">
             <strong>How-to guides</strong>
             <span>Reach one concrete goal</span>
           </a>
-          <a class="card-link" href="https://github.com/besessener/PlayMonkey/tree/main/docs/reference">
+          <a class="card-link" href="https://github.com/besessener/PlayMonkey/blob/main/docs/README.md#reference">
             <strong>Reference</strong>
             <span>Look up exactly how it is</span>
           </a>
-          <a class="card-link" href="https://github.com/besessener/PlayMonkey/tree/main/docs/explanation">
+          <a class="card-link" href="https://github.com/besessener/PlayMonkey/blob/main/docs/README.md#explanation">
             <strong>Explanation</strong>
             <span>Understand why it is so</span>
+          </a>
+        </div>
+      </section>
+
+      <section id="related">
+        <h2>Related projects</h2>
+        <p class="section-lead">Three tools that started from the same agentic idea, with the same ground rules, quality gates and documentation layout.</p>
+        <div class="cards">
+          <a class="card-link" href="https://besessener.github.io/flakipype/">
+            <strong><img src="https://besessener.github.io/flakipype/favicon.svg" alt="" width="24" height="24" /> flakipype</strong>
+            <span>Find, explain and fix flaky GitHub Actions pipelines through draft pull requests.</span>
+          </a>
+          <a class="card-link" href="https://besessener.github.io/Archivist/">
+            <strong><img src="https://besessener.github.io/Archivist/favicon.svg" alt="" width="24" height="24" /> Archivist</strong>
+            <span>A personal, agentic AI archivist for Windows (in German).</span>
           </a>
         </div>
       </section>
@@ -146,6 +182,7 @@ Exit codes:
       <p>
         PlayMonkey is released under the <a href="https://github.com/besessener/PlayMonkey/blob/main/LICENSE">MIT License</a>.
         <a href="https://github.com/besessener/PlayMonkey">Source on GitHub</a> ·
+        <a href="https://github.com/besessener/PlayMonkey/releases">Releases</a> ·
         <a href="https://github.com/besessener/PlayMonkey/issues">Issues</a>
       </p>
     </footer>
