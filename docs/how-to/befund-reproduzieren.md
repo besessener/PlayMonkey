@@ -27,7 +27,7 @@ npx monkey replay monkey-report/user/actions.json --config config.json
 
 Replay executes the recorded actions again in a fresh, logged-in context, without randomness and without an LLM, runs
 the oracles and prints for each recorded finding whether it was `reproduced`. Exit code `1` means at least one
-recurred. Add `--watch` to [watch it](watch-a-run.md), `--strict` to stop at the first element that is gone. How it
+recurred. Add `--watch` to [watch it](lauf-beobachten.md), `--strict` to stop at the first element that is gone. How it
 works and what drift means: [replay](../explanation/replay.md).
 
 ## 4. Or run the seed again
@@ -44,5 +44,5 @@ replay is the reliable way.
 
 ## Findings from CI
 
-Download the `monkey-report` artifact of the CI run (see [run in CI](run-in-ci.md)), unpack it, and replay its
+Download the `monkey-report` artifact of the CI run (see [run in CI](in-ci-ausfuehren.md)), unpack it, and replay its
 `actions.json` against the same test environment, with the same environment variables set.

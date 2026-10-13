@@ -1,7 +1,7 @@
 # Quality gates
 
 Every gate below runs in CI on each pull request and push to `main`. `npm run check` runs the local ones in one go;
-see [development setup](../tutorials/development-setup.md).
+see [development setup](../tutorials/entwicklungsumgebung.md).
 
 | Gate | Command | Checks | Workflow |
 | --- | --- | --- | --- |

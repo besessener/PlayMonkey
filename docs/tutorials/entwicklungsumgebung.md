@@ -50,6 +50,6 @@ prek run --all-files
 
 CI (`.github/workflows/ci.yml`) runs the same: a hygiene job with gitleaks over the whole history and the hooks, and
 a build-test job that installs Chromium with `--with-deps`, then build, lint, Knip and the tests with coverage on
-Node 22. `.github/workflows/monkey.yml`, the [CI example](../how-to/run-in-ci.md), runs `monkey run` against the
-fixture site as a user's project would. Every gate and threshold is listed in [quality gates](../reference/quality.md);
-every script in [commands](../reference/commands.md).
+Node 22. `.github/workflows/monkey.yml`, the [CI example](../how-to/in-ci-ausfuehren.md), runs `monkey run` against the
+fixture site as a user's project would. Every gate and threshold is listed in [quality gates](../reference/qualitaetssicherung.md);
+every script in [commands](../reference/befehle.md).

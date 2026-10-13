@@ -59,7 +59,7 @@ exit 1: findings present
 
 Open `fixtures/configs/monkey-report/report.html` in a browser: each finding with its steps to reproduce, a
 screenshot and links to the trace and video. The same data is in `report.json`; see the
-[report reference](../reference/report.md).
+[report reference](../reference/bericht.md).
 
 Watch what it did with `npx playwright show-trace fixtures/configs/monkey-report/user/trace.zip`, or look at the video
 next to it. Run it again: with the same seed it takes the same steps.
@@ -104,8 +104,8 @@ not set`), never a value, and the exit code is `2`.
 
 ## Next
 
-- Write a config for your own test environment: [configuration reference](../reference/configuration.md).
-- Set up roles and logins: [configure login](../how-to/configure-login.md).
-- Let an LLM help when the monkey is stuck: [configure the LLM](../how-to/configure-llm.md).
-- More roles and seeds at once: [run in parallel](../how-to/run-in-parallel.md).
-- Run it on every pull request: [run in CI](../how-to/run-in-ci.md).
+- Write a config for your own test environment: [configuration reference](../reference/konfiguration.md).
+- Set up roles and logins: [configure login](../how-to/anmeldung-einrichten.md).
+- Let an LLM help when the monkey is stuck: [configure the LLM](../how-to/llm-einrichten.md).
+- More roles and seeds at once: [run in parallel](../how-to/parallel-ausfuehren.md).
+- Run it on every pull request: [run in CI](../how-to/in-ci-ausfuehren.md).

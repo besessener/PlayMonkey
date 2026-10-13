@@ -1,7 +1,7 @@
 # Configure login
 
 Each entry in `auth` is a role. PlayMonkey runs every role in its own browser context; see
-[sessions and login](../explanation/sessions.md) for how that works.
+[sessions and login](../explanation/sitzungen.md) for how that works.
 
 ## Log in through the form
 
@@ -61,7 +61,7 @@ List them all; names must be unique. Each role runs separately, with its own coo
 ```
 
 Without `auth`, PlayMonkey runs one anonymous role. To run the roles at the same time instead of one after the
-other, set `parallel`; see [run in parallel](run-in-parallel.md).
+other, set `parallel`; see [run in parallel](parallel-ausfuehren.md).
 
 ## Keep secrets out of the file
 

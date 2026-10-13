@@ -98,7 +98,7 @@ LLM calls cost money and time, so the monkey only asks when it is stuck, and you
 
 When a budget is spent, the run continues as a pure monkey and the console and report say when that happened.
 `pricing` turns token counts into an **estimated** cost in the report; take the prices of your deployment from your
-Azure agreement, there is no built-in price list. The report's [LLM usage](../reference/report.md#llm) shows calls,
+Azure agreement, there is no built-in price list. The report's [LLM usage](../reference/bericht.md#llm) shows calls,
 tokens, cache reads, retries, fallbacks and latency per role.
 
 ## Thinking and effort

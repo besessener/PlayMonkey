@@ -26,7 +26,7 @@ with the steps to reproduce it. An LLM steps in only when the random monkey gets
 - **An LLM only when stuck** – optional; cookie banners, dialogs or forms that need valid data get a few model
   decisions, and if the model fails the monkey simply goes on.
 - **Test environments only** – no guardrails by design: it will click "Delete" and submit every form
-  ([ground rules](docs/explanation/ground-rules.md)). Not a test-case generator, visual regression or load test.
+  ([ground rules](docs/explanation/grundregeln.md)). Not a test-case generator, visual regression or load test.
 
 > **Status:** version 0.4.0: the seeded random monkey with oracles, reports and replay; Claude on Microsoft Foundry
 > or any OpenAI-compatible endpoint as the LLM for stuck situations; cookie banners, native dialogs, iframes,
@@ -53,7 +53,7 @@ npx monkey run fixtures/configs/fixture.json
 ```
 
 It prints the seed, one summary per role, every finding, and where the report is:
-`fixtures/configs/monkey-report/report.html`. Step by step: [getting started](docs/tutorials/getting-started.md).
+`fixtures/configs/monkey-report/report.html`. Step by step: [getting started](docs/tutorials/erste-schritte.md).
 Releases and changes: [GitHub Releases](https://github.com/besessener/PlayMonkey/releases).
 
 ## Usage
@@ -83,9 +83,9 @@ precedence over `1`. A minimal config:
 ```
 
 Secrets come from environment variables (`${VAR}`) and are masked in all output. Next steps:
-[configure login](docs/how-to/configure-login.md), [configure the LLM](docs/how-to/configure-llm.md),
-[run in parallel](docs/how-to/run-in-parallel.md), [run in CI](docs/how-to/run-in-ci.md) and
-[reproduce a finding](docs/how-to/reproduce-a-finding.md); every key: [configuration](docs/reference/configuration.md).
+[configure login](docs/how-to/anmeldung-einrichten.md), [configure the LLM](docs/how-to/llm-einrichten.md),
+[run in parallel](docs/how-to/parallel-ausfuehren.md), [run in CI](docs/how-to/in-ci-ausfuehren.md) and
+[reproduce a finding](docs/how-to/befund-reproduzieren.md); every key: [configuration](docs/reference/konfiguration.md).
 
 ## Development
 
@@ -97,7 +97,7 @@ npx playwright install chromium
 npm run check
 ```
 
-Details: [development setup](docs/tutorials/development-setup.md), [commands](docs/reference/commands.md) and
+Details: [development setup](docs/tutorials/entwicklungsumgebung.md), [commands](docs/reference/befehle.md) and
 [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Documentation
@@ -105,10 +105,10 @@ Details: [development setup](docs/tutorials/development-setup.md), [commands](do
 Website: <https://besessener.github.io/PlayMonkey/>. The full documentation is in [docs/](docs/README.md), organised
 by [Diátaxis](https://diataxis.fr/):
 
-- **[Tutorials](docs/README.md#tutorials)** – step by step to a first success, e.g. [getting started](docs/tutorials/getting-started.md)
-- **[How-to guides](docs/README.md#how-to-guides)** – reach one goal, e.g. [configure login](docs/how-to/configure-login.md) or [configure the LLM](docs/how-to/configure-llm.md)
-- **[Reference](docs/README.md#reference)** – look up exact behaviour, e.g. [configuration](docs/reference/configuration.md) or [commands](docs/reference/commands.md)
-- **[Explanation](docs/README.md#explanation)** – understand why, e.g. [architecture](docs/explanation/architecture.md) or [ground rules](docs/explanation/ground-rules.md)
+- **[Tutorials](docs/README.md#tutorials)** – step by step to a first success, e.g. [getting started](docs/tutorials/erste-schritte.md)
+- **[How-to guides](docs/README.md#how-to-guides)** – reach one goal, e.g. [configure login](docs/how-to/anmeldung-einrichten.md) or [configure the LLM](docs/how-to/llm-einrichten.md)
+- **[Reference](docs/README.md#reference)** – look up exact behaviour, e.g. [configuration](docs/reference/konfiguration.md) or [commands](docs/reference/befehle.md)
+- **[Explanation](docs/README.md#explanation)** – understand why, e.g. [architecture](docs/explanation/architektur.md) or [ground rules](docs/explanation/grundregeln.md)
 
 ## Related projects
 

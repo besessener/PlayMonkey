@@ -1,7 +1,7 @@
 # Run in CI
 
 Run the monkey on every pull request, nightly or by hand, keep the report as a build artifact, and let the
-[exit code](../reference/commands.md#exit-codes) decide whether the job fails.
+[exit code](../reference/befehle.md#exit-codes) decide whether the job fails.
 
 ## Install PlayMonkey in your project
 
@@ -14,18 +14,18 @@ npx monkey --help
 
 Pin a release tag (`github:besessener/PlayMonkey#v0.4.0`, see the [releases](https://github.com/besessener/PlayMonkey/releases)) or a commit for
 repeatable builds. Commit your config next to it, e.g.
-`monkey.json`, with every secret as a `${VAR}` placeholder (see [configure login](configure-login.md#keep-secrets-out-of-the-file)).
+`monkey.json`, with every secret as a `${VAR}` placeholder (see [configure login](anmeldung-einrichten.md#keep-secrets-out-of-the-file)).
 
 ## The workflow
 
 This is `.github/workflows/monkey.yml` of the PlayMonkey repository. It runs there on every pull request against the
-[fixture site](use-the-fixture-site.md), and `test/docs.test.ts` checks that this page shows it unchanged, so the
+[fixture site](fixture-seite-nutzen.md), and `test/docs.test.ts` checks that this page shows it unchanged, so the
 example cannot rot. Copy it to your repository and adapt the lines marked `CHANGE`:
 
 ```yaml
 # Example: run PlayMonkey against a test environment in GitHub Actions.
 # This copy runs in PlayMonkey's own CI against the fixture site, so the example cannot rot.
-# docs/how-to/run-in-ci.md explains it; the lines marked CHANGE are the ones to adapt for your project.
+# docs/how-to/in-ci-ausfuehren.md explains it; the lines marked CHANGE are the ones to adapt for your project.
 name: Monkey
 
 on:
@@ -124,18 +124,18 @@ What it does:
    uploaded whatever happened; the exit code goes to the step output.
 4. **Uploads the report directory** as the artifact `monkey-report`, also when the run failed. Download it from the
    run's summary page and open `report.html`. Traces and videos in it contain the test environment's session
-   cookies (see [report: secrets](../reference/report.md#secrets)), hence the short retention.
+   cookies (see [report: secrets](../reference/bericht.md#secrets)), hence the short retention.
 5. **Checks the exit code:** `0` passes; `1` (findings) warns, or fails with `FAIL_ON_FINDINGS: "true"`; `2`
-   (config error, failed login, failed [LLM preflight](configure-llm.md#troubleshooting), crashed run) always fails.
+   (config error, failed login, failed [LLM preflight](llm-einrichten.md#troubleshooting), crashed run) always fails.
 
 ## Variations
 
 - **Nightly:** add `schedule: [{ cron: "17 3 * * *" }]` under `on:`, and run longer (`limits.maxSteps`,
   `limits.maxMinutes`) than on pull requests.
-- **More coverage in the same time:** several seeds and roles side by side, see [run in parallel](run-in-parallel.md).
+- **More coverage in the same time:** several seeds and roles side by side, see [run in parallel](parallel-ausfuehren.md).
   Keep `limits.maxMinutes` × the number of runs ÷ `parallel` under the job's `timeout-minutes`.
 - **With an LLM:** add the `llm` section and its key (`FOUNDRY_API_KEY: ${{ secrets.FOUNDRY_API_KEY }}`); set a
   budget with `llm.maxCalls`. A broken endpoint fails the job with exit `2` before any browser starts, unless
-  `llm.required` is `false`. See [configure the LLM](configure-llm.md).
+  `llm.required` is `false`. See [configure the LLM](llm-einrichten.md).
 - **Reproduce a CI finding locally:** download the artifact and replay the run's `actions.json`, see
-  [reproduce a finding](reproduce-a-finding.md).
+  [reproduce a finding](befund-reproduzieren.md).

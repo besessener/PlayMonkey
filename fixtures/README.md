@@ -51,7 +51,7 @@ Each bug must be reported **exactly once** (deduplicated), with these oracles:
 
 The 404 and the 500 pages are not also reported as `errorPage` (the HTTP oracles already cover their status), and
 Chromium's console echo of them ("Failed to load resource …") is not a `console` finding; see
-[oracles and findings](../docs/explanation/oracles.md). The overflow is keyed by its culprit element, not the
+[oracles and findings](../docs/explanation/orakel.md). The overflow is keyed by its culprit element, not the
 viewport, so resizing does not split it into several findings.
 
 `/clean`, `/login`, `/account` and a valid `/form` submission are controls and must yield **no** findings.

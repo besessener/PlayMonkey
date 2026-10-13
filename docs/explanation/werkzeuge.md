@@ -9,7 +9,7 @@
 - **Stricter lint and import boundaries in Biome, not ESLint or dependency-cruiser.** Biome covers unused code,
   floating promises, import cycles and restricted imports itself. TypeScript 7 has no JavaScript compiler API, which
   dependency-cruiser's TypeScript parsing relies on. The rules and boundaries are listed in
-  [quality gates](../reference/quality.md).
+  [quality gates](../reference/qualitaetssicherung.md).
 - **Coverage: Node's built-in.** `--experimental-test-coverage` with `--test-coverage-*` thresholds needs no
   dependency; c8 or Vitest's coverage would add one for the same numbers.
 - **Dead code: Knip.** It finds unused files, exports and dependencies, which neither Biome nor `tsc` reports.

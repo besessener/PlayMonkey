@@ -18,7 +18,7 @@ lives in `src/oracles/`.
 | `overflow` | Horizontal overflow: the document's `scrollWidth` is larger than its `clientWidth`. | low |
 | `download` | A download the site started failed, e.g. the connection dropped mid-file (`download.failure()`). | medium |
 
-Each one can be switched off with `oracles.<name>: false` in the [config](../reference/configuration.md).
+Each one can be switched off with `oracles.<name>: false` in the [config](../reference/konfiguration.md).
 
 The event oracles (`pageerror`, `console`, `http*`, `crash`) listen on every page of the role's browser context,
 including tabs and popups the site opens and the iframes inside them. `download` looks at the downloads of each step
@@ -36,7 +36,7 @@ after each step, with one script evaluation per step.
   title or main heading says "Not found", "Something went wrong", "Internal Server Error", "Error 500" and the like;
   and failed pages whose HTTP oracle is switched off.
 - **Off-domain navigations** blocked by `stayOnDomain`: they are logged as session events, see
-  [sessions](sessions.md).
+  [sessions](sitzungen.md).
 
 ## Finding model
 
@@ -54,7 +54,7 @@ after each step, with one script evaluation per step.
 | `lastActions` | The last `findings.lastActions` actions (default 10) up to and including `step`, each with its durable locator: the way to the bug. |
 | `screenshotPath` | A screenshot taken right after detection, in `<report.dir>/<role>/screenshots/`. Absent for crashed or hung pages. |
 
-Everything in a finding except the screenshot path goes through [secret masking](ground-rules.md), because pages can
+Everything in a finding except the screenshot path goes through [secret masking](grundregeln.md), because pages can
 echo what was typed into them.
 
 ## Deduplication
@@ -115,7 +115,7 @@ Oracles live in `src/oracles/oracles.ts`; each produces signals through `#add(or
 ignore rules and deduplicates by key.
 
 1. Add the name to `ORACLES` in `src/config/values.ts`. That makes `oracles.<name>` a config key (default on);
-   document it in [configuration](../reference/configuration.md), which `test/docs.test.ts` enforces.
+   document it in [configuration](../reference/konfiguration.md), which `test/docs.test.ts` enforces.
 2. Detect the problem in the `Oracles` class: an **event oracle** registers a listener in `#watch(page)`, which runs
    for every page of the context, popups included; a **state oracle** checks the page after each step in
    `#inspect(page, navigated)`; something recorded in the step's events belongs in `check`. Return early when
@@ -124,8 +124,8 @@ ignore rules and deduplicates by key.
    bug and stays the same across occurrences, runs and replay: use `normalizeUrl` and `normalizeMessage` from
    `src/oracles/keys.ts`, and never the step, a timestamp or the port. Keep the message short; put the rest in
    `details`.
-4. Add a page with the bug to the [fixture site](../how-to/use-the-fixture-site.md) and a test in
+4. Add a page with the bug to the [fixture site](../how-to/fixture-seite-nutzen.md) and a test in
    `test/oracles.test.ts` that the oracle reports it exactly once, and does not fire on a clean page.
 
 Everything else follows: the finding gets an id, the last actions and a screenshot, goes into the action log for
-replay, into both reports, and is aggregated across [parallel runs](../how-to/run-in-parallel.md).
+replay, into both reports, and is aggregated across [parallel runs](../how-to/parallel-ausfuehren.md).

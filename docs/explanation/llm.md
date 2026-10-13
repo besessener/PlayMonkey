@@ -51,7 +51,7 @@ A handoff gives the LLM up to `maxDecisions` decisions in a row; `done` ends it 
   exponential backoff (`llm.maxRetries`); other errors, such as 400 or 401, fail at once. Then the monkey chooses.
 - **Outage:** after `llm.breaker.failures` failed decisions in a row the LLM is paused for `llm.breaker.pauseSteps`
   steps, then tried again. The breaker is shared by all runs of a `monkey run`: failures count across runs, and a
-  trip pauses the LLM in every run for `pauseSteps` of its own steps, so [parallel runs](../how-to/run-in-parallel.md)
+  trip pauses the LLM in every run for `pauseSteps` of its own steps, so [parallel runs](../how-to/parallel-ausfuehren.md)
   do not keep hammering an endpoint that is down.
 - **Budget:** once `llm.maxCalls` or `llm.maxTokens` is reached, the rest of the run (all remaining roles and seeds,
   also those running in parallel) is a pure monkey. A call counts against `maxCalls` from the moment it starts, so
@@ -59,7 +59,7 @@ A handoff gives the LLM up to `maxDecisions` decisions in a row; `done` ends it 
   `maxTokens` by their own usage.
 
 Every handoff, fallback, breaker trip and the budget's end are logged on the console and counted in the
-[report](../reference/report.md#llm).
+[report](../reference/bericht.md#llm).
 
 ## Secrets and placeholders
 

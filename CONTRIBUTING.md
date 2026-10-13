@@ -12,7 +12,7 @@ npm ci                            # installs and builds (prepare)
 npx playwright install chromium
 ```
 
-Details, also for sandboxes without a Playwright browser: [development setup](docs/tutorials/development-setup.md).
+Details, also for sandboxes without a Playwright browser: [development setup](docs/tutorials/entwicklungsumgebung.md).
 
 ## Work
 
@@ -42,13 +42,13 @@ prek run --all-files   # gitleaks, zizmor, file hygiene
 - Keep changes focused; one topic per pull request.
 - Update the docs with the code. A new config key goes into `src/config/schema.ts` (`llm.*` keys into
   `src/config/llm-schema.ts`, defaults into `src/config/defaults.ts`) **and**
-  [configuration](docs/reference/configuration.md); `test/docs.test.ts` fails otherwise. It also checks relative
-  links and anchors, that every sample config parses, and that the [CI example](docs/how-to/run-in-ci.md) matches
+  [configuration](docs/reference/konfiguration.md); `test/docs.test.ts` fails otherwise. It also checks relative
+  links and anchors, that every sample config parses, and that the [CI example](docs/how-to/in-ci-ausfuehren.md) matches
   `.github/workflows/monkey.yml`.
 - Never let a secret reach output: values from `${VAR}` placeholders are masked everywhere, see the
-  [ground rules](docs/explanation/ground-rules.md).
+  [ground rules](docs/explanation/grundregeln.md).
 
-CI runs every [quality gate](docs/reference/quality.md) (`ci.yml`, `codeql.yml`) and the CI example against the
+CI runs every [quality gate](docs/reference/qualitaetssicherung.md) (`ci.yml`, `codeql.yml`) and the CI example against the
 fixture site (`monkey.yml`).
 
 ## Releasing
@@ -56,7 +56,7 @@ fixture site (`monkey.yml`).
 Changes are listed in the [GitHub Releases](https://github.com/besessener/PlayMonkey/releases).
 
 1. Set the version with `npm version X.Y.Z --no-git-tag-version` and update the pinned tag (`#vX.Y.Z`) in the
-   [README](README.md), [run in CI](docs/how-to/run-in-ci.md) and `site/index.html`. Merge that through a pull
+   [README](README.md), [run in CI](docs/how-to/in-ci-ausfuehren.md) and `site/index.html`. Merge that through a pull
    request.
 2. Tag the merge commit on `main` and push the tag: `git tag vX.Y.Z && git push origin vX.Y.Z`.
 
@@ -66,4 +66,4 @@ notes generated from the merged pull requests.
 ## Extending
 
 - A new LLM backend: [adding a backend](docs/explanation/llm.md#adding-a-backend).
-- A new oracle: [adding an oracle](docs/explanation/oracles.md#adding-an-oracle).
+- A new oracle: [adding an oracle](docs/explanation/orakel.md#adding-an-oracle).

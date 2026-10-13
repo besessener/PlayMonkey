@@ -47,7 +47,7 @@ monkey-report/
 Findings are deduplicated per run as usual, and then **aggregated across runs** by their dedup key: the report shows
 each problem once, with the roles and runs that found it ("found in admin, user"), and the steps to reproduce from
 the first of them. `report.json` keeps both, `findings[]` per run and `aggregated[]`; see the
-[report reference](../reference/report.md#reportjson). Runs are listed in config order, roles first, then seeds,
+[report reference](../reference/bericht.md#reportjson). Runs are listed in config order, roles first, then seeds,
 whatever order they finished in.
 
 ## Determinism

@@ -48,7 +48,7 @@ Each action runs with `monkey.actionTimeoutMs` (default 5 s). Element actions re
 when it is stale. When the main document changed, the executor waits for its `load` event before the next snapshot.
 
 **A failed action is not a finding:** an element that vanished, is covered or does not respond is recorded with the
-error and the run continues. Problems of the site are the [oracles'](oracles.md) job; a timeout while waiting
+error and the run continues. Problems of the site are the [oracles'](orakel.md) job; a timeout while waiting
 for a navigation or page load is the exception, it is a `hang`.
 
 ## Pages that ask for something
@@ -62,10 +62,10 @@ Every page of the role's context, popups included, is watched (`src/monkey/event
   file, a PNG, an empty file, 1 MiB, a wrong extension (`invoice.pdf.exe`), text named `.png`, and a Unicode file
   name; sometimes two when the input takes several. No file comes from the disk.
 - **Downloads** are saved to `<report.dir>/<role>/downloads/`, measured, and deleted when the role ends unless
-  `report.keepDownloads` is on. A download that fails is a `download` [finding](oracles.md).
+  `report.keepDownloads` is on. A download that fails is a `download` [finding](orakel.md).
 
 Each step waits up to `monkey.actionTimeoutMs` for these to finish and records them with the step (`events` in the
-[action log](../reference/action-log.md)); replay gives the same answers again.
+[action log](../reference/aktionsprotokoll.md)); replay gives the same answers again.
 
 ## Tabs and popups
 

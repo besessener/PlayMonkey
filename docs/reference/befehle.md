@@ -15,11 +15,11 @@ monkey --version | -v
 
 | Command | Today |
 | --- | --- |
-| `run` | Validates the config, prints the seed, runs the [LLM preflight](../how-to/configure-llm.md#troubleshooting) when `llm` is set (before any browser work), then runs the random monkey with the [oracles](../explanation/oracles.md) for every role and seed, `parallel` at a time ([run in parallel](../how-to/run-in-parallel.md)). Prints a summary per run (log lines are prefixed `[role]`, or `[role/seed]` with `seeds`), one line per finding, the trace path and the total number of distinct findings; screenshots go to `<report.dir>/<role>/screenshots/`, the [action log](action-log.md) to `<report.dir>/<role>/actions.json` (with `seeds`: `<report.dir>/<role>/<seed>/…`). Writes the [report](report.md) (`report.json`, self-contained `report.html`) and ends with the LLM usage (with `llm`), the counts per severity, the report path and the reason for the exit code. |
+| `run` | Validates the config, prints the seed, runs the [LLM preflight](../how-to/llm-einrichten.md#troubleshooting) when `llm` is set (before any browser work), then runs the random monkey with the [oracles](../explanation/orakel.md) for every role and seed, `parallel` at a time ([run in parallel](../how-to/parallel-ausfuehren.md)). Prints a summary per run (log lines are prefixed `[role]`, or `[role/seed]` with `seeds`), one line per finding, the trace path and the total number of distinct findings; screenshots go to `<report.dir>/<role>/screenshots/`, the [action log](aktionsprotokoll.md) to `<report.dir>/<role>/actions.json` (with `seeds`: `<report.dir>/<role>/<seed>/…`). Writes the [report](bericht.md) (`report.json`, self-contained `report.html`) and ends with the LLM usage (with `llm`), the counts per severity, the report path and the reason for the exit code. |
 | `replay` | Executes an action log again in a fresh context for its role, without an LLM, runs the oracles and prints for each recorded finding whether it was `reproduced`, plus `new` findings. `--config` (`-c`) supplies login, browser and oracle settings and is required for roles that log in; `--strict` aborts at the first element that cannot be found instead of skipping it. Output goes to `replay/` next to the log. See [replay](../explanation/replay.md). |
 | `preflight` | Validates the config and sends one probe request to the configured LLM that must come back as a tool call. Prints `llm preflight ok: …` and exits `0`, or the provider, sanitized URL, HTTP status, cause and a hint, and exits `2`, also with `llm.required: false`. A config without `llm` exits `2`. |
 
-`--watch` (`-w`) on `run` and `replay` is [spectator mode](../how-to/watch-a-run.md): a visible, slowed-down browser
+`--watch` (`-w`) on `run` and `replay` is [spectator mode](../how-to/lauf-beobachten.md): a visible, slowed-down browser
 that outlines each element before acting and prints one line per step; it never changes which actions are taken.
 `--slow-mo <ms>` (0 … 99999, default 250) sets the delay per browser operation and implies `--watch`.
 
@@ -41,11 +41,11 @@ complete`.
 | --- | --- |
 | `npm run build` | `tsc` from `src/` to `dist/`, and makes the `monkey` bin executable. |
 | `npm test` | Builds, then `node --test "test/**/*.test.ts"`. |
-| `npm run test:coverage` | Builds, runs the tests with coverage of `src/`, fails below the [thresholds](quality.md#coverage-thresholds), writes `lcov.info`. |
+| `npm run test:coverage` | Builds, runs the tests with coverage of `src/`, fails below the [thresholds](qualitaetssicherung.md#coverage-thresholds), writes `lcov.info`. |
 | `npm run lint` | `biome ci .` and typechecks `src` and `test`. |
 | `npm run typecheck` | Typechecks only. |
 | `npm run knip` | Unused files, exports and dependencies. |
-| `npm run check` | `lint`, `knip` and `test:coverage`: every local [quality gate](quality.md). |
+| `npm run check` | `lint`, `knip` and `test:coverage`: every local [quality gate](qualitaetssicherung.md). |
 | `npm run format` | `biome check --write .`: formatting and safe fixes. |
 | `npm run fixture` | Starts the fixture site until interrupted. |
 | `npm run prepare` | Runs `build`; npm runs it on `npm ci` and when PlayMonkey is installed from git. |

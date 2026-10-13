@@ -8,7 +8,7 @@ monkey-report/
   report.json              the same data, machine-readable
   llm-debug.jsonl          only with llm.debugLog: every LLM prompt and response, sanitized
   <role>/
-    actions.json           the action log, see action-log.md
+    actions.json           the action log, see aktionsprotokoll.md
     trace.zip              Playwright trace: npx playwright show-trace <role>/trace.zip
     video/*.webm           video of each page of the role
     screenshots/step-NNNN.png
@@ -59,7 +59,7 @@ videos are relative, so keep the directory together when you move it.
 | `seeds` | Only with `seeds` in the config: all of them. |
 | `config` | The config with defaults applied and every secret value masked as `***`. |
 | `roles[]` | One entry per run, in config order (roles, then seeds), whatever order they finished in: `role`, `seed`, `steps`, `durationMs`, `stopReason` (`maxSteps`, `maxMinutes`, `aborted`, `error`), `error`, `states`, `failedActions`, `findings` (count), `blockedNavigations`, and the paths `actionLog`, `trace`, `videos`. A run that could not log in or crashed has only `role`, `seed`, `error`, `findings: 0` and empty `videos`. |
-| `findings[]` | Every run's findings, deduplicated per run, as described in [oracles and findings](../explanation/oracles.md#finding-model), plus the run's `seed` and `screenshot` as a path. Sorted by severity, then occurrences, then run order. Ids (`F1`, …) count per run. |
+| `findings[]` | Every run's findings, deduplicated per run, as described in [oracles and findings](../explanation/orakel.md#finding-model), plus the run's `seed` and `screenshot` as a path. Sorted by severity, then occurrences, then run order. Ids (`F1`, …) count per run. |
 | `aggregated[]` | The findings across runs, one per dedup key: `key`, `oracle`, `severity`, `message`, `url` (of the first run that found it), `occurrences` (sum), `roles` (distinct, config order) and `runs[]` (`role`, `seed`, `id`). Sorted like the HTML. |
 | `counts` | Aggregated findings per severity: `critical`, `high`, `medium`, `low`. |
 | `llm` | Only with `llm` in the config; see below. |

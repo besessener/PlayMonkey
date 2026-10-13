@@ -21,7 +21,7 @@ messages name the config path and the variable, never a value.
 Traces and videos are the exception: Playwright cannot redact them, and they contain the base URL, the session
 cookie, request headers and every value the monkey typed. A login's typed values never reach them (the login runs in
 a separate, unrecorded browser context). Treat `trace.zip` and the videos like the test environment's session data;
-see [report](../reference/report.md#secrets) for exactly what they hold.
+see [report](../reference/bericht.md#secrets) for exactly what they hold.
 
 ## Roles are isolated
 

@@ -2,7 +2,7 @@
 
 Every finding must be reproducible. The random monkey is reproducible by its seed as long as the site renders the
 same, but LLM decisions are not, and a changed site sends a seeded run elsewhere. So `monkey run` records every
-executed action in an [action log](../reference/action-log.md), and `monkey replay` executes that log again:
+executed action in an [action log](../reference/aktionsprotokoll.md), and `monkey replay` executes that log again:
 
 ```sh
 monkey replay monkey-report/user/actions.json --config config.json
@@ -16,7 +16,7 @@ monkey replay monkey-report/user/actions.json --config config.json
    always come from the log.
 3. Executes the actions in order through the same loop as `monkey run`, with the same page handling: a page that
    left the site's origin is sent back to `baseUrl`, a crashed page is replaced.
-4. Runs the same [oracles](oracles.md) and compares their findings with the recorded ones by dedup key.
+4. Runs the same [oracles](orakel.md) and compares their findings with the recorded ones by dedup key.
 
 No LLM is involved, and replay needs neither an `llm` config nor network access to one: LLM decisions are in the log
 as plain actions.
