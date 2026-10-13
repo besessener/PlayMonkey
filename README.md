@@ -55,7 +55,7 @@ npx monkey run fixtures/configs/fixture.json
 
 It prints the seed, one summary per role, every finding, and where the report is:
 `fixtures/configs/monkey-report/report.html`. Step by step: [getting started](docs/tutorials/getting-started.md).
-Releases and changes: [CHANGELOG](CHANGELOG.md).
+Releases and changes: [GitHub Releases](https://github.com/besessener/PlayMonkey/releases).
 
 ## Usage
 
