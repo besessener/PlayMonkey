@@ -1,10 +1,11 @@
-# The LLM
+# Das LLM
 
-The seeded random monkey is good at hammering a page and bad at getting past obstacles: a consent banner, a dialog,
-a form that wants a valid IBAN, an expired session. The LLM is only asked then, for a few decisions, so runs stay
-cheap and fast, and an LLM outage never stops a run. Without `llm` in the config the loop is exactly the M1 monkey.
+Der Zufalls-Monkey mit Seed ist gut darin, auf eine Seite einzuhämmern, und schlecht darin, an Hindernissen
+vorbeizukommen: ein Consent-Banner, ein Dialog, ein Formular, das eine gültige IBAN verlangt, eine abgelaufene
+Sitzung. Nur dann wird das LLM gefragt, für wenige Entscheidungen. So bleiben Läufe günstig und schnell, und ein
+Ausfall des LLM hält nie einen Lauf an. Ohne `llm` in der Konfiguration ist die Schleife genau der Zufalls-Monkey.
 
-## A step with an LLM
+## Ein Schritt mit LLM
 
 ```text
 snapshot -> stuck? --no--> monkey chooses
@@ -16,76 +17,80 @@ snapshot -> stuck? --no--> monkey chooses
 execute -> oracles -> action log (source "monkey" or "llm")
 ```
 
-The LLM sees a [serialized snapshot](snapshot.md#serializing-for-the-llm) within `llm.snapshotChars`, the last
-`llm.historyActions` actions with their outcomes, the findings so far, why it was called, the role, and the
-placeholders it may use. It answers with exactly one tool call; each action is one tool (`click`, `dblclick`, `hover`,
-`fill`, `select`, `check`, `uncheck`, `press`, `scroll`, `back`, `navigate`) plus `done` to give control back
-early. Native dialogs and file choosers are answered automatically, also during the LLM's steps; the prompt says so.
+Das LLM sieht einen [serialisierten Snapshot](snapshot.md#serialisieren-für-das-llm) innerhalb von
+`llm.snapshotChars`, die letzten `llm.historyActions` Aktionen mit ihren Ergebnissen, die bisherigen Befunde, warum es
+gerufen wurde, die Rolle und die Platzhalter, die es verwenden darf. Es antwortet mit genau einem Tool-Aufruf; jede
+Aktion ist ein Tool (`click`, `dblclick`, `hover`, `fill`, `select`, `check`, `uncheck`, `press`, `scroll`, `back`,
+`navigate`), dazu `done`, um die Kontrolle früher zurückzugeben. Native Dialoge und Dateiauswahlen werden automatisch
+beantwortet, auch während der Schritte des LLM; der Prompt sagt das.
 
-Nothing it returns is trusted. The tool input is validated against the tool's JSON schema, element tools must name a
-ref of the current snapshot, and `navigate` must stay on the site when `stayOnDomain` is on. A violation counts as an
-invalid answer.
+Nichts, was es zurückgibt, gilt als vertrauenswürdig. Die Tool-Eingabe wird gegen das JSON-Schema des Tools
+validiert, Element-Tools müssen eine Ref des aktuellen Snapshots nennen, und `navigate` muss auf der Seite bleiben,
+wenn `stayOnDomain` an ist. Ein Verstoß zählt als ungültige Antwort.
 
-## When the monkey hands over
+## Wann der Monkey übergibt
 
-The stuck detection runs before every monkey decision; the first trigger that holds starts a handoff.
-Thresholds are under `llm.handoff`.
+Die Erkennung des Feststeckens läuft vor jeder Entscheidung des Monkeys; der erste Auslöser, der zutrifft, startet
+eine Übergabe. Die Schwellen stehen unter `llm.handoff`.
 
-| Trigger | Fires when |
+| Auslöser | Greift, wenn |
 | --- | --- |
-| `blockingUi` | A dialog (`role=dialog` or `alertdialog`, including an open `<dialog>`) is open, or the page mentions cookies or consent and has a button such as "Accept" or "Reject". |
-| `loginWall` | A role that logged in arrives on its `loginUrl`, or on a page with a password field and a "Log in" or "Sign in" button: the session probably expired. Fires once per arrival. |
-| `invalidForm` | `invalidForm` submissions in a row (a button click or Enter on a page with a form) end on the same path with validation text such as "required" or "please enter a valid …". |
-| `failedActions` | The monkey's last `failedActions` actions all failed (elements never became actionable, timeouts). |
-| `noStateChange` | The page did not change at all for `noStateChange` steps. |
-| `noProgress` | No new (URL, snapshot hash) state was found for `noProgress` steps. |
+| `blockingUi` | Ein Dialog (`role=dialog` oder `alertdialog`, auch ein offenes `<dialog>`) offen ist oder die Seite Cookies oder Consent erwähnt und einen Button wie „Accept“ oder „Reject“ hat. |
+| `loginWall` | Eine angemeldete Rolle auf ihrer `loginUrl` landet oder auf einer Seite mit Passwortfeld und einem Button „Log in“ oder „Sign in“: Die Sitzung ist vermutlich abgelaufen. Greift einmal pro Ankunft. |
+| `invalidForm` | `invalidForm` Absendungen in Folge (ein Button-Klick oder Enter auf einer Seite mit Formular) auf demselben Pfad mit einem Validierungstext wie „required“ oder „please enter a valid …“ enden. |
+| `failedActions` | Die letzten `failedActions` Aktionen des Monkeys alle fehlgeschlagen sind (Elemente wurden nie bedienbar, Timeouts). |
+| `noStateChange` | Sich die Seite `noStateChange` Schritte lang überhaupt nicht verändert hat. |
+| `noProgress` | `noProgress` Schritte lang kein neuer Zustand (URL, Snapshot-Hash) gefunden wurde. |
 
-A handoff gives the LLM up to `maxDecisions` decisions in a row; `done` ends it earlier. Then the monkey has at least
-`cooldownSteps` steps before the next handoff, and the counters start afresh.
+Eine Übergabe gibt dem LLM bis zu `maxDecisions` Entscheidungen in Folge; `done` beendet sie früher. Danach hat der
+Monkey mindestens `cooldownSteps` Schritte bis zur nächsten Übergabe, und die Zähler beginnen von vorn.
 
-## Fallback and circuit breaker
+## Fallback und Circuit Breaker
 
-- **Bad answer** (text instead of a tool call, an invalid tool call, a refusal, an answer cut off at
-  `maxOutputTokens`): asked once more with the same input, then the monkey chooses this step.
-- **Transport and HTTP errors:** the SDK retries rate limits (429), server errors and connection problems with
-  exponential backoff (`llm.maxRetries`); other errors, such as 400 or 401, fail at once. Then the monkey chooses.
-- **Outage:** after `llm.breaker.failures` failed decisions in a row the LLM is paused for `llm.breaker.pauseSteps`
-  steps, then tried again. The breaker is shared by all runs of a `monkey run`: failures count across runs, and a
-  trip pauses the LLM in every run for `pauseSteps` of its own steps, so [parallel runs](../how-to/run-in-parallel.md)
-  do not keep hammering an endpoint that is down.
-- **Budget:** once `llm.maxCalls` or `llm.maxTokens` is reached, the rest of the run (all remaining roles and seeds,
-  also those running in parallel) is a pure monkey. A call counts against `maxCalls` from the moment it starts, so
-  parallel runs cannot overspend it; tokens are only known afterwards, so calls already in flight can exceed
-  `maxTokens` by their own usage.
+- **Schlechte Antwort** (Text statt Tool-Aufruf, ein ungültiger Tool-Aufruf, eine Verweigerung, eine bei
+  `maxOutputTokens` abgeschnittene Antwort): Es wird einmal mit derselben Eingabe nachgefragt, dann wählt der Monkey
+  diesen Schritt.
+- **Transport- und HTTP-Fehler:** Das SDK wiederholt bei Rate Limits (429), Serverfehlern und Verbindungsproblemen mit
+  exponentiellem Backoff (`llm.maxRetries`); andere Fehler wie 400 oder 401 schlagen sofort fehl. Dann wählt der
+  Monkey.
+- **Ausfall:** Nach `llm.breaker.failures` fehlgeschlagenen Entscheidungen in Folge wird das LLM für
+  `llm.breaker.pauseSteps` Schritte pausiert und danach wieder versucht. Den Breaker teilen sich alle Läufe eines
+  `monkey run`: Fehlschläge zählen über Läufe hinweg, und ein Auslösen pausiert das LLM in jedem Lauf für
+  `pauseSteps` seiner eigenen Schritte, damit [parallele Läufe](../how-to/parallel-ausfuehren.md) nicht weiter auf
+  einen ausgefallenen Endpunkt einhämmern.
+- **Budget:** Sobald `llm.maxCalls` oder `llm.maxTokens` erreicht ist, ist der Rest des Laufs (alle verbleibenden
+  Rollen und Seeds, auch die parallel laufenden) reiner Monkey. Ein Aufruf zählt ab seinem Start gegen `maxCalls`,
+  sodass parallele Läufe das Budget nicht überziehen können; Tokens sind erst danach bekannt, deshalb können bereits
+  laufende Aufrufe `maxTokens` um ihren eigenen Verbrauch überschreiten.
 
-Every handoff, fallback, breaker trip and the budget's end are logged on the console and counted in the
-[report](../reference/report.md#llm).
+Jede Übergabe, jeder Fallback, jedes Auslösen des Breakers und das Ende des Budgets werden auf der Konsole
+protokolliert und im [Bericht](../reference/bericht.md#llm) gezählt.
 
-## Secrets and placeholders
+## Secrets und Platzhalter
 
-Secrets never enter a prompt:
+Secrets gelangen nie in einen Prompt:
 
-- Login fields and test data are offered as placeholders, `{{<role>.<field>}}` (e.g. `{{admin.password}}`) and
-  `{{testData.<key>}}`, never as values. The model writes the placeholder; PlayMonkey substitutes the value after the
-  model returned, right before typing.
-- Any value from a `${VAR}` placeholder that shows up in the page, a URL or the history is replaced by
-  `{{env.VAR}}` before it is sent; the model may use that placeholder too.
-- The action log stores what was typed with the `${VAR}` placeholder as usual, so [replay](replay.md) works without
-  the LLM.
+- Anmeldefelder und Testdaten werden als Platzhalter angeboten, `{{<role>.<field>}}` (z. B. `{{admin.password}}`) und
+  `{{testData.<key>}}`, nie als Werte. Das Modell schreibt den Platzhalter; PlayMonkey setzt den Wert erst ein,
+  nachdem das Modell geantwortet hat, direkt vor dem Tippen.
+- Jeder Wert aus einem Platzhalter `${VAR}`, der in der Seite, einer URL oder dem Verlauf auftaucht, wird vor dem
+  Senden durch `{{env.VAR}}` ersetzt; das Modell darf auch diesen Platzhalter verwenden.
+- Das Aktionsprotokoll speichert wie üblich, was mit dem Platzhalter `${VAR}` getippt wurde, damit
+  [Replay](replay.md) ohne LLM funktioniert.
 
-Prompts and responses are not stored unless `llm.debugLog` is on, and then masked once more.
+Prompts und Antworten werden nicht gespeichert, außer `llm.debugLog` ist an, und dann noch einmal maskiert.
 
-## Prompt caching
+## Prompt-Caching
 
-The system prompt and the tool definitions are identical for every call of a run and come first; the snapshot and
-history change and come last. Backends with prompt caching mark the stable part as cacheable (Anthropic:
-`cache_control` on the system prompt, which caches the tools with it; OpenAI caches long identical prefixes
-automatically). Cache reads show up as `cachedTokens`. Very
-short prompts may be below a model's minimum cacheable length and are then simply not cached.
+System-Prompt und Tool-Definitionen sind für jeden Aufruf eines Laufs gleich und kommen zuerst; Snapshot und Verlauf
+ändern sich und kommen zuletzt. Backends mit Prompt-Caching markieren den stabilen Teil als cachebar (Anthropic:
+`cache_control` am System-Prompt, was die Tools mit cacht; OpenAI cacht lange identische Präfixe automatisch).
+Cache-Lesezugriffe erscheinen als `cachedTokens`. Sehr kurze Prompts können unter der minimalen cachebaren Länge
+eines Modells liegen und werden dann einfach nicht gecacht.
 
-## Adding a backend
+## Ein Backend hinzufügen
 
-A backend implements `LlmProvider` from `src/llm/provider.ts`:
+Ein Backend implementiert `LlmProvider` aus `src/llm/provider.ts`:
 
 ```ts
 interface LlmProvider {
@@ -95,26 +100,28 @@ interface LlmProvider {
 }
 ```
 
-- Declare the shared `ACTION_TOOLS` (and `PING_TOOL` for the preflight) from `src/llm/tools.ts` in the provider's
-  tool format, send `SYSTEM_PROMPT` and `buildUserMessage(input)` from `src/llm/prompt.ts`, stable parts first.
-- Do not force a tool choice: some models reject it. The prompt asks for exactly one tool call.
-- Turn the first tool call into a decision with `parseToolCall(name, input, input.refs)`, which validates it.
-- Map failures to an `LlmError` with a kind (`auth`, `notFound`, `rateLimited`, `invalid`, …; see
-  `LlmErrorKind`) and keep the usage of failed calls; the preflight hints and the report are keyed by kind.
-- Report `usage` (input, output, cache read and write tokens) and how many requests were retried.
-- Add the name to `LLM_PROVIDERS` in `src/config/values.ts` and to `createProvider` in `src/llm/factory.ts`.
+- Deklariere die gemeinsamen `ACTION_TOOLS` (und `PING_TOOL` für die Vorabprüfung) aus `src/llm/tools.ts` im
+  Tool-Format des Anbieters, sende `SYSTEM_PROMPT` und `buildUserMessage(input)` aus `src/llm/prompt.ts`, stabile
+  Teile zuerst.
+- Erzwinge keine Tool-Wahl: Manche Modelle lehnen das ab. Der Prompt verlangt genau einen Tool-Aufruf.
+- Mach aus dem ersten Tool-Aufruf mit `parseToolCall(name, input, input.refs)` eine Entscheidung; das validiert ihn.
+- Bilde Fehler auf einen `LlmError` mit einer Art ab (`auth`, `notFound`, `rateLimited`, `invalid`, …; siehe
+  `LlmErrorKind`) und behalte den Verbrauch fehlgeschlagener Aufrufe; die Hinweise der Vorabprüfung und der Bericht
+  sind nach Art geordnet.
+- Melde `usage` (Eingabe-, Ausgabe-, Cache-Lese- und Cache-Schreib-Tokens) und wie viele Anfragen wiederholt wurden.
+- Trage den Namen in `LLM_PROVIDERS` in `src/config/values.ts` und in `createProvider` in `src/llm/factory.ts` ein.
 
-`test/helpers/fake-provider.ts` is a scripted provider for tests; `test/foundry.test.ts` and `test/openai.test.ts`
-show how to test a backend with its HTTP layer mocked. Add the new backend to `test/provider-conformance.test.ts`:
-it runs the same conversations (valid and invalid tool calls, text only, retries, errors, preflight) against every
-backend.
+`test/helpers/fake-provider.ts` ist ein geskripteter Anbieter für Tests; `test/foundry.test.ts` und
+`test/openai.test.ts` zeigen, wie man ein Backend mit gemockter HTTP-Schicht testet. Trage das neue Backend in
+`test/provider-conformance.test.ts` ein: Es führt dieselben Gespräche (gültige und ungültige Tool-Aufrufe, nur Text,
+Wiederholungen, Fehler, Vorabprüfung) gegen jedes Backend.
 
 ## Backends
 
-| Provider | SDK | API |
+| Anbieter | SDK | API |
 | --- | --- | --- |
-| `anthropic-foundry` | `@anthropic-ai/foundry-sdk` | Anthropic Messages API on Foundry (`…/anthropic/v1/messages`) |
-| `openai` | `openai` | Responses API (default) or Chat Completions on any OpenAI-compatible base URL |
+| `anthropic-foundry` | `@anthropic-ai/foundry-sdk` | Anthropic Messages API auf Foundry (`…/anthropic/v1/messages`) |
+| `openai` | `openai` | Responses API (Standard) oder Chat Completions auf jeder OpenAI-kompatiblen Basis-URL |
 
-Both map their SDK's typed errors through `src/llm/sdk-errors.ts`, so retries, error kinds and the preflight hints
-behave the same.
+Beide bilden die typisierten Fehler ihres SDK über `src/llm/sdk-errors.ts` ab, sodass Wiederholungen, Fehlerarten und
+die Hinweise der Vorabprüfung sich gleich verhalten.

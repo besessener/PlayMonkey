@@ -1,37 +1,38 @@
-# Contributing
+# Mitmachen
 
-Thanks for helping. PlayMonkey is a small TypeScript CLI on Playwright; the [documentation](docs/README.md) explains
-how it works.
+Danke, dass du hilfst. PlayMonkey ist ein kleines TypeScript-CLI auf Basis von Playwright; die
+[Dokumentation](docs/README.md) erklärt, wie es funktioniert.
 
-## Set up
+## Einrichten
 
-Node.js 22.18 or newer:
+Node.js 22.18 oder neuer:
 
 ```sh
 npm ci                            # installs and builds (prepare)
 npx playwright install chromium
 ```
 
-Details, also for sandboxes without a Playwright browser: [development setup](docs/tutorials/development-setup.md).
+Ausführlich, auch für Sandboxes ohne Playwright-Browser:
+[Entwicklungsumgebung aufsetzen](docs/tutorials/entwicklungsumgebung.md).
 
-## Work
+## Arbeiten
 
-| Task | Command |
+| Aufgabe | Befehl |
 | --- | --- |
-| Build `src/` to `dist/` | `npm run build` |
-| Run all tests (builds first) | `npm test` |
-| One test file | `node --test test/report.test.ts` |
-| Lint and typecheck | `npm run lint` |
-| Every local quality gate | `npm run check` |
-| Format and safe fixes | `npm run format` |
-| Fixture site with seeded bugs | `npm run fixture` |
-| Try the CLI | `npx monkey run fixtures/configs/fixture.json` |
+| `src/` nach `dist/` bauen | `npm run build` |
+| Alle Tests (baut vorher) | `npm test` |
+| Eine Testdatei | `node --test test/report.test.ts` |
+| Lint und Typprüfung | `npm run lint` |
+| Alle lokalen Qualitätsprüfungen | `npm run check` |
+| Formatieren und sichere Korrekturen | `npm run format` |
+| Fixture-Seite mit eingebauten Fehlern | `npm run fixture` |
+| CLI ausprobieren | `npx monkey run fixtures/configs/fixture.json` |
 
-Tests use `node:test` and run the TypeScript sources directly. End-to-end tests start the
-[fixture site](fixtures/README.md) themselves; a new kind of bug gets a fixture page first, then the code, then a
-test that it is reported exactly once.
+Tests nutzen `node:test` und führen die TypeScript-Quellen direkt aus. End-to-End-Tests starten die
+[Fixture-Seite](fixtures/README.md) selbst; eine neue Fehlerart bekommt zuerst eine Fixture-Seite, dann den Code,
+dann einen Test, dass sie genau einmal gemeldet wird.
 
-## Before you open a pull request
+## Bevor du einen Pull Request öffnest
 
 ```sh
 npm run format
@@ -39,29 +40,31 @@ npm run check          # lint, types, dead code, tests with coverage thresholds
 prek run --all-files   # gitleaks, zizmor, file hygiene
 ```
 
-- Keep changes focused; one topic per pull request, its milestone in the title when it belongs to one
-  ([roadmap](docs/explanation/roadmap.md)).
-- Update the docs with the code. A new config key goes into `src/config/schema.ts` (`llm.*` keys into
-  `src/config/llm-schema.ts`, defaults into `src/config/defaults.ts`) **and**
-  [configuration](docs/reference/configuration.md); `test/docs.test.ts` fails otherwise. It also checks relative
-  links and anchors, that every sample config parses, and that the [CI example](docs/how-to/run-in-ci.md) matches
-  `.github/workflows/monkey.yml`.
-- Never let a secret reach output: values from `${VAR}` placeholders are masked everywhere, see the
-  [ground rules](docs/explanation/ground-rules.md).
+- Halte Änderungen fokussiert: ein Thema je Pull Request.
+- Die Dokumentation wandert mit dem Code. Ein neuer Konfigurationsschlüssel gehört in `src/config/schema.ts`
+  (`llm.*`-Schlüssel in `src/config/llm-schema.ts`, Standardwerte in `src/config/defaults.ts`) **und** in die
+  [Konfiguration](docs/reference/konfiguration.md); sonst schlägt `test/docs.test.ts` fehl. Der Test prüft außerdem
+  relative Links und Anker, dass sich jede Beispielkonfiguration parsen lässt und dass das
+  [CI-Beispiel](docs/how-to/in-ci-ausfuehren.md) mit `.github/workflows/monkey.yml` übereinstimmt.
+- Kein Secret darf in eine Ausgabe gelangen: Werte aus `${VAR}`-Platzhaltern werden überall maskiert, siehe die
+  [Grundregeln](docs/explanation/grundregeln.md).
 
-CI runs every [quality gate](docs/reference/quality.md) (`ci.yml`, `codeql.yml`) and the CI example against the
-fixture site (`monkey.yml`).
+Die CI führt alle [Qualitätsprüfungen](docs/reference/qualitaetssicherung.md) aus (`ci.yml`, `codeql.yml`) und
+das CI-Beispiel gegen die Fixture-Seite (`monkey.yml`).
 
-## Releasing
+## Veröffentlichen
 
-1. Add a section `## X.Y.Z – <date>` to [CHANGELOG.md](CHANGELOG.md) and set the version:
-   `npm version X.Y.Z --no-git-tag-version`. Merge that through a pull request.
-2. Tag the merge commit on `main` and push the tag: `git tag vX.Y.Z && git push origin vX.Y.Z`.
+Änderungen stehen in den [GitHub Releases](https://github.com/besessener/PlayMonkey/releases).
 
-`.github/workflows/release.yml` then checks that the tag matches `package.json` and publishes a GitHub release with
-the changelog section as notes. `test/docs.test.ts` fails when the changelog has no section for the package version.
+1. Setze die Version mit `npm version X.Y.Z --no-git-tag-version` und aktualisiere den festgelegten Tag (`#vX.Y.Z`)
+   in der [README](README.md), in [In der CI ausführen](docs/how-to/in-ci-ausfuehren.md) und in `site/index.html`.
+   Merge das über einen Pull Request.
+2. Tagge den Merge-Commit auf `main` und pushe den Tag: `git tag vX.Y.Z && git push origin vX.Y.Z`.
 
-## Extending
+`.github/workflows/release.yml` prüft dann, dass der Tag zu `package.json` passt, und veröffentlicht ein
+GitHub-Release mit Notizen, die aus den gemergten Pull Requests erzeugt werden.
 
-- A new LLM backend: [adding a backend](docs/explanation/llm.md#adding-a-backend).
-- A new oracle: [adding an oracle](docs/explanation/oracles.md#adding-an-oracle).
+## Erweitern
+
+- Ein neues LLM-Backend: [Ein Backend hinzufügen](docs/explanation/llm.md#ein-backend-hinzufügen).
+- Ein neues Orakel: [Ein Orakel hinzufügen](docs/explanation/orakel.md#ein-orakel-hinzufügen).

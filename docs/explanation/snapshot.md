@@ -1,48 +1,51 @@
-# Page snapshots
+# Seiten-Snapshots
 
-The random monkey and the LLM see the page the same way: as a list of actionable elements, each with a short-lived
-**ref** such as `e8`, taken from Playwright's accessibility snapshot.
+Der Zufalls-Monkey und das LLM sehen die Seite auf dieselbe Weise: als Liste bedienbarer Elemente, jedes mit einer
+kurzlebigen **Ref** wie `e8`, entnommen aus dem Accessibility-Snapshot von Playwright.
 
-## Where the refs come from
+## Woher die Refs kommen
 
-Playwright (since 1.59) takes an "AI mode" aria snapshot that assigns a ref to every element
-(`page.ariaSnapshotJSON({ mode: "ai" })`, the structured form since 1.63) and resolves refs back to elements with
-`page.getByRef(ref)`. PlayMonkey builds on that instead of keeping its own element registry:
+Playwright (seit 1.59) nimmt einen ARIA-Snapshot im „AI mode“ auf, der jedem Element eine Ref zuweist
+(`page.ariaSnapshotJSON({ mode: "ai" })`, die strukturierte Form seit 1.63), und löst Refs mit `page.getByRef(ref)`
+wieder in Elemente auf. PlayMonkey baut darauf auf, statt ein eigenes Elementregister zu führen:
 
-- **Elements:** nodes with an interactive role (link, button, textbox, checkbox, combobox, …) plus anything the page
-  marks clickable (`cursor: pointer`). Each carries role, accessible name, link target, placeholder, combobox
-  options, checked and expanded state, whether it is enabled, whether it is in the viewport (from its bounding box)
-  whether it is inside an iframe, and whether it is inside an open dialog (the monkey prefers those while one is
-  open).
-- **Open shadow DOM** is part of the snapshot. **Same-origin iframes** (including `srcdoc` and `about:blank`) are
-  entered; their elements resolve like any other. **Cross-origin iframes** are counted, not entered: acting inside
-  them would act on another origin.
-- **Text:** static text and the names of headings and other non-actionable nodes, in document order.
+- **Elemente:** Knoten mit einer interaktiven Rolle (link, button, textbox, checkbox, combobox, …) und alles, was die
+  Seite als klickbar markiert (`cursor: pointer`). Jedes trägt Rolle, zugänglichen Namen, Linkziel, Platzhalter,
+  Optionen einer Combobox, Zustand „checked“ und „expanded“, ob es aktiviert ist, ob es im Viewport liegt (aus seiner
+  Bounding Box), ob es in einem Iframe liegt und ob es in einem offenen Dialog liegt (der Monkey bevorzugt solche,
+  solange einer offen ist).
+- **Offenes Shadow DOM** gehört zum Snapshot. **Same-Origin-Iframes** (auch `srcdoc` und `about:blank`) werden
+  betreten; ihre Elemente lösen sich auf wie alle anderen. **Cross-Origin-Iframes** werden gezählt, nicht betreten:
+  In ihnen zu handeln hieße, auf einem anderen Origin zu handeln.
+- **Text:** statischer Text und die Namen von Überschriften und anderen nicht bedienbaren Knoten, in
+  Dokumentreihenfolge.
 
-## Refs are short-lived
+## Refs sind kurzlebig
 
-A ref belongs to the latest aria snapshot of the page. A new snapshot keeps the refs of elements that are still there,
-but a navigation renumbers them, and **any** other aria snapshot of the page (including `locator.ariaSnapshot()`)
-replaces the set. `resolve(page, ref)` therefore checks that the ref matches exactly one element and throws
-`StaleRefError` at once; Playwright itself would wait for the element until its timeout.
+Eine Ref gehört zum neuesten ARIA-Snapshot der Seite. Ein neuer Snapshot behält die Refs von Elementen, die noch da
+sind, aber eine Navigation nummeriert sie neu, und **jeder** andere ARIA-Snapshot der Seite (auch
+`locator.ariaSnapshot()`) ersetzt die Menge. `resolve(page, ref)` prüft deshalb, dass die Ref auf genau ein Element
+passt, und wirft sofort `StaleRefError`; Playwright selbst würde bis zu seinem Timeout auf das Element warten.
 
-Because refs do not survive page loads, the action log stores a durable locator next to each ref:
-`durableLocator(page, ref)` asks Playwright for the locator `codegen` would write, for example
+Weil Refs das Laden einer Seite nicht überleben, speichert das Aktionsprotokoll neben jeder Ref einen dauerhaften
+Locator: `durableLocator(page, ref)` fragt Playwright nach dem Locator, den `codegen` schreiben würde, zum Beispiel
 `getByRole('button', { name: 'Send' })`.
 
-## Snapshot hash
+## Snapshot-Hash
 
-The hash identifies a page state for stuck detection and the action log. It is a SHA-256 over the snapshot tree with
-refs, bounding boxes, focus and cursor removed and whitespace normalised. So it stays the same for an unchanged page,
-across reloads and runs, and changes when content or element state changes (a section opens, a checkbox is ticked).
-It does not include the URL; the monkey tracks states as (URL, hash) pairs.
+Der Hash identifiziert einen Seitenzustand für die Erkennung des Feststeckens und das Aktionsprotokoll. Er ist ein
+SHA-256 über den Snapshot-Baum, aus dem Refs, Bounding Boxes, Fokus und Cursor entfernt und in dem Leerraum
+normalisiert ist. So bleibt er für eine unveränderte Seite gleich, über Neuladen und Läufe hinweg, und ändert sich,
+wenn sich Inhalt oder Zustand eines Elements ändern (ein Abschnitt klappt auf, eine Checkbox wird angehakt). Er
+enthält die URL nicht; der Monkey verfolgt Zustände als Paare (URL, Hash).
 
-## Serializing for the LLM
+## Serialisieren für das LLM
 
-`serializeSnapshot(snapshot, { maxChars })` renders the snapshot as plain lines (`e8 textbox "Name"`) within a
-character budget (default 8000, roughly 2000 tokens). Elements in the viewport come first, then the rest in document
-order; names are shortened, the page text gets at most a quarter of the budget when elements need the rest, and the
-output always says what was left out (`[312 more elements omitted to fit the budget]`).
+`serializeSnapshot(snapshot, { maxChars })` gibt den Snapshot als schlichte Zeilen aus (`e8 textbox "Name"`),
+innerhalb eines Zeichenbudgets (Standard 8000, etwa 2000 Tokens). Elemente im Viewport kommen zuerst, dann der Rest
+in Dokumentreihenfolge; Namen werden gekürzt, der Seitentext bekommt höchstens ein Viertel des Budgets, wenn die
+Elemente den Rest brauchen, und die Ausgabe sagt immer, was weggelassen wurde
+(`[312 more elements omitted to fit the budget]`).
 
-The serializer also lists open dialogs (`Open dialogs: "Cookies"`); the snapshot records them in `dialogs` for the
-[stuck detection](llm.md#when-the-monkey-hands-over).
+Der Serialisierer listet auch offene Dialoge auf (`Open dialogs: "Cookies"`); der Snapshot hält sie in `dialogs` für
+die [Erkennung des Feststeckens](llm.md#wann-der-monkey-übergibt) fest.

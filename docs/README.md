@@ -1,43 +1,55 @@
-# PlayMonkey documentation
+# PlayMonkey-Dokumentation
 
-Organised by [Diátaxis](https://diataxis.fr/).
+Die Dokumentation folgt [Diátaxis](https://diataxis.fr/): Sie ist nach dem geordnet, was du gerade brauchst.
+
+|  | Zum Lernen | Für die Arbeit |
+| --- | --- | --- |
+| **Praxis** | [Tutorials](#tutorials) – Schritt für Schritt zum ersten Erfolg | [Anleitungen](#anleitungen) – ein konkretes Ziel erreichen |
+| **Wissen** | [Hintergrund](#hintergrund) – verstehen, warum es so ist | [Referenz](#referenz) – nachschlagen, wie es genau ist |
 
 ## Tutorials
 
-- [Getting started](tutorials/getting-started.md) – install, start the fixture site, validate a config.
-- [Development setup](tutorials/development-setup.md) – from clone to all checks green.
+- [Erste Schritte](tutorials/erste-schritte.md) – installieren, die Fixture-Seite starten, eine Konfiguration prüfen.
+- [Entwicklungsumgebung aufsetzen](tutorials/entwicklungsumgebung.md) – vom Klonen bis zu allen Prüfungen grün.
 
-## How-to guides
+## Anleitungen
 
-- [Configure login](how-to/configure-login.md) – form login, saved sessions, several roles, secrets.
-- [Configure the LLM](how-to/configure-llm.md) – Claude on Microsoft Foundry, preflight, budget, troubleshooting.
-- [Run in parallel](how-to/run-in-parallel.md) – several roles and seeds at the same time, one combined report.
-- [Run in CI](how-to/run-in-ci.md) – a GitHub Actions workflow with secrets, the report as artifact and exit codes.
-- [Reproduce a finding](how-to/reproduce-a-finding.md) – steps in the report, trace viewer, replay, seed.
-- [Watch a run](how-to/watch-a-run.md) – spectator mode for watching and demos: visible, slowed down, outlined.
-- [Use the fixture site](how-to/use-the-fixture-site.md) – start it, point a config at it, add a page.
-- [Maintain the website](how-to/maintain-the-website.md) – `site/` and the Pages workflow.
+**PlayMonkey benutzen**
 
-Contributing: [CONTRIBUTING.md](../CONTRIBUTING.md).
+- [Anmeldung einrichten](how-to/anmeldung-einrichten.md) – Formular-Login, gespeicherte Sitzungen, mehrere Rollen, Secrets.
+- [LLM einrichten](how-to/llm-einrichten.md) – Claude auf Microsoft Foundry, Preflight, Budget, Fehlerbehebung.
+- [Parallel ausführen](how-to/parallel-ausfuehren.md) – mehrere Rollen und Seeds gleichzeitig, ein gemeinsamer Bericht.
+- [In CI ausführen](how-to/in-ci-ausfuehren.md) – ein GitHub-Actions-Workflow mit Secrets, dem Bericht als Artefakt und Exit-Codes.
+- [Einen Befund reproduzieren](how-to/befund-reproduzieren.md) – Schritte im Bericht, Trace-Viewer, Replay, Seed.
+- [Einen Lauf beobachten](how-to/lauf-beobachten.md) – Zuschauermodus zum Zusehen und für Demos: sichtbar, verlangsamt, umrandet.
 
-## Reference
+**PlayMonkey entwickeln**
 
-- [Configuration](reference/configuration.md) – every key with type, default and meaning.
-- [Report](reference/report.md) – the report directory, `report.html`, `report.json`, what traces contain.
-- [Action log](reference/action-log.md) – the `actions.json` format, placeholders for secrets.
-- [Commands](reference/commands.md) – the `monkey` CLI, exit codes, npm scripts and environment variables.
-- [Quality gates](reference/quality.md) – lint rules, import boundaries, coverage thresholds, hooks, CodeQL.
-- [Fixture site](../fixtures/README.md) – pages, seeded bugs and the findings they must produce.
+- [Mitmachen](../CONTRIBUTING.md) – einrichten, arbeiten, Pull Request öffnen, veröffentlichen.
+- [Die Fixture-Seite nutzen](how-to/fixture-seite-nutzen.md) – starten, eine Konfiguration darauf richten, eine Seite hinzufügen.
+- [Webseite pflegen](how-to/webseite-pflegen.md) – `site/` und der Pages-Workflow.
 
-## Explanation
+## Referenz
 
-- [Architecture](explanation/architecture.md) – the run pipeline, modules and what exists today.
-- [Ground rules](explanation/ground-rules.md) – test environments only, stop conditions, secrets, role isolation.
-- [Sessions and login](explanation/sessions.md) – contexts, the login heuristic, stayOnDomain, trace and video.
-- [Page snapshots](explanation/snapshot.md) – elements and refs, frames, the snapshot hash, the LLM serializer.
-- [The random monkey](explanation/monkey.md) – seeding, how actions and values are chosen, limits.
-- [Oracles and findings](explanation/oracles.md) – what counts as a bug, the finding model, deduplication, ignore rules, adding an oracle.
-- [The LLM](explanation/llm.md) – when the monkey hands over, fallback and circuit breaker, secrets, adding a backend.
-- [Replay](explanation/replay.md) – how a run is repeated without randomness or LLM, drift, the result.
-- [Tooling choices](explanation/tooling.md) – why `node:test`, Biome, Knip, these TypeScript settings and so few dependencies.
-- [Roadmap](explanation/roadmap.md) – milestones and status.
+- [Konfiguration](reference/konfiguration.md) – jeder Schlüssel mit Typ, Standardwert und Bedeutung.
+- [Bericht](reference/bericht.md) – das Berichtsverzeichnis, `report.html`, `report.json`, was Traces enthalten.
+- [Aktionsprotokoll](reference/aktionsprotokoll.md) – das Format von `actions.json`, Platzhalter für Secrets.
+- [Befehle](reference/befehle.md) – die `monkey`-CLI, Exit-Codes, npm-Skripte und Umgebungsvariablen.
+- [Qualitätsprüfungen](reference/qualitaetssicherung.md) – Lint-Regeln, Importgrenzen, Abdeckungsschwellen, Hooks, CodeQL.
+- [Fixture-Seite](../fixtures/README.md) – Seiten, eingebaute Fehler und die Befunde, die sie erzeugen müssen.
+
+## Hintergrund
+
+- [Architektur](explanation/architektur.md) – die Lauf-Pipeline, die Module und was es heute gibt.
+- [Grundregeln](explanation/grundregeln.md) – nur Testumgebungen, Abbruchbedingungen, Secrets, Trennung der Rollen.
+- [Sitzungen und Anmeldung](explanation/sitzungen.md) – Kontexte, die Login-Heuristik, stayOnDomain, Trace und Video.
+- [Seiten-Snapshots](explanation/snapshot.md) – Elemente und Refs, Frames, der Snapshot-Hash, der LLM-Serialisierer.
+- [Der Zufalls-Monkey](explanation/monkey.md) – Seeding, wie Aktionen und Werte gewählt werden, Limits.
+- [Orakel und Befunde](explanation/orakel.md) – was als Fehler zählt, das Befundmodell, Deduplizierung, Ignorierregeln, ein Orakel hinzufügen.
+- [Das LLM](explanation/llm.md) – wann der Monkey übergibt, Fallback und Circuit Breaker, Secrets, ein Backend hinzufügen.
+- [Replay](explanation/replay.md) – wie ein Lauf ohne Zufall und ohne LLM wiederholt wird, Abweichungen, das Ergebnis.
+- [Werkzeugwahl](explanation/werkzeuge.md) – warum `node:test`, Biome, Knip, diese TypeScript-Einstellungen und so wenige Abhängigkeiten.
+
+Verwandte Projekte mit derselben Idee und demselben Aufbau der Dokumentation:
+[flakipype](https://github.com/besessener/flakipype/blob/main/docs/README.md) und
+[Archivist](https://github.com/besessener/Archivist/blob/main/docs/README.md).

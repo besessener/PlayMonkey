@@ -204,11 +204,17 @@ h3 {
   color: var(--muted-foreground);
 }
 
+.card-link strong {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
 .card-link:hover {
   border-color: var(--primary);
 }
 
-#rules {
+.panel {
   padding-inline: clamp(1rem, 4vw, 2.5rem);
   border-radius: 1rem;
   background: var(--canvas);
@@ -238,6 +244,22 @@ pre {
   margin-bottom: 0.75rem;
 }
 
+.status {
+  max-width: 44rem;
+  margin: 0 auto 1.5rem;
+  padding: 0.5rem 1rem;
+  border: 1px solid var(--border);
+  border-radius: 0.75rem;
+  color: var(--muted-foreground);
+  font-size: 0.95rem;
+}
+
+.terminal {
+  margin: 1.5rem 0 0;
+  text-align: left;
+  box-shadow: var(--shadow);
+}
+
 .site-footer {
   padding-block: 2rem;
   border-top: 1px solid var(--border);
@@ -254,20 +276,4 @@ pre {
   html {
     scroll-behavior: auto;
   }
-}
-
-.terminal {
-  margin: 1.5rem 0 0;
-  text-align: left;
-  box-shadow: var(--shadow);
-}
-
-.status {
-  max-width: 44rem;
-  margin: 0 auto 1.5rem;
-  padding: 0.5rem 1rem;
-  border: 1px solid var(--border);
-  border-radius: 0.75rem;
-  color: var(--muted-foreground);
-  font-size: 0.95rem;
 }

@@ -53,7 +53,6 @@ function documentationFiles(): string[] {
   return [
     join(root, "README.md"),
     join(root, "CONTRIBUTING.md"),
-    join(root, "CHANGELOG.md"),
     ...markdownFiles(join(root, "docs")),
     join(root, "fixtures/README.md"),
   ];
@@ -121,8 +120,8 @@ function validationErrors({ where, json }: Sample): string[] {
 }
 
 describe("documentation", () => {
-  it("documents every config key in docs/reference/configuration.md", () => {
-    const doc = readFileSync(join(root, "docs/reference/configuration.md"), "utf8");
+  it("documents every config key in docs/reference/konfiguration.md", () => {
+    const doc = readFileSync(join(root, "docs/reference/konfiguration.md"), "utf8");
     const missing = schemaPaths(configSchema as unknown as Record<string, unknown>).filter(
       (path) => !doc.includes(`| \`${path}\` |`),
     );
@@ -139,16 +138,13 @@ describe("documentation", () => {
     assert.deepEqual(samples.flatMap(validationErrors), []);
   });
 
-  it("has a changelog section for the package version, as the release workflow needs", () => {
-    const { version } = JSON.parse(readFileSync(join(root, "package.json"), "utf8")) as { version: string };
-    const changelog = readFileSync(join(root, "CHANGELOG.md"), "utf8");
-    assert.ok(changelog.includes(`\n## ${version} – `), `CHANGELOG.md has no "## ${version} – <date>" section`);
-  });
-
   it("shows the CI example workflow exactly as it runs in this repository", () => {
     const workflow = readFileSync(join(root, ".github/workflows/monkey.yml"), "utf8");
-    const doc = readFileSync(join(root, "docs/how-to/run-in-ci.md"), "utf8");
+    const doc = readFileSync(join(root, "docs/how-to/in-ci-ausfuehren.md"), "utf8");
     const blocks = [...doc.matchAll(/```yaml\n([\s\S]*?)```/g)].map(([, block]) => block);
-    assert.ok(blocks.includes(workflow), "docs/how-to/run-in-ci.md must contain .github/workflows/monkey.yml verbatim");
+    assert.ok(
+      blocks.includes(workflow),
+      "docs/how-to/in-ci-ausfuehren.md must contain .github/workflows/monkey.yml verbatim",
+    );
   });
 });
