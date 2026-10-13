@@ -12,7 +12,7 @@ to reproduce it. An LLM steps in only when the random monkey is stuck. Full docs
 
 - **Entry point:** `src/cli/main.ts`; modules and responsibilities in
   [architektur.md](docs/explanation/architektur.md).
-- **Runtime:** Node.js 22, TypeScript run through Node's type stripping, few dependencies
+- **Runtime:** Node.js 26, TypeScript run through Node's type stripping, few dependencies
   ([werkzeuge.md](docs/explanation/werkzeuge.md)).
 - **Ground truth:** the [fixture site](fixtures/README.md) with seeded bugs.
 - **Siblings:** [flakipype](https://github.com/besessener/flakipype) and [Archivist](https://github.com/besessener/Archivist)

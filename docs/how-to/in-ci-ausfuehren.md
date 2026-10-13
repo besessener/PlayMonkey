@@ -53,7 +53,7 @@ jobs:
           persist-credentials: false
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
-          node-version: 22
+          node-version: 26
           cache: npm
       # Installs PlayMonkey with the other dependencies. In your project it is a devDependency:
       #   npm install --save-dev github:besessener/PlayMonkey
@@ -115,7 +115,7 @@ jobs:
 
 Was er tut:
 
-1. **Installiert** Node.js 22, die Abhängigkeiten des Projekts (darunter PlayMonkey) und Chromium mit seinen
+1. **Installiert** Node.js 26, die Abhängigkeiten des Projekts (darunter PlayMonkey) und Chromium mit seinen
    Systembibliotheken (`--with-deps`).
 2. **Startet die Fixture-Seite.** Das braucht nur PlayMonkeys eigene Kopie; deine Testumgebung läuft schon, also
    lösch den Schritt.

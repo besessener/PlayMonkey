@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { existsSync } from "node:fs";
 import { mkdtemp, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 import { after, before, describe, it } from "node:test";
 import { FIXTURE_CREDENTIALS, type Fixture, startFixture } from "../fixtures/site/server.ts";
 import { runCli } from "../src/cli/cli.ts";
@@ -126,15 +126,15 @@ describe("parallel runs per role and seed", () => {
     assert.deepEqual(
       planRuns(parse({ auth, seeds: [7, 1] })).map((r) => [r.label, r.seed, r.outputDir]),
       [
-        ["a/7", 7, "/c/monkey-report/a/7"],
-        ["a/1", 1, "/c/monkey-report/a/1"],
-        ["b c/7", 7, "/c/monkey-report/b_c/7"],
-        ["b c/1", 1, "/c/monkey-report/b_c/1"],
+        ["a/7", 7, resolve("/c/monkey-report/a/7")],
+        ["a/1", 1, resolve("/c/monkey-report/a/1")],
+        ["b c/7", 7, resolve("/c/monkey-report/b_c/7")],
+        ["b c/1", 1, resolve("/c/monkey-report/b_c/1")],
       ],
     );
     assert.deepEqual(
       planRuns(parse({ seed: 9 })).map((r) => [r.label, r.seed, r.outputDir]),
-      [["anonymous", 9, "/c/monkey-report/anonymous"]],
+      [["anonymous", 9, resolve("/c/monkey-report/anonymous")]],
     );
   });
 });

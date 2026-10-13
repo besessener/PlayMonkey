@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { mkdtemp, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 import { describe, it } from "node:test";
 import { runCli } from "../src/cli/cli.ts";
 import { ConfigError, type LoadedConfig, loadConfig, parseConfig } from "../src/config/config.ts";
@@ -77,7 +77,7 @@ describe("parseConfig", () => {
         download: true,
       },
       findings: { lastActions: 10, ignoreStatus: [], ignore: [] },
-      report: { dir: "/configs/monkey-report", keepDownloads: false },
+      report: { dir: resolve("/configs/monkey-report"), keepDownloads: false },
       monkey: {
         actionTimeoutMs: 5000,
         maxTabs: 5,
@@ -119,13 +119,13 @@ describe("parseConfig", () => {
         fields: { username: "admin", password: SECRET },
         submit: "button[type=submit]",
       },
-      { kind: "storageState", name: "user", storageState: "/configs/states/user.json" },
+      { kind: "storageState", name: "user", storageState: resolve("/configs/states/user.json") },
     ]);
     assert.equal(config.llm?.apiKey, ENV.FOUNDRY_API_KEY);
     assert.equal(config.oracles.overflow, false);
     assert.equal(config.oracles.console, true);
     assert.deepEqual(config.browser, { engine: "firefox", viewport: [800, 600], headless: false });
-    assert.equal(config.report.dir, "/configs/out");
+    assert.equal(config.report.dir, resolve("/configs/out"));
   });
 
   it("resolves placeholders embedded in longer strings", () => {

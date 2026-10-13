@@ -4,8 +4,7 @@ Vom Klonen bis zu Build, Tests und Lint, die lokal grün sind – dieselben Prü
 
 ## Voraussetzungen
 
-- Node.js 22.18 oder neuer. Die Tests importieren die TypeScript-Quellen direkt über das Type Stripping von Node, das
-  ab 22.18 standardmäßig aktiv ist. Die gebaute CLI selbst läuft auf jedem Node.js 22.
+- Node.js 26 oder neuer. Die Tests importieren die TypeScript-Quellen direkt über das Type Stripping von Node.
 - Ein Playwright-Chromium für die Browsertests.
 
 ## Schritte
@@ -51,7 +50,7 @@ prek run --all-files
 
 Die CI (`.github/workflows/ci.yml`) führt dasselbe aus: einen Hygiene-Job mit gitleaks über die gesamte Historie und
 die Hooks, und einen Build-Test-Job, der Chromium mit `--with-deps` installiert und dann Build, Lint, Knip und die
-Tests mit Abdeckung auf Node 22 ausführt. `.github/workflows/monkey.yml`, das
+Tests mit Abdeckung auf Node 26 ausführt. `.github/workflows/monkey.yml`, das
 [CI-Beispiel](../how-to/in-ci-ausfuehren.md), führt `monkey run` gegen die Fixture-Seite aus, wie es das Projekt eines
 Benutzers tun würde. Jede Prüfung und jeder Schwellwert stehen in
 [Qualitätsprüfungen](../reference/qualitaetssicherung.md), jedes Skript in [Befehle](../reference/befehle.md).
