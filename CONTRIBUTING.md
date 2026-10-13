@@ -54,12 +54,15 @@ fixture site (`monkey.yml`).
 
 ## Releasing
 
-1. Add a section `## X.Y.Z – <date>` to [CHANGELOG.md](CHANGELOG.md) and set the version:
-   `npm version X.Y.Z --no-git-tag-version`. Merge that through a pull request.
+Changes are listed in the [GitHub Releases](https://github.com/besessener/PlayMonkey/releases).
+
+1. Set the version with `npm version X.Y.Z --no-git-tag-version` and update the pinned tag (`#vX.Y.Z`) in the
+   [README](README.md), [run in CI](docs/how-to/run-in-ci.md) and `site/index.html`. Merge that through a pull
+   request.
 2. Tag the merge commit on `main` and push the tag: `git tag vX.Y.Z && git push origin vX.Y.Z`.
 
 `.github/workflows/release.yml` then checks that the tag matches `package.json` and publishes a GitHub release with
-the changelog section as notes. `test/docs.test.ts` fails when the changelog has no section for the package version.
+notes generated from the merged pull requests.
 
 ## Extending
 

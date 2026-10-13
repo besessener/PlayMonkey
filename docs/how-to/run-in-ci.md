@@ -12,7 +12,7 @@ npm install --save-dev github:besessener/PlayMonkey
 npx monkey --help
 ```
 
-Pin a release tag (`github:besessener/PlayMonkey#v0.4.0`, see the [changelog](../../CHANGELOG.md)) or a commit for
+Pin a release tag (`github:besessener/PlayMonkey#v0.4.0`, see the [releases](https://github.com/besessener/PlayMonkey/releases)) or a commit for
 repeatable builds. Commit your config next to it, e.g.
 `monkey.json`, with every secret as a `${VAR}` placeholder (see [configure login](configure-login.md#keep-secrets-out-of-the-file)).
 

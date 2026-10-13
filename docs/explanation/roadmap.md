@@ -2,7 +2,7 @@
 
 The plan lives in the [epic](https://github.com/besessener/PlayMonkey/issues/1); each work item is a sub-issue
 carrying its milestone in the title. Work goes in milestone order, with a review after each. Released versions
-and what changed: [CHANGELOG](../../CHANGELOG.md).
+and what changed: [GitHub Releases](https://github.com/besessener/PlayMonkey/releases).
 
 | Milestone | Scope | Status |
 | --- | --- | --- |
