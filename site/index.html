@@ -1,50 +1,53 @@
 <!doctype html>
-<html lang="en">
+<html lang="de">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>PlayMonkey – monkey testing for websites, built on Playwright</title>
+    <title>PlayMonkey – Monkey-Testing für Websites, gebaut auf Playwright</title>
     <meta
       name="description"
-      content="PlayMonkey is a command line tool that drives a real browser against a website in a test environment, clicks around with seeded randomness and reports reproducible bugs. An LLM steps in only when the monkey is stuck."
+      content="PlayMonkey ist ein Kommandozeilenwerkzeug, das einen echten Browser gegen eine Website in einer Testumgebung steuert, mit Seed-gesteuertem Zufall herumklickt und reproduzierbare Fehler meldet. Ein LLM springt nur ein, wenn der Monkey feststeckt."
     />
     <meta property="og:type" content="website" />
     <meta property="og:url" content="https://besessener.github.io/PlayMonkey/" />
-    <meta property="og:title" content="PlayMonkey – monkey testing for websites, built on Playwright" />
+    <meta property="og:title" content="PlayMonkey – Monkey-Testing für Websites, gebaut auf Playwright" />
     <meta
       property="og:description"
-      content="A command line tool that drives a real browser against a website in a test environment, clicks around with seeded randomness and reports reproducible bugs."
+      content="Ein Kommandozeilenwerkzeug, das einen echten Browser gegen eine Website in einer Testumgebung steuert, mit Seed-gesteuertem Zufall herumklickt und reproduzierbare Fehler meldet."
     />
     <meta property="og:image" content="https://besessener.github.io/PlayMonkey/img/report-light.png" />
+    <meta property="og:locale" content="de_DE" />
     <link rel="icon" href="favicon.svg" type="image/svg+xml" />
     <link rel="stylesheet" href="style.css" />
   </head>
   <body>
     <header class="site-header">
       <a class="brand" href="#top"><img src="favicon.svg" alt="" width="28" height="28" /> PlayMonkey</a>
-      <nav aria-label="Site navigation">
-        <a href="#features">Features</a>
-        <a href="#rules">Ground rules</a>
-        <a href="#start">Get started</a>
-        <a href="#docs">Documentation</a>
+      <nav aria-label="Seitennavigation">
+        <a href="#features">Funktionen</a>
+        <a href="#rules">Grundregeln</a>
+        <a href="#start">Loslegen</a>
+        <a href="#docs">Dokumentation</a>
         <a href="https://github.com/besessener/PlayMonkey">GitHub</a>
       </nav>
     </header>
 
     <main id="top">
       <section class="hero">
-        <h1>Let a monkey loose on your test environment</h1>
+        <h1>Lass einen Affen auf deine Testumgebung los</h1>
         <p class="lead">
-          A command line tool that drives a real browser with Playwright, clicks, types and submits its way through your site with seeded randomness and
-          reports what breaks: uncaught errors, failing requests, broken pages. Every finding comes with the steps to reproduce it.
+          Ein Kommandozeilenwerkzeug, das mit Playwright einen echten Browser steuert, sich mit Seed-gesteuertem Zufall klickend, tippend und absendend durch
+          deine Website bewegt und meldet, was kaputtgeht: nicht abgefangene Fehler, fehlschlagende Requests, kaputte Seiten. Zu jedem Befund gibt es die
+          Schritte zum Nachstellen.
         </p>
         <p class="status">
-          Status: milestone M4. The seeded random monkey with oracles, reports and replay; Claude on Microsoft Foundry or any OpenAI-compatible endpoint for stuck situations; cookie banners, native dialogs, iframes, popups, uploads and downloads handled; parallel runs per role and seed, and a CI example. See the
-          <a href="https://github.com/besessener/PlayMonkey/blob/main/docs/explanation/roadmap.md">roadmap</a>.
+          Stand: Version 0.4.0. Der Zufalls-Monkey mit Seed, mit Orakeln, Berichten und Replay; Claude auf Microsoft Foundry oder jeder OpenAI-kompatible
+          Endpunkt für festgefahrene Situationen; Cookie-Banner, native Dialoge, iframes, Popups, Uploads und Downloads werden behandelt; parallele Läufe je
+          Rolle und Seed und ein CI-Beispiel.
         </p>
         <p class="actions">
-          <a class="button primary" href="#start">Install</a>
-          <a class="button" href="https://github.com/besessener/PlayMonkey/blob/main/docs/tutorials/getting-started.md">Getting started</a>
+          <a class="button primary" href="#start">Installieren</a>
+          <a class="button" href="https://github.com/besessener/PlayMonkey/blob/main/docs/tutorials/erste-schritte.md">Erste Schritte</a>
         </p>
         <pre class="terminal"><code>$ npx monkey run fixtures/configs/fixture.json
 seed: 42
@@ -63,23 +66,23 @@ exit 1: findings present</code></pre>
       </section>
 
       <section id="features">
-        <h2>What PlayMonkey does for you</h2>
+        <h2>Was PlayMonkey für dich tut</h2>
         <div class="cards">
           <article>
-            <h3>Seeded random monkey</h3>
-            <p>Clicks links and buttons, fills forms with valid and nasty values and explores unvisited states. The same seed gives the same run.</p>
+            <h3>Zufalls-Monkey mit Seed</h3>
+            <p>Klickt Links und Buttons, füllt Formulare mit gültigen und fiesen Werten und erkundet unbesuchte Zustände. Derselbe Seed ergibt denselben Lauf.</p>
           </article>
           <article>
-            <h3>An LLM only when stuck</h3>
-            <p>Cookie banners, dialogs, forms that need valid data or a login wall: a model takes over for a few steps, then the monkey continues.</p>
+            <h3>Ein LLM nur, wenn er feststeckt</h3>
+            <p>Cookie-Banner, Dialoge, Formulare, die gültige Daten brauchen, oder eine Anmeldeschranke: Ein Modell übernimmt für ein paar Schritte, dann macht der Monkey weiter.</p>
           </article>
           <article>
-            <h3>Findings, not noise</h3>
-            <p>Oracles watch for uncaught exceptions, console errors, HTTP 4xx and 5xx, crashes, hangs, error pages and layout overflow, deduplicated.</p>
+            <h3>Befunde statt Rauschen</h3>
+            <p>Orakel achten auf nicht abgefangene Exceptions, Konsolenfehler, HTTP 4xx und 5xx, Abstürze, Hänger, Fehlerseiten und Layout-Überlauf, ohne Duplikate.</p>
           </article>
           <article>
-            <h3>Reproducible by design</h3>
-            <p>Every action is logged with a durable locator. <code>monkey replay</code> runs the log again without an LLM; traces and videos show what happened.</p>
+            <h3>Reproduzierbar von Grund auf</h3>
+            <p>Jede Aktion wird mit einem dauerhaften Locator protokolliert. <code>monkey replay</code> spielt das Protokoll ohne LLM erneut ab; Traces und Videos zeigen, was passiert ist.</p>
           </article>
         </div>
         <picture>
@@ -90,29 +93,29 @@ exit 1: findings present</code></pre>
             width="1120"
             height="858"
             loading="lazy"
-            alt="The PlayMonkey report of a run against the fixture site: five findings by severity, and the first one with the steps to reproduce it and a screenshot."
+            alt="Der PlayMonkey-Bericht eines Laufs gegen die Fixture-Seite: fünf Befunde nach Schweregrad, der erste mit den Schritten zum Nachstellen und einem Screenshot."
           />
         </picture>
       </section>
 
       <section id="rules" class="panel">
-        <h2>Built for test environments</h2>
-        <p class="section-lead">PlayMonkey clicks, deletes and submits anything it finds. Point it only at environments you can reset.</p>
+        <h2>Gebaut für Testumgebungen</h2>
+        <p class="section-lead">PlayMonkey klickt, löscht und sendet alles ab, was es findet. Richte es nur auf Umgebungen, die du zurücksetzen kannst.</p>
         <ul class="checks">
-          <li><strong>No guardrails, on purpose.</strong> There is no read-only mode and no confirmation; that is how it finds the bugs.</li>
-          <li><strong>Runs always end.</strong> <code>maxSteps</code> and <code>maxMinutes</code> stop every run.</li>
-          <li><strong>It stays on your site.</strong> With <code>stayOnDomain</code> (on by default) links to other origins are not followed.</li>
-          <li><strong>Secrets come from the environment.</strong> <code>${VAR}</code> placeholders are resolved at start and masked as <code>***</code> in all output.</li>
-          <li><strong>Each role is isolated.</strong> Every login runs in its own browser context; cookies never leak between roles.</li>
+          <li><strong>Bewusst ohne Schutzgeländer.</strong> Es gibt keinen Nur-Lese-Modus und keine Bestätigung; genau so findet es die Fehler.</li>
+          <li><strong>Läufe enden immer.</strong> <code>maxSteps</code> und <code>maxMinutes</code> beenden jeden Lauf.</li>
+          <li><strong>Es bleibt auf deiner Website.</strong> Mit <code>stayOnDomain</code> (standardmäßig an) folgt es keinen Links zu anderen Origins.</li>
+          <li><strong>Secrets kommen aus der Umgebung.</strong> <code>${VAR}</code>-Platzhalter werden beim Start aufgelöst und in jeder Ausgabe als <code>***</code> maskiert.</li>
+          <li><strong>Jede Rolle ist isoliert.</strong> Jede Anmeldung läuft in ihrem eigenen Browserkontext; Cookies gelangen nie von einer Rolle zur anderen.</li>
         </ul>
         <p>
-          <a href="https://github.com/besessener/PlayMonkey/blob/main/docs/explanation/ground-rules.md">More about the ground rules</a>
+          <a href="https://github.com/besessener/PlayMonkey/blob/main/docs/explanation/grundregeln.md">Mehr zu den Grundregeln</a>
         </p>
       </section>
 
       <section id="start">
-        <h2>Get started</h2>
-        <p class="section-lead">Requires Node.js 22.18 or newer and a Playwright browser. Describe the site in a JSON config; secrets stay in environment variables.</p>
+        <h2>In drei Schritten loslegen</h2>
+        <p class="section-lead">Du brauchst Node.js 22.18 oder neuer und einen Playwright-Browser. Beschreibe die Website in einer JSON-Konfiguration; Secrets bleiben in Umgebungsvariablen.</p>
         <pre><code>{
   "baseUrl": "https://test.example.org",
   "auth": [
@@ -126,53 +129,55 @@ exit 1: findings present</code></pre>
 }</code></pre>
         <ol class="steps">
           <li>
-            <strong>Install.</strong> <code>npm install --save-dev github:besessener/PlayMonkey#v0.4.0</code> in your project, then
+            <strong>Installieren.</strong> <code>npm install --save-dev github:besessener/PlayMonkey#v0.4.0</code> in deinem Projekt, danach
             <code>npx playwright install chromium</code>.
           </li>
-          <li><strong>Configure.</strong> Write a config like the one above and export the variables it references.</li>
-          <li><strong>Run.</strong> <code>npx monkey run config.json</code> logs in, explores every role and lists the findings, each with a screenshot and the steps that led to it.</li>
+          <li><strong>Konfigurieren.</strong> Schreibe eine Konfiguration wie die obige und exportiere die Variablen, auf die sie verweist.</li>
+          <li><strong>Starten.</strong> <code>npx monkey run config.json</code> meldet sich an, erkundet jede Rolle und listet die Befunde auf, jeden mit Screenshot und den Schritten, die zu ihm geführt haben.</li>
         </ol>
         <p>
-          The <a href="https://github.com/besessener/PlayMonkey/blob/main/docs/tutorials/getting-started.md">getting started</a> tutorial walks you
-          through it against the bundled fixture site; the
-          <a href="https://github.com/besessener/PlayMonkey/blob/main/docs/reference/configuration.md">configuration reference</a> lists every key.
+          Das Tutorial <a href="https://github.com/besessener/PlayMonkey/blob/main/docs/tutorials/erste-schritte.md">Erste Schritte</a> führt dich gegen die
+          mitgelieferte Fixture-Seite durch alles; die
+          <a href="https://github.com/besessener/PlayMonkey/blob/main/docs/reference/konfiguration.md">Konfigurationsreferenz</a> listet jeden Schlüssel auf.
         </p>
       </section>
 
       <section id="docs">
-        <h2>Documentation</h2>
-        <p class="section-lead">Organised by what you need right now (<a href="https://diataxis.fr/">Diátaxis</a>).</p>
+        <h2>Dokumentation</h2>
+        <p class="section-lead">Geordnet nach dem, was du gerade brauchst (<a href="https://diataxis.fr/">Diátaxis</a>).</p>
         <div class="cards">
           <a class="card-link" href="https://github.com/besessener/PlayMonkey/blob/main/docs/README.md#tutorials">
             <strong>Tutorials</strong>
-            <span>Step by step to a first success</span>
+            <span>Schritt für Schritt zum ersten Erfolg</span>
           </a>
-          <a class="card-link" href="https://github.com/besessener/PlayMonkey/blob/main/docs/README.md#how-to-guides">
-            <strong>How-to guides</strong>
-            <span>Reach one concrete goal</span>
+          <a class="card-link" href="https://github.com/besessener/PlayMonkey/blob/main/docs/README.md#anleitungen">
+            <strong>Anleitungen</strong>
+            <span>Ein konkretes Ziel erreichen</span>
           </a>
-          <a class="card-link" href="https://github.com/besessener/PlayMonkey/blob/main/docs/README.md#reference">
-            <strong>Reference</strong>
-            <span>Look up exactly how it is</span>
+          <a class="card-link" href="https://github.com/besessener/PlayMonkey/blob/main/docs/README.md#referenz">
+            <strong>Referenz</strong>
+            <span>Nachschlagen, wie es genau ist</span>
           </a>
-          <a class="card-link" href="https://github.com/besessener/PlayMonkey/blob/main/docs/README.md#explanation">
-            <strong>Explanation</strong>
-            <span>Understand why it is so</span>
+          <a class="card-link" href="https://github.com/besessener/PlayMonkey/blob/main/docs/README.md#hintergrund">
+            <strong>Hintergrund</strong>
+            <span>Verstehen, warum es so ist</span>
           </a>
         </div>
       </section>
 
       <section id="related">
-        <h2>Related projects</h2>
-        <p class="section-lead">Three tools that started from the same agentic idea, with the same ground rules, quality gates and documentation layout.</p>
+        <h2>Verwandte Projekte</h2>
+        <p class="section-lead">
+          Drei Werkzeuge aus derselben agentischen Idee, mit denselben Grundregeln, Qualitätsprüfungen und demselben Aufbau der Dokumentation.
+        </p>
         <div class="cards">
-          <a class="card-link" href="https://besessener.github.io/flakipype/">
+          <a class="card-link" href="https://besessener.github.io/flakipype/" hreflang="de">
             <strong><img src="https://besessener.github.io/flakipype/favicon.svg" alt="" width="24" height="24" /> flakipype</strong>
-            <span>Find, explain and fix flaky GitHub Actions pipelines through draft pull requests.</span>
+            <span>Findet, erklärt und behebt instabile GitHub-Actions-Pipelines per Draft-PR.</span>
           </a>
-          <a class="card-link" href="https://besessener.github.io/Archivist/">
+          <a class="card-link" href="https://besessener.github.io/Archivist/" hreflang="de">
             <strong><img src="https://besessener.github.io/Archivist/favicon.svg" alt="" width="24" height="24" /> Archivist</strong>
-            <span>A personal, agentic AI archivist for Windows (in German).</span>
+            <span>Ein persönlicher, agentischer KI-Archivar für Windows.</span>
           </a>
         </div>
       </section>
@@ -180,10 +185,10 @@ exit 1: findings present</code></pre>
 
     <footer class="site-footer">
       <p>
-        PlayMonkey is released under the <a href="https://github.com/besessener/PlayMonkey/blob/main/LICENSE">MIT License</a>.
-        <a href="https://github.com/besessener/PlayMonkey">Source on GitHub</a> ·
+        PlayMonkey steht unter der <a href="https://github.com/besessener/PlayMonkey/blob/main/LICENSE">MIT-Lizenz</a>.
+        <a href="https://github.com/besessener/PlayMonkey">Quellcode auf GitHub</a> ·
         <a href="https://github.com/besessener/PlayMonkey/releases">Releases</a> ·
-        <a href="https://github.com/besessener/PlayMonkey/issues">Issues</a>
+        <a href="https://github.com/besessener/PlayMonkey/issues">Fehler melden</a>
       </p>
     </footer>
   </body>

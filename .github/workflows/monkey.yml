@@ -1,6 +1,6 @@
 # Example: run PlayMonkey against a test environment in GitHub Actions.
 # This copy runs in PlayMonkey's own CI against the fixture site, so the example cannot rot.
-# docs/how-to/run-in-ci.md explains it; the lines marked CHANGE are the ones to adapt for your project.
+# docs/how-to/in-ci-ausfuehren.md explains it; the lines marked CHANGE are the ones to adapt for your project.
 name: Monkey
 
 on:
