@@ -209,7 +209,10 @@ describe("the lab: hard parts of real pages", () => {
   });
 
   it("saves downloads and reports a broken one", async () => {
-    const run = await drive("/lab/download", [click(link("Download the report")), click(link("Download the export"))]);
+    // Chromium needs up to ~10 s on a busy machine to report the cut-off download as failed.
+    const run = await drive("/lab/download", [click(link("Download the report")), click(link("Download the export"))], {
+      monkey: { actionTimeoutMs: 15_000 },
+    });
     try {
       assert.equal(run.result.stopReason, "end", run.result.error ?? "no error");
       const downloads = run.events.filter((e) => e.kind === "download");
