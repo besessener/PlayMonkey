@@ -110,6 +110,7 @@ dort ein Schlüssel steht, der auf dieser Seite fehlt.
 | `findings.ignore[].oracle` | Orakelname | alle | Nur Signale dieses Orakels. |
 | `findings.ignore[].url` | regulärer Ausdruck | – | Wird gegen die Anfrage-URL (HTTP-Befunde) oder die Seiten-URL geprüft. |
 | `findings.ignore[].message` | regulärer Ausdruck | – | Wird gegen die Meldung des Befunds geprüft. Jede Regel braucht `url` oder `message`. |
+| `findings.baseline` | string | fehlt | `baseline.json` eines früheren Laufs, relativ zur Konfigurationsdatei. Befunde, die es auflistet, sind bekannt und lassen den Lauf nicht scheitern; siehe [Baseline](../how-to/in-ci-ausfuehren.md#nur-neue-befunde-mit-einer-baseline). |
 | `report.dir` | string | `./monkey-report` | Ausgabeverzeichnis des Berichts, relativ zur Konfigurationsdatei. |
 | `report.keepDownloads` | boolean | `false` | Die Dateien, die die Seite heruntergeladen hat, in `<role>/downloads/` des Berichtsverzeichnisses behalten. Aus: Sie werden vermessen (Name, Größe) und gelöscht, wenn die Rolle endet. |
 | `monkey.actionTimeoutMs` | integer ≥ 100 | `5000` | Zeitlimit einer Aktion in Millisekunden; eine langsamere Aktion schlägt fehl, und der Lauf geht weiter. Auch so lange wartet ein Schritt darauf, dass Dialoge, Uploads und Downloads fertig werden. |
@@ -145,8 +146,8 @@ Befunde](../explanation/orakel.md).
 - **`scope`:** Jedes Muster muss ein gültiger regulärer Ausdruck sein, und `baseUrl` muss im Scope liegen.
 - **Ignorierregeln** brauchen `url` oder `message`, und beide müssen gültige reguläre Ausdrücke von JavaScript sein;
   um ein Orakel ganz abzuschalten, nutze `oracles.<name>: false`.
-- **Relative Pfade** (`auth[].storageState`, `report.dir`) werden gegen das Verzeichnis der Konfigurationsdatei
-  aufgelöst.
+- **Relative Pfade** (`auth[].storageState`, `report.dir`, `findings.baseline`) werden gegen das Verzeichnis der
+  Konfigurationsdatei aufgelöst.
 - **Fehler** werden alle auf einmal aufgelistet, jeder mit seinem Pfad (z. B. `auth[0].fields.password`); der
   Exit-Code ist `2`.
 

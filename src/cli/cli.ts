@@ -7,6 +7,7 @@ import type { LlmProvider } from "../llm/provider.ts";
 import { describeUsage, LlmStats } from "../llm/usage.ts";
 import { DEFAULT_SPECTATOR, type Spectator } from "../monkey/spectator.ts";
 import { SEVERITIES } from "../oracles/finding.ts";
+import { type Baseline, BaselineError, readBaseline } from "../report/baseline.ts";
 import { buildReport, type Report, writeReport } from "../report/report.ts";
 import { planRuns, type RoleOutcome, type RunLlm, runAllRoles } from "../run.ts";
 import { readVersion } from "../version.ts";
@@ -34,8 +35,10 @@ Options:
   -v, --version          Show the version.
 
 Exit codes:
-  0  no findings (replay: none of the recorded findings recurred)
-  1  findings present (replay: at least one recorded finding recurred)
+  0  no findings (with findings.baseline: no new ones; replay: none of the recorded
+     findings recurred)
+  1  findings present (with findings.baseline: new ones; replay: at least one
+     recorded finding recurred)
   2  tool or config error (also: the LLM preflight failed with llm.required, or a
      run did not complete; takes precedence over 1)
 `;
@@ -172,13 +175,15 @@ async function run(configFile: string, io: CliIo, spectator?: Spectator): Promis
   const loaded = await load("run", configFile, io);
   if (loaded === undefined) return ExitCode.Error;
   printRunPlan(loaded, io);
-  // Before any browser work, so a broken endpoint fails fast.
+  // Before any browser work, so a missing baseline or a broken endpoint fails fast.
+  const baseline = await configuredBaseline(loaded, io);
+  if (typeof baseline === "number") return baseline;
   const llm = await startLlm("run", loaded, io);
   if (typeof llm === "number") return llm;
 
   return await withStopSignal("run", io, async (signal) => {
     try {
-      return await runAndReport({ loaded, llm, spectator, io }, signal);
+      return await runAndReport({ loaded, llm, spectator, io, baseline }, signal);
     } catch (error) {
       const message = loaded.secrets.mask(error instanceof Error ? error.message : String(error));
       io.stderr(`monkey run: ${launchHint(message, spectator)}\n`);
@@ -197,14 +202,31 @@ function printRunPlan({ config, seedGenerated }: LoadedConfig, io: CliIo): void 
   if (runs > 1) io.stdout(`runs: ${runs}, ${Math.min(config.parallel, runs)} at a time\n`);
 }
 
+/** The baseline of `findings.baseline`, undefined without one, or exit code 2 when it cannot be read. */
+async function configuredBaseline({ config }: LoadedConfig, io: CliIo): Promise<Baseline | ExitCode | undefined> {
+  const file = config.findings.baseline;
+  if (file === undefined) return undefined;
+  try {
+    return await readBaseline(file);
+  } catch (error) {
+    if (!(error instanceof BaselineError)) throw error;
+    io.stderr(`monkey run: ${error.message}\n`);
+    return ExitCode.Error;
+  }
+}
+
 interface RunContext {
   loaded: LoadedConfig;
   llm: RunLlm | undefined;
   spectator: Spectator | undefined;
   io: CliIo;
+  baseline: Baseline | undefined;
 }
 
-async function runAndReport({ loaded, llm, spectator, io }: RunContext, signal: AbortSignal): Promise<ExitCode> {
+async function runAndReport(
+  { loaded, llm, spectator, io, baseline }: RunContext,
+  signal: AbortSignal,
+): Promise<ExitCode> {
   const startedAt = new Date();
   const outcomes = await runAllRoles(loaded, {
     log: (line) => io.stdout(`${line}\n`),
@@ -219,19 +241,29 @@ async function runAndReport({ loaded, llm, spectator, io }: RunContext, signal: 
     startedAt,
     finishedAt: new Date(),
     ...(llm === undefined ? {} : { llm: llm.stats.report() }),
+    ...(baseline === undefined ? {} : { baseline }),
   });
   const paths = await writeReport(report, loaded.config.report.dir);
 
   printLlmUsage(report, io);
+  printSummary(report, io);
+  io.stdout(`report: ${paths.html}\n`);
+  return runExitCode(report, incompleteRuns(outcomes, loaded), io);
+}
+
+/** The findings, the comparison with the baseline and the coverage, one line each. */
+function printSummary(report: Report, io: CliIo): void {
   const total = report.aggregated.length;
   const counts = SEVERITIES.filter((severity) => report.counts[severity] > 0)
     .map((severity) => `${report.counts[severity]} ${severity}`)
     .join(", ");
   io.stdout(`findings: ${total}${total === 0 ? "" : ` (${counts})`}\n`);
+  const { baseline } = report;
+  if (baseline !== undefined) {
+    io.stdout(`baseline: ${baseline.new} new, ${baseline.known} known, ${baseline.unseen.length} not seen this time\n`);
+  }
   const { pages, unvisited } = report.coverage;
   io.stdout(`coverage: ${pages.length} pages visited, ${unvisited.length} linked pages never visited\n`);
-  io.stdout(`report: ${paths.html}\n`);
-  return runExitCode(total, incompleteRuns(outcomes, loaded), io);
 }
 
 function printLlmUsage({ llm }: Report, io: CliIo): void {
@@ -250,13 +282,16 @@ function incompleteRuns(outcomes: RoleOutcome[], { config, secrets }: LoadedConf
     .map((outcome) => secrets.mask(config.seeds === undefined ? outcome.role : `${outcome.role}/${outcome.seed}`));
 }
 
-function runExitCode(findings: number, incomplete: string[], io: CliIo): ExitCode {
+/** With a baseline, only new findings fail the run. */
+function runExitCode(report: Report, incomplete: string[], io: CliIo): ExitCode {
   // Precedence: a run that did not complete (2) outranks findings (1).
   if (incomplete.length > 0) {
     io.stdout(`exit 2: ${incomplete.length === 1 ? "run" : "runs"} ${incomplete.join(", ")} did not complete\n`);
     return ExitCode.Error;
   }
-  io.stdout(findings > 0 ? "exit 1: findings present\n" : "exit 0: no findings\n");
+  const findings = report.baseline?.new ?? report.aggregated.length;
+  const kind = report.baseline === undefined ? "" : "new ";
+  io.stdout(findings > 0 ? `exit 1: ${kind}findings present\n` : `exit 0: no ${kind}findings\n`);
   return findings > 0 ? ExitCode.Findings : ExitCode.NoFindings;
 }
 

@@ -39,7 +39,8 @@ export interface Config {
   testData: Record<string, string>;
   llm?: LlmConfig;
   oracles: Record<OracleName, boolean>;
-  findings: { lastActions: number; ignoreStatus: number[]; ignore: IgnoreRule[] };
+  /** `baseline`: absolute path, present only when configured. */
+  findings: { lastActions: number; ignoreStatus: number[]; ignore: IgnoreRule[]; baseline?: string };
   report: { dir: string; keepDownloads: boolean };
   monkey: { actionTimeoutMs: number; maxTabs: number; weights: Record<ActionType, number> };
 }
@@ -195,7 +196,7 @@ function normalize(raw: RawConfig, seed: number, baseDir: string): Config {
       OracleName,
       boolean
     >,
-    findings: normalizeFindings(raw.findings),
+    findings: normalizeFindings(raw.findings, baseDir),
     report: {
       dir: resolve(baseDir, raw.report?.dir ?? DEFAULTS.report.dir),
       keepDownloads: raw.report?.keepDownloads ?? DEFAULTS.report.keepDownloads,
@@ -215,11 +216,12 @@ function normalizeBrowser(raw: RawConfig["browser"]): Config["browser"] {
   };
 }
 
-function normalizeFindings(raw: RawConfig["findings"]): Config["findings"] {
+function normalizeFindings(raw: RawConfig["findings"], baseDir: string): Config["findings"] {
   return {
     lastActions: raw?.lastActions ?? DEFAULTS.findings.lastActions,
     ignoreStatus: [...(raw?.ignoreStatus ?? DEFAULTS.findings.ignoreStatus)],
     ignore: (raw?.ignore ?? []).map((rule) => ({ ...rule })),
+    ...(raw?.baseline === undefined ? {} : { baseline: resolve(baseDir, raw.baseline) }),
   };
 }
 

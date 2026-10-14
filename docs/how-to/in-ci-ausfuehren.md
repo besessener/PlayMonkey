@@ -144,3 +144,19 @@ Was er tut:
   [LLM einrichten](llm-einrichten.md).
 - **Einen CI-Befund lokal reproduzieren:** Lad das Artefakt herunter und spiel die `actions.json` des Laufs ab, siehe
   [Einen Befund reproduzieren](befund-reproduzieren.md).
+
+## Nur neue Befunde: mit einer Baseline
+
+Eine Seite mit vielen bekannten Befunden ließe jeden Lauf mit `1` enden. Mit einer Baseline scheitert er nur an neuen:
+
+1. Lass den Monkey einmal laufen und kopier `baseline.json` aus dem Berichtsverzeichnis in dein Repository, z. B.
+   neben die Konfiguration als `monkey-baseline.json`.
+2. Trag sie in die Konfiguration ein: `"findings": { "baseline": "monkey-baseline.json" }` (relativ zur
+   Konfigurationsdatei).
+3. Ab jetzt endet `monkey run` mit `1` nur, wenn es einen Befund gibt, dessen Dedup-Schlüssel die Baseline nicht
+   kennt (`exit 1: new findings present`); bekannte stehen weiter im Bericht, mit dem Abzeichen **known**.
+
+Die Konsole sagt `baseline: 2 new, 5 known, 1 not seen this time`. „Not seen“ heißt nicht sicher „behoben“: Ein
+Zufallslauf erreicht nicht jedes Mal jede Seite. Ist ein Fehler behoben oder ein neuer akzeptiert, kopier die
+`baseline.json` des Laufs erneut; weil sie nach Schlüssel sortiert ist, zeigt der Diff im Pull Request genau, was sich
+geändert hat. Fehlt die Datei oder ist sie kaputt, endet der Lauf mit `2`, bevor ein Browser startet.
