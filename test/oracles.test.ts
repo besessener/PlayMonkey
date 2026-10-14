@@ -406,8 +406,10 @@ describe("oracles in the browser", () => {
         onStep: async (rec: StepRecord) => {
           const page = context.pages()[rec.result.tab] ?? context.pages()[0];
           if (rec.step === 2 && page !== undefined) {
-            // The crash event can arrive after goto settles (headless shell), so wait for it explicitly.
-            await Promise.all([page.waitForEvent("crash"), page.goto("chrome://crash").catch(() => undefined)]);
+            // The crash event can arrive after goto settles (headless shell), so wait for it explicitly, longer than
+            // the run's default timeout of actionTimeoutMs.
+            const crashed = page.waitForEvent("crash", { timeout: 15_000 });
+            await Promise.all([crashed, page.goto("chrome://crash").catch(() => undefined)]);
           }
           await oracles.check(rec, page);
         },
