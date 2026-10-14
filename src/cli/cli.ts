@@ -13,6 +13,7 @@ import { planRuns, type RoleOutcome, type RunLlm, runAllRoles } from "../run.ts"
 import { readVersion } from "../version.ts";
 import { type CliIo, launchHint, load, withStopSignal } from "./common.ts";
 import { replay } from "./replay.ts";
+import { DEFAULT_MAX_REPLAYS, shrink } from "./shrink.ts";
 
 const USAGE = `Usage: monkey <command> [options]
 
@@ -20,12 +21,16 @@ Commands:
   run <config.json>        Explore the site described by the config and report findings.
   replay <actions.json>    Re-execute a recorded action log and check which findings recur.
   preflight <config.json>  Check that the configured LLM endpoint works, without a browser.
+  shrink <actions.json>    Shorten the way to each finding of an action log to the fewest
+                           actions that still reproduce it, by replaying parts of it.
 
 Options:
-  -c, --config <file>    replay: config for login, browser and oracle settings
+  -c, --config <file>    replay, shrink: config for login, browser and oracle settings
                          (needed when the log was recorded as a role that logs in).
   --strict               replay: abort when a recorded element is not found,
                          instead of skipping that action.
+  --finding <id>         shrink: only this finding, e.g. F2 (default: all of the log).
+  --max-replays <n>      shrink: replays per finding, 2 … 1000 (default ${DEFAULT_MAX_REPLAYS}).
   -w, --watch            run, replay: spectator mode for watching or demos. Opens a
                          visible browser, slows it down, outlines each element
                          before acting on it and prints every step.
@@ -36,9 +41,9 @@ Options:
 
 Exit codes:
   0  no findings (with findings.baseline: no new ones; replay: none of the recorded
-     findings recurred)
+     findings recurred; shrink: none reproduced)
   1  findings present (with findings.baseline: new ones; replay: at least one
-     recorded finding recurred)
+     recorded finding recurred; shrink: at least one reproduced and shortened)
   2  tool or config error (also: the LLM preflight failed with llm.required, or a
      run did not complete; takes precedence over 1)
 `;
@@ -47,6 +52,17 @@ const COMMANDS: Record<string, { argName: string }> = {
   run: { argName: "config.json" },
   replay: { argName: "actions.json" },
   preflight: { argName: "config.json" },
+  shrink: { argName: "actions.json" },
+};
+
+/** The commands each option belongs to; `--help` and `--version` go with any. */
+const OPTION_COMMANDS: Record<string, string[]> = {
+  config: ["replay", "shrink"],
+  strict: ["replay"],
+  watch: ["run", "replay"],
+  "slow-mo": ["run", "replay"],
+  finding: ["shrink"],
+  "max-replays": ["shrink"],
 };
 
 type Parsed = ReturnType<typeof parse>;
@@ -95,15 +111,13 @@ function checkInvocation({ values, positionals }: Parsed, io: CliIo): Invocation
     return usageError(io, `monkey ${command}`, `expected exactly one <${spec.argName}> argument`);
   }
   const [file] = rest as [string];
+  const misplaced = Object.keys(values).find((name) => !(OPTION_COMMANDS[name]?.includes(command) ?? true));
+  if (misplaced !== undefined) {
+    const owners = (OPTION_COMMANDS[misplaced] ?? []).join(" and ");
+    return usageError(io, `monkey ${command}`, `--${misplaced} belongs to ${owners}`);
+  }
   const spectator = spectatorOf(values);
   if (typeof spectator === "string") return usageError(io, `monkey ${command}`, spectator);
-  if (command === "preflight" && spectator !== undefined) {
-    return usageError(io, "monkey preflight", "--watch and --slow-mo belong to run and replay");
-  }
-  const replayOnly = values.config !== undefined || values.strict === true;
-  if ((command === "run" || command === "preflight") && replayOnly) {
-    return usageError(io, `monkey ${command}`, "--config and --strict belong to replay");
-  }
   return { command, file, values, spectator };
 }
 
@@ -115,6 +129,15 @@ function usageError(io: CliIo, prefix: string, message: string): ExitCode {
 function dispatch({ command, file, values, spectator }: Invocation, io: CliIo): Promise<ExitCode> {
   if (command === "run") return run(file, io, spectator);
   if (command === "preflight") return preflight(file, io);
+  if (command === "shrink") {
+    return shrink({
+      logFile: file,
+      configFile: values.config,
+      finding: values.finding,
+      maxReplays: values["max-replays"],
+      io,
+    });
+  }
   return replay({ logFile: file, configFile: values.config, strict: values.strict === true, io, spectator });
 }
 
@@ -307,6 +330,8 @@ function parse(argv: string[]) {
       strict: { type: "boolean" },
       watch: { type: "boolean", short: "w" },
       "slow-mo": { type: "string" },
+      finding: { type: "string" },
+      "max-replays": { type: "string" },
     },
   });
 }

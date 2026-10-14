@@ -160,6 +160,8 @@ export interface RoleOptions {
   outputDir: string;
   /** Write `actions.json`. */
   actionLog: boolean;
+  /** Record a trace and a video; default true. */
+  artifacts?: boolean;
   /** Replay these actions instead of running the random monkey. */
   replay?: ReplayPlan;
   onStep?: (record: StepRecord) => void | Promise<void>;
@@ -184,7 +186,12 @@ export async function runRole(
   log(options.replay === undefined ? "starting" : `replaying ${plural(options.replay.actions.length, "action")}`);
   let session: RoleSession;
   try {
-    session = await openRoleSession(browser, role, { config, secrets, outputDir: options.outputDir });
+    session = await openRoleSession(browser, role, {
+      config,
+      secrets,
+      outputDir: options.outputDir,
+      ...(options.artifacts === false ? { trace: false, video: false } : {}),
+    });
   } catch (error) {
     if (!(error instanceof LoginError)) throw error;
     log(error.message);

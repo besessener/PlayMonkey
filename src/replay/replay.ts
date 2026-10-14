@@ -1,11 +1,12 @@
 import { dirname, join } from "node:path";
 import { launchBrowser } from "../auth/browser.ts";
 import { ANONYMOUS_ROLE } from "../auth/session.ts";
-import { type Config, type LoadedConfig, loadConfig, parseConfig } from "../config/config.ts";
+import { type AuthRole, type Config, type LoadedConfig, loadConfig, parseConfig } from "../config/config.ts";
 import { maskSecrets, Secrets } from "../config/secrets.ts";
+import type { PlannedAction } from "../monkey/loop.ts";
 import type { Spectator } from "../monkey/spectator.ts";
 import { type RoleOutcome, runRole } from "../run.ts";
-import { type LoggedFinding, readActionLog, toAction } from "./log.ts";
+import { type ActionLog, type LoggedAction, type LoggedFinding, readActionLog, toAction } from "./log.ts";
 
 export interface ReplayOptions {
   /** Config file for login, browser and oracle settings; needed to replay a role that logs in. */
@@ -35,17 +36,28 @@ export class ReplayError extends Error {
   }
 }
 
+/** An action log, ready to replay: its config, secrets and role. */
+export interface PreparedReplay {
+  /** With placeholders resolved. */
+  log: ActionLog;
+  loaded: Pick<LoadedConfig, "config" | "secrets">;
+  /** Undefined for the anonymous role. */
+  role: AuthRole | undefined;
+}
+
 /**
- * Re-executes a recorded action log in a fresh context for its role, without an LLM, runs the same oracles and
- * compares the findings with the recorded ones by dedup key. Output goes to `replay/` next to the log.
+ * Reads an action log and the config for its role. The recorded run decides where and at which size the actions
+ * happen; the config adds login, browser and oracle settings.
  */
-export async function replayActionLog(file: string, options: ReplayOptions): Promise<ReplayResult> {
+export async function prepareReplay(
+  file: string,
+  options: Pick<ReplayOptions, "config" | "env">,
+): Promise<PreparedReplay> {
   const { log, secrets: logSecrets } = await readActionLog(file, options.env);
   const loaded: LoadedConfig =
     options.config === undefined
       ? parseConfig(JSON.stringify({ baseUrl: log.baseUrl, seed: log.seed }), { env: {} })
       : await loadConfig(options.config, { env: options.env });
-  // The recorded run decides where and at which size the actions happen.
   const config: Config = {
     ...loaded.config,
     baseUrl: log.baseUrl,
@@ -53,7 +65,6 @@ export async function replayActionLog(file: string, options: ReplayOptions): Pro
     browser: { ...loaded.config.browser, viewport: log.viewport },
   };
   const secrets = new Secrets([...loaded.secrets.entries, ...logSecrets]);
-
   const role = config.auth.find((r) => r.name === log.role);
   if (role === undefined && log.role !== ANONYMOUS_ROLE) {
     throw new ReplayError(
@@ -62,35 +73,41 @@ export async function replayActionLog(file: string, options: ReplayOptions): Pro
         : `role "${secrets.mask(log.role)}" is not in the config's auth`,
     );
   }
+  return { log, loaded: { config, secrets }, role };
+}
 
+/** A logged action as a step of a replay plan. */
+export function toPlanned(entry: LoggedAction): PlannedAction {
+  return {
+    action: toAction(entry),
+    source: entry.source,
+    ...(entry.locator === undefined ? {} : { locator: entry.locator }),
+    ...(entry.toLocator === undefined ? {} : { toLocator: entry.toLocator }),
+    ...(entry.events === undefined ? {} : { events: entry.events }),
+  };
+}
+
+/**
+ * Re-executes a recorded action log in a fresh context for its role, without an LLM, runs the same oracles and
+ * compares the findings with the recorded ones by dedup key. Output goes to `replay/` next to the log.
+ */
+export async function replayActionLog(file: string, options: ReplayOptions): Promise<ReplayResult> {
+  const { log, loaded, role } = await prepareReplay(file, options);
+  const { config, secrets } = loaded;
   const browser = await launchBrowser(
     config.browser,
     options.spectator === undefined ? {} : { spectator: options.spectator },
   );
   let outcome: RoleOutcome;
   try {
-    outcome = await runRole(
-      browser,
-      role,
-      { config, secrets },
-      {
-        log: options.log,
-        outputDir: join(dirname(file), "replay"),
-        actionLog: false,
-        replay: {
-          strict: options.strict,
-          actions: log.actions.map((entry) => ({
-            action: toAction(entry),
-            source: entry.source,
-            ...(entry.locator === undefined ? {} : { locator: entry.locator }),
-            ...(entry.toLocator === undefined ? {} : { toLocator: entry.toLocator }),
-            ...(entry.events === undefined ? {} : { events: entry.events }),
-          })),
-        },
-        ...(options.signal === undefined ? {} : { signal: options.signal }),
-        ...(options.spectator === undefined ? {} : { spectator: options.spectator }),
-      },
-    );
+    outcome = await runRole(browser, role, loaded, {
+      log: options.log,
+      outputDir: join(dirname(file), "replay"),
+      actionLog: false,
+      replay: { strict: options.strict, actions: log.actions.map(toPlanned) },
+      ...(options.signal === undefined ? {} : { signal: options.signal }),
+      ...(options.spectator === undefined ? {} : { spectator: options.spectator }),
+    });
   } finally {
     await browser.close();
   }
