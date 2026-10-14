@@ -229,7 +229,7 @@ export class LlmDriver {
 
   record(record: StepRecord, snapshot: Snapshot): void {
     this.#o.detector.record(record, snapshot);
-    const hide = (text: string) => this.#o.placeholders.hide(text);
+    const hide = (value: string) => this.#o.placeholders.hide(value);
     const text =
       record.source === "llm" && this.#chosen?.step === record.step
         ? this.#chosen.text

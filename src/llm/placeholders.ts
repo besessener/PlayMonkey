@@ -67,7 +67,7 @@ export class PromptPlaceholders {
 
   /** The snapshot with every secret hidden, before serializing cuts its text where a secret could be split. */
   hideSnapshot(snapshot: Snapshot): Snapshot {
-    const hide = (text: string) => this.hide(text);
+    const hide = this.hide.bind(this);
     return {
       ...snapshot,
       url: hide(snapshot.url),

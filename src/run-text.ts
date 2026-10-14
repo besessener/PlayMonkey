@@ -10,7 +10,7 @@ import type { Finding } from "./oracles/finding.ts";
 export function describeStep(record: StepRecord, secrets: Secrets): string {
   const { locator } = record;
   // Masked before describeAction shortens the value, which could cut a secret in half.
-  const action = mapActionText(record.action, (text) => secrets.mask(text));
+  const action = mapActionText(record.action, (value) => secrets.mask(value));
   // The durable locator says more than the short-lived ref.
   const text = describeAction(
     locator === undefined || !("ref" in action) ? action : ({ ...action, ref: locator } as Action),
