@@ -1,5 +1,5 @@
 import type { LlmConfig } from "../config/config.ts";
-import { type Action, describeAction } from "../monkey/actions.ts";
+import { type Action, describeAction, mapActionText } from "../monkey/actions.ts";
 import type { StepRecord } from "../monkey/loop.ts";
 import type { UrlScope } from "../monkey/scope.ts";
 import { serializeSnapshot } from "../snapshot/serialize.ts";
@@ -229,8 +229,11 @@ export class LlmDriver {
 
   record(record: StepRecord, snapshot: Snapshot): void {
     this.#o.detector.record(record, snapshot);
+    const hide = (text: string) => this.#o.placeholders.hide(text);
     const text =
-      record.source === "llm" && this.#chosen?.step === record.step ? this.#chosen.text : describeAction(record.action);
+      record.source === "llm" && this.#chosen?.step === record.step
+        ? this.#chosen.text
+        : describeAction(mapActionText(record.action, hide));
     this.#history.push({
       step: record.step,
       source: record.source,
@@ -245,7 +248,10 @@ export class LlmDriver {
   #input(snapshot: Snapshot): DecideInput {
     const { placeholders, config } = this.#o;
     return {
-      snapshot: placeholders.hide(serializeSnapshot(snapshot, { maxChars: config.snapshotChars })),
+      // Hidden before serializing cuts the text, and once more for secrets that only the JSON quoting reveals.
+      snapshot: placeholders.hide(
+        serializeSnapshot(placeholders.hideSnapshot(snapshot), { maxChars: config.snapshotChars }),
+      ),
       refs: new Set(snapshot.elements.map((element) => element.ref)),
       history: [...this.#history],
       // Hidden before cut, so no cut can leave part of a secret that `hide` no longer recognizes.
@@ -273,7 +279,7 @@ export class LlmDriver {
     if (decision.type !== "navigate") return decision;
     let target: URL;
     try {
-      target = new URL(this.#o.placeholders.fill(decision.url), snapshot.url);
+      target = new URL(decision.url, snapshot.url);
     } catch {
       throw new LlmError("invalid", "tool navigate: url is not a valid URL");
     }

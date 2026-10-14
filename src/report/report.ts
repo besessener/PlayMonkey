@@ -168,7 +168,7 @@ function summarizeRun(outcome: RoleOutcome, secrets: Secrets, path: (file: strin
   const result = outcome.result;
   const error = result?.error ?? outcome.error;
   return {
-    role: secrets.mask(outcome.role),
+    role: outcome.role,
     seed: outcome.seed,
     ...(result === undefined
       ? {}

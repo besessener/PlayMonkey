@@ -3,7 +3,7 @@ import { readFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { DEFAULTS } from "./defaults.ts";
 import type { RawHandoff, RawLlm } from "./llm-schema.ts";
-import { formatPath } from "./path.ts";
+import { formatPath, type PathSegment } from "./path.ts";
 import { resolvePlaceholders } from "./placeholders.ts";
 import type { RawAuth, RawConfig } from "./schema.ts";
 import { Secrets } from "./secrets.ts";
@@ -99,7 +99,10 @@ export interface LlmPricing {
 
 export interface LoadedConfig {
   config: Config;
-  /** Values that came from `${VAR}` placeholders; mask everything derived from the config with them. */
+  /**
+   * Values that came from `${VAR}` placeholders in credential positions (`isCredential`); mask everything derived from
+   * the config with them.
+   */
   secrets: Secrets;
   /** True when no seed was configured and a random one was generated. */
   seedGenerated: boolean;
@@ -157,8 +160,8 @@ export function parseConfig(text: string, options: ParseOptions = {}): LoadedCon
     throw new ConfigError(source, [{ path: "(file)", message: `invalid JSON: ${(error as Error).message}` }]);
   }
 
-  const { value: raw, secrets: secretValues, missing } = resolvePlaceholders(json, env);
-  const secrets = new Secrets(secretValues);
+  const { value: raw, secrets: substituted, missing } = resolvePlaceholders(json, env);
+  const secrets = new Secrets(substituted.filter(({ path }) => isCredential(path)));
   const issues = findIssues(raw, missing);
   if (issues.length > 0) {
     throw new ConfigError(source, dedupe(issues, secrets));
@@ -172,6 +175,17 @@ export function parseConfig(text: string, options: ParseOptions = {}): LoadedCon
     secrets,
     seedGenerated,
   };
+}
+
+/**
+ * Positions whose `${VAR}` values are secrets: login fields, test data (the monkey types both) and the LLM's API key.
+ * Values elsewhere, such as a host in `baseUrl` or a role name, are configuration; masking them would garble findings.
+ */
+function isCredential(path: PathSegment[]): boolean {
+  const [first, second, third] = path;
+  if (first === "auth") return third === "fields";
+  if (first === "llm") return second === "apiKey";
+  return first === "testData";
 }
 
 function normalize(raw: RawConfig, seed: number, baseDir: string): Config {

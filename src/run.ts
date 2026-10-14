@@ -227,6 +227,7 @@ async function exploreSession(run: RoleRun, session: RoleSession, downloadDir: s
     config,
     role: name,
     screenshotDir: join(options.outputDir, "screenshots"),
+    secrets: run.loaded.secrets,
   });
   const writer = options.actionLog ? await createActionLog(run) : undefined;
   const advisor = createAdvisor(run, oracles);
@@ -297,7 +298,7 @@ function createAdvisor(run: RoleRun, oracles: Oracles): LlmDriver | undefined {
       authenticated: role !== undefined,
       ...(role?.kind === "fields" ? { loginUrl: new URL(role.loginUrl, config.baseUrl).href } : {}),
     }),
-    placeholders: new PromptPlaceholders(config, secrets),
+    placeholders: new PromptPlaceholders(config, secrets, name),
     role: name,
     run: label,
     ...(llm.breaker === undefined ? {} : { breaker: llm.breaker }),
@@ -332,7 +333,7 @@ function stepHandler(
     const pages = session.context.pages();
     await oracles.check(record, pages[record.result.tab] ?? pages[0]);
     if (record.skipped === true) log(`step ${record.step} skipped: ${secrets.mask(record.result.error ?? "")}`);
-    else if (options.spectator !== undefined) log(secrets.mask(describeStep(record)));
+    else if (options.spectator !== undefined) log(describeStep(record, secrets));
     await writer?.append(record);
     await options.onStep?.(record);
   };

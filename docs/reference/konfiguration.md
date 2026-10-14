@@ -158,5 +158,9 @@ Strings (`"https://${HOST}/app"`). Namen entsprechen `[A-Za-z_][A-Za-z0-9_]*`. E
 ersetzt, und es gibt keine Escape-Syntax. Eine nicht gesetzte Variable ist ein Fehler, der den Pfad in der
 Konfiguration und die Variable nennt; eine leere wird als leer verwendet.
 
-Jeder eingesetzte Wert wird in Konsolenausgabe, Fehlermeldungen und Berichten als `***` maskiert. Secrets kommen nur
-aus der Umgebung, nie aus Dateien.
+Secrets sind die Werte, die an diesen Stellen eingesetzt werden: in `auth[].fields`, in `testData` und in
+`llm.apiKey`. Sie werden in Konsolenausgabe, Fehlermeldungen, Aktionsprotokollen und Berichten als `***` maskiert,
+auch URL-kodiert oder in JSON-Strings, und Prompts bekommen nur Platzhalter. Werte an anderen Stellen, etwa ein Host in
+`baseUrl`, ein Port oder ein Rollenname, sind gewöhnliche Konfiguration und erscheinen, wie sie sind; sie zu
+maskieren, würde Befunde, Dedup-Schlüssel und Rollennamen verstümmeln. Gehört ein Wert geheim gehalten, steht er an
+einer der drei Stellen. Secrets kommen nur aus der Umgebung, nie aus Dateien.

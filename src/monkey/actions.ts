@@ -25,7 +25,17 @@ export function isElementAction(action: Action): action is ElementAction {
   return "ref" in action;
 }
 
-/** One line for logs, e.g. `fill e8 "abc"`. Values are shortened; they may still contain test data. */
+/** The action with `map` applied to its free text: a typed or selected value, a navigation target. */
+export function mapActionText<T extends { type: string }>(action: T, map: (text: string) => string): T {
+  if ("value" in action && typeof action.value === "string") return { ...action, value: map(action.value) };
+  if ("url" in action && typeof action.url === "string") return { ...action, url: map(action.url) };
+  return action;
+}
+
+/**
+ * One line for logs, e.g. `fill e8 "abc"`. Values are shortened, so mask secrets in the action first
+ * (`mapActionText`): a cut can leave part of a secret that masking no longer recognizes.
+ */
 export function describeAction(action: Action): string {
   const value = (text: string) => JSON.stringify(text.length > 40 ? `${text.slice(0, 39)}…` : text);
   switch (action.type) {

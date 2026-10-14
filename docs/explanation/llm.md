@@ -79,11 +79,16 @@ protokolliert und im [Bericht](../reference/bericht.md#llm) gezählt.
 
 Secrets gelangen nie in einen Prompt:
 
-- Anmeldefelder und Testdaten werden als Platzhalter angeboten, `{{<role>.<field>}}` (z. B. `{{admin.password}}`) und
-  `{{testData.<key>}}`, nie als Werte. Das Modell schreibt den Platzhalter; PlayMonkey setzt den Wert erst ein,
-  nachdem das Modell geantwortet hat, direkt vor dem Tippen.
-- Jeder Wert aus einem Platzhalter `${VAR}`, der in der Seite, einer URL oder dem Verlauf auftaucht, wird vor dem
-  Senden durch `{{env.VAR}}` ersetzt; das Modell darf auch diesen Platzhalter verwenden.
+- Die Anmeldefelder der eigenen Rolle und die Testdaten werden als Platzhalter angeboten, `{{<role>.<field>}}`
+  (z. B. `{{admin.password}}`) und `{{testData.<key>}}`, nie als Werte. Das Modell schreibt den Platzhalter;
+  PlayMonkey setzt den Wert erst ein, nachdem das Modell geantwortet hat, direkt vor dem Tippen, und nur in getippte
+  und ausgewählte Werte, nie in die Adresse von `navigate`.
+- Jedes Secret, das in der Seite, einer URL oder dem Verlauf auftaucht, auch URL-kodiert oder in einem JSON-String,
+  wird vor dem Senden durch `{{env.VAR}}` ersetzt, bevor der Snapshot oder eine Aktion für den Prompt gekürzt wird,
+  damit kein halbes Secret übrig bleibt.
+- Eingesetzt wird nur, was das Modell gezeigt bekam: die angebotenen Platzhalter und ein `{{env.VAR}}`, das in einem
+  Prompt stand und für einen Wert steht, den die Rolle ohnehin tippen darf. Den API-Key von `llm.apiKey` und die
+  Zugangsdaten anderer Rollen setzt PlayMonkey nie ein, was auch immer eine Seite dem Modell zu tippen aufträgt.
 - Das Aktionsprotokoll speichert wie üblich, was mit dem Platzhalter `${VAR}` getippt wurde, damit
   [Replay](replay.md) ohne LLM funktioniert.
 

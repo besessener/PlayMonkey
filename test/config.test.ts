@@ -337,8 +337,33 @@ describe("secret masking", () => {
   });
 
   it("masks only the substituted part of a longer string", () => {
-    const { config, secrets } = parse({ baseUrl: "https://${HOST}/app", seed: 1 }, { HOST: "internal.test" });
-    assert.equal(maskSecrets(config, secrets).baseUrl, "https://***/app");
+    const { config, secrets } = parse(
+      { baseUrl: "https://test.local", testData: { mail: "${USER}@test.local" } },
+      {
+        USER: "monkey4711",
+      },
+    );
+    assert.equal(maskSecrets(config, secrets).testData.mail, "***@test.local");
+  });
+
+  it("treats only login fields, test data and the API key as secrets, not hosts, ports or role names", () => {
+    const env = { ...ENV, HOST: "test.local", PORT: "80", ROLE: "admin" };
+    const { config, secrets } = parse(
+      {
+        ...fullConfig,
+        baseUrl: "http://${HOST}:${PORT}/app",
+        auth: [{ name: "${ROLE}", loginUrl: "/login", fields: { password: "${ADMIN_PASS}" }, submit: "button" }],
+      },
+      env,
+    );
+    assert.deepEqual(secrets.names, ["ADMIN_PASS", "FOUNDRY_API_KEY"]);
+    const masked = maskSecrets(config, secrets);
+    assert.equal(masked.baseUrl, "http://test.local:80/app");
+    assert.equal(masked.auth[0]?.name, "admin");
+    assert.equal(
+      secrets.mask("GET /admin/users 404 in a 1280px viewport"),
+      "GET /admin/users 404 in a 1280px viewport",
+    );
   });
 
   it("masks arbitrary text such as log lines", () => {

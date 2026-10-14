@@ -60,3 +60,27 @@ export const READ_PAGE_FACTS = `(() => {
     culprit,
   };
 })()`;
+
+/** Attribute that marks the form fields a finding screenshot blacks out. */
+export const SECRET_FIELD = "data-monkey-secret";
+
+/**
+ * Evaluated in the page before a finding screenshot: marks every password field and every field whose value contains
+ * one of `values`, and returns how many it marked.
+ */
+export function markSecretFields(values: string[]): string {
+  return `(() => {
+  const values = ${JSON.stringify(values)};
+  let marked = 0;
+  for (const field of document.querySelectorAll("input, textarea")) {
+    if (field.type !== "password" && !values.some((value) => field.value.includes(value))) continue;
+    field.setAttribute("${SECRET_FIELD}", "");
+    marked++;
+  }
+  return marked;
+})()`;
+}
+
+export const UNMARK_SECRET_FIELDS = `(() => {
+  for (const field of document.querySelectorAll("[${SECRET_FIELD}]")) field.removeAttribute("${SECRET_FIELD}");
+})()`;

@@ -2,6 +2,7 @@ import { mkdir } from "node:fs/promises";
 import { join } from "node:path";
 import type { BrowserContext, ConsoleMessage, Page, Request, Response } from "playwright";
 import type { Config } from "../config/config.ts";
+import type { Secrets } from "../config/secrets.ts";
 import type { OracleName } from "../config/values.ts";
 import type { StepRecord } from "../monkey/loop.ts";
 import { TIMEOUT, withTimeout } from "../monkey/timeout.ts";
@@ -12,9 +13,12 @@ import {
   ERROR_PAGE_PATTERNS,
   FAILED_RESOURCE,
   IGNORED_NAVIGATION_FAILURES,
+  markSecretFields,
   OFFLINE_RESOURCE,
   type PageFacts,
   READ_PAGE_FACTS,
+  SECRET_FIELD,
+  UNMARK_SECRET_FIELDS,
 } from "./patterns.ts";
 
 export interface OracleOptions {
@@ -22,6 +26,11 @@ export interface OracleOptions {
   role: string;
   /** Directory for finding screenshots; created on the first finding. */
   screenshotDir: string;
+  /**
+   * Masks finding keys before deduplication, so the same bug keeps one key whatever secret it showed, and blacks out
+   * fields holding a secret in screenshots. Password fields are blacked out without it too.
+   */
+  secrets?: Secrets;
 }
 
 /**
@@ -35,6 +44,9 @@ export class Oracles {
   readonly #config: Config;
   readonly #role: string;
   readonly #screenshotDir: string;
+  readonly #secrets: Secrets | undefined;
+  /** Secret values the monkey may type into fields; the LLM's API key is never sent to the page. */
+  readonly #typedSecrets: string[];
   readonly #origin: string;
   readonly #ignore: IgnoreRules;
   readonly #byKey = new Map<string, Finding>();
@@ -52,6 +64,11 @@ export class Oracles {
     this.#config = options.config;
     this.#role = options.role;
     this.#screenshotDir = options.screenshotDir;
+    this.#secrets = options.secrets;
+    const apiKey = options.config.llm?.apiKey;
+    this.#typedSecrets = (options.secrets?.entries ?? [])
+      .map(({ value }) => value)
+      .filter((value) => apiKey === undefined || !apiKey.includes(value));
     this.#origin = new URL(options.config.baseUrl).origin;
     this.#ignore = new IgnoreRules(options.config.findings.ignore);
     this.#accessibility = new AccessibilityAudit(this.#origin);
@@ -77,7 +94,7 @@ export class Oracles {
     if (hang !== undefined) {
       this.#add("hang", {
         severity: "high",
-        key: `navigation|${normalizeUrl(hang, this.#origin)}`,
+        key: `navigation|${this.#url(hang)}`,
         message: `${hang} did not load within ${this.#config.monkey.actionTimeoutMs}ms: ${record.result.error ?? ""}`,
         url: hang,
         details: { kind: "navigation", action: record.action, error: record.result.error },
@@ -85,7 +102,7 @@ export class Oracles {
     }
     for (const event of record.events ?? []) {
       if (event.kind !== "download" || event.failure === undefined) continue;
-      const path = normalizeUrl(event.url, this.#origin);
+      const path = this.#url(event.url);
       this.#add("download", {
         severity: "medium",
         key: path,
@@ -120,7 +137,7 @@ export class Oracles {
       const message = `${error.name}: ${error.message}`;
       this.#add("pageerror", {
         severity: "high",
-        key: `${normalizeMessage(message, this.#origin)}|${firstStackFrame(error.stack, this.#origin, message)}`,
+        key: `${this.#text(message)}|${firstStackFrame(this.#mask(error.stack ?? ""), this.#origin, this.#mask(message))}`,
         message,
         url: safeUrl(page),
         details: { stack: (error.stack ?? "").split("\n").slice(0, 10).join("\n") },
@@ -133,7 +150,7 @@ export class Oracles {
       this.#crashed.add(page);
       this.#add("crash", {
         severity: "critical",
-        key: normalizeUrl(safeUrl(page), this.#origin),
+        key: this.#url(safeUrl(page)),
         message: `page crashed on ${safeUrl(page)}`,
         url: safeUrl(page),
         details: {},
@@ -148,7 +165,7 @@ export class Oracles {
     const location = message.location();
     this.#add("console", {
       severity: "medium",
-      key: normalizeMessage(text, this.#origin),
+      key: this.#text(text),
       message: text,
       url: safeUrl(page),
       details: { location: `${location.url}:${location.line + 1}:${location.column + 1}` },
@@ -170,7 +187,7 @@ export class Oracles {
     const oracle = status >= 500 ? "http5xx" : "http4xx";
     const url = response.url();
     const method = request.method();
-    const path = normalizeUrl(url, this.#origin);
+    const path = this.#url(url);
     this.#add(oracle, {
       severity: httpSeverity(status, isDocument),
       key: `${method} ${path} ${status}`,
@@ -189,7 +206,7 @@ export class Oracles {
     const failure = request.failure()?.errorText ?? "";
     if (IGNORED_NAVIGATION_FAILURES.has(failure) || !isMainFrameNavigation(page, request)) return;
     const url = request.url();
-    const path = normalizeUrl(url, this.#origin);
+    const path = this.#url(url);
     this.#add("errorPage", {
       severity: "high",
       key: `${path}|${failure}`,
@@ -211,7 +228,7 @@ export class Oracles {
     // An evaluation that fails (the page is navigating, or closed) says nothing about the page.
     if (facts === undefined) return;
     const url = page.url();
-    const path = normalizeUrl(url, this.#origin);
+    const path = this.#url(url);
 
     if (facts === TIMEOUT) {
       this.#add("hang", {
@@ -228,7 +245,7 @@ export class Oracles {
     const previous = this.#overflow;
     this.#overflow = undefined;
     if (facts.scrollWidth > facts.clientWidth) {
-      const culprit = normalizeMessage(facts.culprit);
+      const culprit = normalizeMessage(this.#mask(facts.culprit));
       const key = `${path}|${culprit}`;
       this.#overflow = { page, key };
       if (navigated || previous?.page !== page || previous.key !== key) {
@@ -258,9 +275,22 @@ export class Oracles {
     }
   }
 
+  /** Secrets are masked before a key is normalized, which would change a secret's digits and hide it from masking. */
+  #mask(text: string): string {
+    return this.#secrets?.mask(text) ?? text;
+  }
+
+  #url(url: string): string {
+    return normalizeUrl(this.#mask(url), this.#origin);
+  }
+
+  #text(text: string): string {
+    return normalizeMessage(this.#mask(text), this.#origin);
+  }
+
   #add(oracle: OracleName, signal: Omit<Signal, "oracle">): void {
     if (!this.#config.oracles[oracle]) return;
-    this.#pending.push({ oracle, ...signal, key: `${oracle}|${signal.key}` });
+    this.#pending.push({ oracle, ...signal, key: this.#mask(`${oracle}|${signal.key}`) });
   }
 
   async #flush(): Promise<void> {
@@ -303,8 +333,14 @@ export class Oracles {
     try {
       await mkdir(this.#screenshotDir, { recursive: true });
       const timeout = this.#config.monkey.actionTimeoutMs;
+      // Without the fields marked, the screenshot could show a secret: none then.
+      if ((await withTimeout(page.evaluate(markSecretFields(this.#typedSecrets)), timeout)) === TIMEOUT)
+        return undefined;
+      const mask = [page.locator(`[${SECRET_FIELD}]`)];
       // A frozen page ignores the screenshot's own timeout.
-      return (await withTimeout(page.screenshot({ path, timeout }), timeout)) === TIMEOUT ? undefined : path;
+      const shot = await withTimeout(page.screenshot({ path, timeout, mask }), timeout);
+      await withTimeout(page.evaluate(UNMARK_SECRET_FIELDS), timeout).catch(() => undefined);
+      return shot === TIMEOUT ? undefined : path;
     } catch {
       return undefined;
     }

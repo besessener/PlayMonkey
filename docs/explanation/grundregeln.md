@@ -28,9 +28,12 @@ Befunde“ durchgeht. Ein zweites Signal beendet den Prozess sofort, ohne Berich
 ## Secrets kommen aus der Umgebung und erscheinen nur maskiert
 
 Zugangsdaten und Schlüssel stehen als Platzhalter `${VAR}` in der Konfiguration und werden beim Start aus
-Umgebungsvariablen aufgelöst, nie aus Dateien gelesen. Jeder eingesetzte Wert wird in Konsolenausgabe,
-Fehlermeldungen und Berichten als `***` maskiert. Fehlermeldungen nennen den Konfigurationspfad und die Variable, nie
-einen Wert.
+Umgebungsvariablen aufgelöst, nie aus Dateien gelesen. Jeder Wert, der so in die Anmeldefelder (`auth[].fields`), die
+Testdaten (`testData`) oder `llm.apiKey` kommt, ist ein Secret und wird in Konsolenausgabe, Fehlermeldungen,
+Aktionsprotokollen und Berichten als `***` maskiert. `${VAR}` an anderen Stellen, etwa für den Host in `baseUrl`, ist
+gewöhnliche Konfiguration: Würde ein kurzer Wert wie `admin` oder `80` überall maskiert, würden Befunde,
+Dedup-Schlüssel und Rollennamen unbrauchbar. Dedup-Schlüssel werden vor der Deduplizierung maskiert, nie danach.
+Fehlermeldungen nennen den Konfigurationspfad und die Variable, nie einen Wert.
 
 Ein Aktionsprotokoll entscheidet nie, welche Variablen eingesetzt werden: Replay löst nur die auf, die deine
 Konfiguration verwendet, und nur auf dem Origin ihrer `baseUrl` (siehe

@@ -54,7 +54,7 @@ function setup(script: ConstructorParameters<typeof FakeProvider>[0], options: O
     config: llm,
     stats,
     detector: new StuckDetector(llm.handoff, { authenticated: false }),
-    placeholders: new PromptPlaceholders(config, secrets),
+    placeholders: new PromptPlaceholders(config, secrets, "admin"),
     role: "anonymous",
     breaker,
     findings: () => [],

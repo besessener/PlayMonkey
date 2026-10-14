@@ -122,9 +122,15 @@ einmal maskiert.
 
 ## Secrets
 
-`report.json`, `report.html`, `llm-debug.jsonl` und die Konsole maskieren jeden Wert, der aus einem
-`${VAR}`-Platzhalter stammt; `actions.json` speichert stattdessen den Platzhalter, damit sich das Protokoll
-wiederholen lässt. Ein Test lässt die Fixture-Seite mit eigenen Zugangsdaten laufen und durchsucht jede Textdatei des
+`report.json`, `report.html`, `llm-debug.jsonl` und die Konsole maskieren jedes
+[Secret](konfiguration.md#secrets-var), auch URL-kodiert oder in einem JSON-String und bevor ein Wert gekürzt wird;
+`actions.json` speichert stattdessen den Platzhalter, damit sich das Protokoll wiederholen lässt. Dedup-Schlüssel
+werden vor der Deduplizierung maskiert, Rollennamen nie: Sie sind keine Secrets.
+
+Die Screenshots der Befunde (im Ordner `screenshots/` und eingebettet in `report.html`) schwärzen jedes
+Passwortfeld und jedes Feld, dessen Wert ein Secret enthält. Text, den die Seite selbst anzeigt, etwa ein
+zurückgegebener Benutzername, bleibt darauf lesbar, ebenso Felder in Iframes; kann die Seite die Felder nicht rechtzeitig
+markieren, entsteht kein Screenshot. Ein Test lässt die Fixture-Seite mit eigenen Zugangsdaten laufen und durchsucht jede Textdatei des
 Berichtsverzeichnisses danach.
 
 **Traces und Videos sind nicht maskiert.** Playwright kann einen Trace nicht schwärzen, und er zeichnet auf:

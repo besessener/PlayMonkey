@@ -347,6 +347,42 @@ describe("oracles in the browser", () => {
     });
   });
 
+  it("blacks out secret fields in finding screenshots and masks keys before deduplication", async () => {
+    const context = await browser.newContext({ baseURL: site.url });
+    try {
+      const { config: cfg, secrets } = parseConfig(
+        JSON.stringify({ baseUrl: site.url, testData: { token: "${TOKEN}" }, monkey: { actionTimeoutMs: 1000 } }),
+        { env: { TOKEN: "tok-4711-secret" } },
+      );
+      const oracles = new Oracles(context, {
+        config: cfg,
+        role: "tester",
+        screenshotDir: join(dir, "masked"),
+        secrets,
+      });
+      const page = await context.newPage();
+      await page.setContent(
+        '<input type="password" value="hunter2"><input value="my tok-4711-secret"><input value="plain">',
+      );
+      let masked = -1;
+      const screenshot = page.screenshot.bind(page);
+      page.screenshot = async (options) => {
+        masked = (await options?.mask?.[0]?.count()) ?? 0;
+        return await screenshot(options);
+      };
+      await page.evaluate('console.error("bad token tok-4711-secret")');
+      await oracles.check(record(1, page, false), page);
+      assert.equal(masked, 2);
+      assert.equal(await page.locator("[data-monkey-secret]").count(), 0);
+      assert.deepEqual(
+        oracles.findings.map((f) => [f.key, f.screenshotPath !== undefined]),
+        [["console|bad token ***", true]],
+      );
+    } finally {
+      await context.close();
+    }
+  });
+
   it("does not report an element that never becomes clickable as a hang", async () => {
     await withWatch("/clean", {}, async ({ context, oracles, page }) => {
       await page.setContent('<button>Covered</button><div style="position:fixed;inset:0;background:#fff8"></div>');

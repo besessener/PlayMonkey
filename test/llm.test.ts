@@ -39,7 +39,7 @@ function load(llm: Record<string, unknown> = {}, extra: Record<string, unknown> 
       },
       ...extra,
     }),
-    { env: { ADMIN_PASS: SECRET, KEY } },
+    { env: { ADMIN_PASS: SECRET, KEY, GUEST_PASS: "guest-Pa55" } },
   );
 }
 
@@ -137,7 +137,7 @@ describe("LLM tools", () => {
 
 describe("prompt placeholders", () => {
   const { config, secrets } = load();
-  const placeholders = new PromptPlaceholders(config, secrets);
+  const placeholders = new PromptPlaceholders(config, secrets, "admin");
 
   it("offers test data and login fields, not their values", () => {
     assert.deepEqual(placeholders.offered, [
@@ -157,6 +157,42 @@ describe("prompt placeholders", () => {
       type: "fill",
       ref: "e1",
       value: SECRET,
+    });
+  });
+
+  it("hides URL-encoded and JSON-escaped secrets, and secrets a snapshot would cut", () => {
+    const encoded = `https://test.example.org/?q=${encodeURIComponent(SECRET)}+x`;
+    assert.equal(placeholders.hide(encoded), "https://test.example.org/?q={{env.ADMIN_PASS}}+x");
+    assert.equal(placeholders.hide(JSON.stringify(`a"${SECRET}`)), '"a\\"{{env.ADMIN_PASS}}"');
+    const long = snap({ elements: [button("e1", `${"x".repeat(95)}${SECRET}`)], text: `${"y".repeat(9000)}${SECRET}` });
+    const hidden = placeholders.hideSnapshot(long);
+    assert.ok(!JSON.stringify(hidden).includes(SECRET));
+    assert.ok(hidden.elements[0]?.name.endsWith("{{env.ADMIN_PASS}}"));
+  });
+
+  it("fills only what the model was shown: never the API key, another role's login or an address", () => {
+    const { config: two, secrets: both } = load(
+      {},
+      {
+        auth: [
+          { name: "admin", loginUrl: "/login", fields: { password: "${ADMIN_PASS}" }, submit: "button" },
+          { name: "guest", loginUrl: "/login", fields: { password: "${GUEST_PASS}" }, submit: "button" },
+        ],
+      },
+    );
+    const guest = new PromptPlaceholders(two, both, "guest");
+    assert.deepEqual(guest.offered, ["{{testData.email}}", "{{testData.iban}}", "{{guest.password}}"]);
+    // Not offered and never shown: stays as typed.
+    assert.equal(
+      guest.fill("{{admin.password}} {{env.ADMIN_PASS}} {{env.KEY}}"),
+      "{{admin.password}} {{env.ADMIN_PASS}} {{env.KEY}}",
+    );
+    // Shown in a prompt, but only the guest's own values may be typed.
+    assert.equal(guest.hide(`${KEY} ${SECRET}`), "{{env.KEY}} {{env.ADMIN_PASS}}");
+    assert.equal(guest.fill("{{env.KEY}}|{{env.ADMIN_PASS}}"), "{{env.KEY}}|{{env.ADMIN_PASS}}");
+    assert.deepEqual(guest.fillDecision({ type: "navigate", url: "https://test.example.org/?p={{guest.password}}" }), {
+      type: "navigate",
+      url: "https://test.example.org/?p={{guest.password}}",
     });
   });
 
@@ -353,7 +389,7 @@ describe("LLM driver", () => {
       config: config.llm as LlmConfig,
       stats,
       detector: new StuckDetector((config.llm as LlmConfig).handoff, { authenticated: true }),
-      placeholders: new PromptPlaceholders(config, secrets),
+      placeholders: new PromptPlaceholders(config, secrets, "admin"),
       role: "admin",
       ...(shared.run === undefined ? {} : { run: shared.run }),
       ...(shared.breaker === undefined ? {} : { breaker: shared.breaker }),
