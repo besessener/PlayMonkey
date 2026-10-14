@@ -22,7 +22,7 @@ export interface RawConfig {
   testData?: Record<string, string>;
   llm?: RawLlm;
   oracles?: Partial<Record<OracleName, boolean>>;
-  findings?: { lastActions?: number; ignoreStatus?: number[]; ignore?: RawIgnoreRule[] };
+  findings?: { lastActions?: number; ignoreStatus?: number[]; ignore?: RawIgnoreRule[]; baseline?: string };
   report?: { dir?: string; keepDownloads?: boolean };
   monkey?: { actionTimeoutMs?: number; maxTabs?: number; weights?: Partial<Record<ActionType, number>> };
 }
@@ -259,6 +259,12 @@ export const configSchema: JSONSchemaType<RawConfig> = {
               },
             },
           },
+        },
+        baseline: {
+          ...nonEmptyString,
+          nullable: true,
+          description:
+            "baseline.json of an earlier run, relative to the config file. Its findings are known and do not fail the run.",
         },
       },
     },

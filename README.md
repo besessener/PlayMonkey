@@ -70,7 +70,7 @@ monkey preflight config.json   # check the configured LLM endpoint
 monkey run config.json --watch # spectator mode: watch it live, e.g. for a demo
 ```
 
-Exit-Codes: `0` keine Befunde, `1` Befunde, `2` Werkzeug- oder Konfigurationsfehler oder ein Lauf, der nicht zu Ende
+Exit-Codes: `0` keine Befunde, `1` Befunde (mit `findings.baseline`: neue), `2` Werkzeug- oder Konfigurationsfehler oder ein Lauf, der nicht zu Ende
 kam; `2` hat Vorrang vor `1`. Eine minimale Konfiguration:
 
 ```json

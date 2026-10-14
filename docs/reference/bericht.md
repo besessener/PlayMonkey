@@ -6,6 +6,7 @@
 monkey-report/
   report.html              one self-contained page: open it in any browser, also offline
   report.json              the same data, machine-readable
+  baseline.json            this run's findings, to adopt as findings.baseline
   llm-debug.jsonl          only with llm.debugLog: every LLM prompt and response, sanitized
   <role>/
     actions.json           the action log, see aktionsprotokoll.md
@@ -46,6 +47,9 @@ nichts aus dem Netz. Sie zeigt:
   **found in** (die Rollen, z. B. „admin, user“), die Läufe mit ihren Befund-Ids pro Lauf und, aus dem ersten Lauf,
   der es gefunden hat, die **steps to reproduce** (die letzten `findings.lastActions` Aktionen, ausgeschrieben mit
   ihren dauerhaften Locatoren), den Screenshot und die Details, die das Orakel festgehalten hat;
+- mit `findings.baseline`: die Zahl neuer und bekannter Befunde im Kopf, das Abzeichen **known** auf bekannten
+  Befunden und unter **Not seen this time** die Befunde der Baseline, die dieser Lauf nicht gefunden hat (behoben,
+  oder diesmal nicht erreicht);
 - die **Coverage**: eine Zeile pro Seite, auf der ein Lauf gehandelt hat (Schritte, Läufe), und die Seiten, zu denen
   ein Lauf Links gesehen, die aber keiner erreicht hat. So fällt auf, wenn ein Lauf zum Beispiel nie bis zur Kasse
   kam.
@@ -69,7 +73,8 @@ Links zu Traces und Videos sind relativ; halte das Verzeichnis also zusammen, we
 | `config` | Die Konfiguration mit eingesetzten Standardwerten, jeder geheime Wert als `***` maskiert. |
 | `roles[]` | Ein Eintrag pro Lauf, in der Reihenfolge der Konfiguration (Rollen, dann Seeds), egal in welcher Reihenfolge sie fertig wurden: `role`, `seed`, `steps`, `durationMs`, `stopReason` (`maxSteps`, `maxMinutes`, `aborted`, `error`), `error`, `states`, `failedActions`, `pages` (Seiten der Coverage), `findings` (Anzahl), `blockedNavigations` und die Pfade `actionLog`, `trace`, `videos`. Ein Lauf, der sich nicht anmelden konnte oder abgestürzt ist, hat nur `role`, `seed`, `error`, `findings: 0` und leere `videos`. |
 | `findings[]` | Die Befunde jedes Laufs, pro Lauf dedupliziert, wie in [Orakel und Befunde](../explanation/orakel.md#befundmodell) beschrieben, dazu der `seed` des Laufs und `screenshot` als Pfad. Sortiert nach Schweregrad, dann Vorkommen, dann Reihenfolge der Läufe. Ids (`F1`, …) zählen pro Lauf. |
-| `aggregated[]` | Die Befunde über alle Läufe, einer pro Dedup-Schlüssel: `key`, `oracle`, `severity`, `message`, `url` (des ersten Laufs, der ihn gefunden hat), `occurrences` (Summe), `roles` (eindeutig, Reihenfolge der Konfiguration) und `runs[]` (`role`, `seed`, `id`). Sortiert wie im HTML. |
+| `aggregated[]` | Die Befunde über alle Läufe, einer pro Dedup-Schlüssel: `key`, `oracle`, `severity`, `message`, `url` (des ersten Laufs, der ihn gefunden hat), `occurrences` (Summe), `roles` (eindeutig, Reihenfolge der Konfiguration), `runs[]` (`role`, `seed`, `id`) und, mit `findings.baseline`, `known`. Sortiert wie im HTML. |
+| `baseline` | Nur mit `findings.baseline`: `file` (relativ zum Berichtsverzeichnis), `known` und `new` (Anzahl der Befunde, die die Baseline kennt oder nicht kennt; `new` entscheidet über den Exit-Code) und `unseen[]`: Einträge der Baseline, die dieser Lauf nicht gefunden hat. |
 | `counts` | Zusammengefasste Befunde pro Schweregrad: `critical`, `high`, `medium`, `low`. |
 | `coverage` | `pages[]` (`page`, `steps` summiert über die Läufe, `runs`: wie viele Läufe dort gehandelt haben), sortiert nach Seite, und `unvisited[]`: Seiten, zu denen ein Lauf Links gesehen hat und die keiner erreicht hat. |
 | `llm` | Nur mit `llm` in der Konfiguration; siehe unten. |
@@ -94,6 +99,13 @@ Jeder Verbrauchseintrag hat `calls`, `failedCalls`, `errors` (fehlgeschlagene Au
 hat), `fallbacks` (Schritte, in denen der Monkey gehandelt hat, weil das LLM fehlschlug, nach Fehlerart),
 `breakerTrips`, `avgLatencyMs`, `p95LatencyMs` und, mit `llm.pricing`, `estimatedCost`: eine **Schätzung** in der
 Währung der Preise, keine Rechnung.
+
+## `baseline.json`
+
+Jeder Lauf schreibt die Befunde, die er gefunden hat, als `baseline.json`: `version` (derzeit `1`) und `findings[]`
+mit `key`, `oracle`, `severity` und `message`, nach `key` sortiert, damit ein Diff klein bleibt. Maskiert wie
+`report.json`. Nur `key` entscheidet beim Vergleich; der Rest ist für Menschen, die die Datei lesen. Wie du sie als
+Baseline übernimmst, steht in [In der CI ausführen](../how-to/in-ci-ausfuehren.md#nur-neue-befunde-mit-einer-baseline).
 
 ## `llm-debug.jsonl`
 

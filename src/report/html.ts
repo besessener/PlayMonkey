@@ -1,5 +1,6 @@
 import type { LlmReport, LlmSummary } from "../llm/usage.ts";
 import type { ActionContext } from "../oracles/finding.ts";
+import type { BaselineComparison } from "./baseline.ts";
 import { coverageSection } from "./coverage.ts";
 import { e } from "./escape.ts";
 import type { AggregatedFinding, Report, ReportFinding, RoleSummary } from "./report.ts";
@@ -30,6 +31,7 @@ export function renderHtml(report: Report, screenshots: Map<string, string>): st
   <h1>PlayMonkey report</h1>
   <p class="meta">${e(baseUrl ?? "")} · ${seeds} · ${e(report.startedAt)} · playmonkey ${e(report.tool.version)}</p>
   <p class="total">${total === 0 ? "No findings." : `${e(total)} finding${total === 1 ? "" : "s"} ${counts}`}</p>
+  ${report.baseline === undefined ? "" : `<p class="meta">Baseline <code>${e(report.baseline.file)}</code>: ${e(report.baseline.new)} new, ${e(report.baseline.known)} known</p>`}
 </header>
 <main>
 <section>
@@ -46,6 +48,7 @@ ${report.llm === undefined ? "" : llmSection(report.llm)}
   <h2>Findings</h2>
 ${total === 0 ? '  <p class="empty">The oracles found nothing.</p>' : report.aggregated.map((f) => findingCard(f, report, screenshots)).join("\n")}
 </section>
+${unseenSection(report.baseline)}
 ${coverageSection(report.coverage)}
 <footer>
   <p>Open a trace with <code>npx playwright show-trace &lt;trace.zip&gt;</code>. Repeat a run with
@@ -55,6 +58,20 @@ ${coverageSection(report.coverage)}
 </body>
 </html>
 `;
+}
+
+/** The baseline's findings this run did not see: fixed, or just not reached. */
+function unseenSection(baseline: BaselineComparison | undefined): string {
+  if (baseline === undefined || baseline.unseen.length === 0) return "";
+  const items = baseline.unseen.map(
+    (entry) =>
+      `<li><span class="badge ${e(entry.severity)}">${e(entry.severity)}</span> <code>${e(entry.oracle)}</code> ${e(entry.message)}</li>`,
+  );
+  return `<section>
+  <h2>Not seen this time</h2>
+  <p class="meta">In the baseline, but not found by this run: fixed, or not reached this time.</p>
+  <ul>${items.join("")}</ul>
+</section>`;
 }
 
 function llmSection(llm: LlmReport): string {
@@ -138,7 +155,7 @@ function findingCard(group: AggregatedFinding, report: Report, screenshots: Map<
     .join(", ");
   const where = multiSeed ? ` · seed ${e(finding.seed)}` : "";
   return `  <article class="finding" id="${e(group.key)}">
-    <h3><span class="badge ${e(group.severity)}">${e(group.severity)}</span> <code>${e(group.oracle)}</code> ${e(group.message)}</h3>
+    <h3><span class="badge ${e(group.severity)}">${e(group.severity)}</span>${group.known === true ? ' <span class="badge" title="Listed in the baseline">known</span>' : ""} <code>${e(group.oracle)}</code> ${e(group.message)}</h3>
     <dl>
       <dt>Where</dt><dd><code>${e(group.url)}</code></dd>
       <dt>Found in</dt><dd>${e(group.roles.join(", "))} · seen ${e(group.occurrences)}×${group.runs.length > 1 ? ` in ${e(group.runs.length)} runs` : ""}</dd>
