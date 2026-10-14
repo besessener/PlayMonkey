@@ -100,13 +100,15 @@ function documentedSamples(file: string): Sample[] {
   });
 }
 
-/** The sample configs under fixtures/configs, then those in the documentation. */
+/** The sample configs under fixtures/configs and demo/, then those in the documentation. */
 function sampleConfigs(): Sample[] {
-  const configs = join(root, "fixtures/configs");
-  const fixtures = readdirSync(configs)
-    .filter((n) => n.endsWith(".json"))
-    .map((name) => ({ where: `fixtures/configs/${name}`, json: readFileSync(join(configs, name), "utf8") }));
-  return [...fixtures, ...documentationFiles().flatMap(documentedSamples)];
+  const files = ["fixtures/configs", "demo"].flatMap((dir) =>
+    readdirSync(join(root, dir))
+      .filter((name) => name.endsWith(".json"))
+      .map((name) => `${dir}/${name}`),
+  );
+  const configs = files.map((where) => ({ where, json: readFileSync(join(root, where), "utf8") }));
+  return [...configs, ...documentationFiles().flatMap(documentedSamples)];
 }
 
 /** The validation error of a sample, if it has one. */
