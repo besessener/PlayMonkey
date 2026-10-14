@@ -139,7 +139,7 @@ export class Oracles {
       const message = `${error.name}: ${error.message}`;
       this.#add("pageerror", {
         severity: "high",
-        key: `${normalizeMessage(message, this.#origin)}|${firstStackFrame(error.stack, this.#origin)}`,
+        key: `${normalizeMessage(message, this.#origin)}|${firstStackFrame(error.stack, this.#origin, message)}`,
         message,
         url: safeUrl(page),
         details: { stack: (error.stack ?? "").split("\n").slice(0, 10).join("\n") },

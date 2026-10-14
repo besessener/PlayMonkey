@@ -73,7 +73,7 @@ Weg dorthin ist.
 
 | Orakel | Schlüssel |
 | --- | --- |
-| `pageerror` | Normalisierte Meldung + erster Stack-Frame (mit Zeile und Spalte: Dieselbe Meldung von zwei Stellen sind zwei Fehler). |
+| `pageerror` | Normalisierte Meldung + erster Stack-Frame mit URL (mit Zeile und Spalte: Dieselbe Meldung von zwei Stellen sind zwei Fehler). Die Zeile `Name: Meldung` am Anfang des Stacks zählt nie als Frame, auch wenn die Meldung ein `@` enthält; eingebaute Frames ohne URL wie `at JSON.parse (<anonymous>)` oder `at async Promise.all (index 0)` werden übersprungen. |
 | `console` | Normalisierte Meldung. |
 | `http4xx`, `http5xx` | Methode + normalisierte URL + Status. |
 | `overflow` | Normalisierte Seiten-URL + das verursachende Element (das äußerste Element, das rechts herausragt, z. B. `div.banner`). |
@@ -86,11 +86,16 @@ Weg dorthin ist.
 Die **Normalisierung** entfernt, was sich zwischen Auftreten desselben Fehlers ändert:
 
 - URLs verlieren Query und Fragment; numerische Pfadsegmente werden zu `:n`, UUIDs, Hex-IDs und lange Tokens zu
-  `:id` (`/orders/4711/items/9?x=1` → `/orders/:n/items/:n`). Der eigene Origin der Seite fällt weg, sodass Schlüssel
-  gleich bleiben, wenn die Testumgebung auf einen anderen Host oder Port umzieht, zum Beispiel zwischen einem Lauf und
-  seinem Replay.
-- Meldungen werden für URLs darin genauso behandelt; andere Zahlen werden zu `#`, IDs zu `:id`, und Leerraum wird
-  zusammengefasst.
+  `:id` (`/orders/4711/items/9?x=1` → `/orders/:n/items/:n`). Content-Hashes in Dateinamen werden zu `:hash`
+  (`/assets/index-4f3a2b1c.js` → `/assets/index-:hash.js`): ein Lauf aus mindestens acht Buchstaben, Ziffern oder `_`
+  mit mindestens einer Ziffer, nach `-`, `.` oder am Anfang des Segments und vor einem Punkt. Versionen wie
+  `jquery-3.7.1.min.js` und Namen wie `release-notes-2024.html` bleiben. Bei `blob:`-URLs wird die innere URL so
+  normalisiert, `blob:` bleibt davor. Der eigene Origin der Seite fällt weg, sodass Schlüssel gleich bleiben, wenn die
+  Testumgebung auf einen anderen Host oder Port umzieht, zum Beispiel zwischen einem Lauf und seinem Replay.
+- Meldungen werden für URLs darin genauso behandelt. CSP-Nonces werden zu `nonce-:id`, Skript-Hashes wie
+  `'sha256-…'` zu `:hash`, und Tokens aus mindestens 16 Base64-Zeichen mit Ziffer und Kleinbuchstabe (etwa JWTs)
+  zu `:id`, ebenso UUIDs und Hex-IDs; andere Zahlen werden zu `#`, und Leerraum wird zusammengefasst. Konstanten wie
+  `ERR_HTTP2_PROTOCOL_ERROR` bleiben bis auf ihre Ziffern erhalten.
 
 Ein Overflow wird nach seinem Verursacher geschlüsselt, nicht nach der Viewport-Größe: Ein zu breites Element läuft
 in Smartphone-, Tablet- und Laptop-Viewports gleichermaßen über und ist ein Fehler. Overflows, die von verschiedenen
