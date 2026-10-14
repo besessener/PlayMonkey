@@ -1,15 +1,8 @@
 import type { LlmReport, LlmSummary } from "../llm/usage.ts";
 import type { ActionContext } from "../oracles/finding.ts";
+import { coverageSection } from "./coverage.ts";
+import { e } from "./escape.ts";
 import type { AggregatedFinding, Report, ReportFinding, RoleSummary } from "./report.ts";
-
-const ESCAPES: Record<string, string> = { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" };
-
-/** Escapes text for HTML content and attribute values. Every dynamic value in the report goes through this. */
-export function escapeHtml(text: string): string {
-  return text.replace(/[&<>"']/g, (char) => ESCAPES[char] ?? char);
-}
-
-const e = (value: unknown) => escapeHtml(String(value));
 
 /**
  * One self-contained HTML file: inline CSS, screenshots as data URIs, no scripts and nothing loaded from the
@@ -53,6 +46,7 @@ ${report.llm === undefined ? "" : llmSection(report.llm)}
   <h2>Findings</h2>
 ${total === 0 ? '  <p class="empty">The oracles found nothing.</p>' : report.aggregated.map((f) => findingCard(f, report, screenshots)).join("\n")}
 </section>
+${coverageSection(report.coverage)}
 <footer>
   <p>Open a trace with <code>npx playwright show-trace &lt;trace.zip&gt;</code>. Repeat a run with
   <code>monkey replay &lt;actions.json&gt; --config &lt;config.json&gt;</code>, using the run's action log.</p>
