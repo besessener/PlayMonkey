@@ -6,6 +6,7 @@ import type { LlmReport } from "../llm/usage.ts";
 import type { StopReason } from "../monkey/loop.ts";
 import { type Finding, SEVERITIES, type Severity } from "../oracles/finding.ts";
 import type { RoleOutcome } from "../run.ts";
+import { aggregateCoverage, type ReportCoverage } from "./coverage.ts";
 import { renderHtml } from "./html.ts";
 
 export const REPORT_VERSION = 1;
@@ -30,6 +31,8 @@ export interface Report {
   aggregated: AggregatedFinding[];
   /** Aggregated findings per severity. */
   counts: Record<Severity, number>;
+  /** The pages all runs acted on, and linked ones none reached. */
+  coverage: ReportCoverage;
   /** LLM usage; present when `llm` is configured. */
   llm?: LlmReport;
 }
@@ -45,6 +48,8 @@ export interface RoleSummary {
   error?: string;
   states?: number;
   failedActions?: number;
+  /** Distinct pages the run acted on. */
+  pages?: number;
   findings: number;
   blockedNavigations: number;
   actionLog?: string;
@@ -116,6 +121,7 @@ export function buildReport(input: ReportInput): Report {
     findings,
     aggregated: groups,
     counts,
+    coverage: maskSecrets(aggregateCoverage(input.outcomes), secrets),
     ...(input.llm === undefined ? {} : { llm: maskSecrets(input.llm, secrets) }),
   };
 }
@@ -161,6 +167,7 @@ function summarizeRun(outcome: RoleOutcome, secrets: Secrets, path: (file: strin
           failedActions: result.failedActions,
         }),
     ...(error === undefined ? {} : { error: secrets.mask(error) }),
+    ...(outcome.coverage === undefined ? {} : { pages: outcome.coverage.pages.length }),
     findings: outcome.findings.length,
     blockedNavigations: outcome.blockedNavigations,
     ...(outcome.actionLog === undefined ? {} : { actionLog: path(outcome.actionLog) }),

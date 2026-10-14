@@ -1,5 +1,5 @@
 import { parseArgs } from "node:util";
-import { ConfigError, type LlmConfig, type LoadedConfig, loadConfig } from "../config/config.ts";
+import type { LoadedConfig } from "../config/config.ts";
 import { ExitCode } from "../exit-codes.ts";
 import { createProvider } from "../llm/factory.ts";
 import { runPreflight } from "../llm/preflight.ts";
@@ -7,19 +7,11 @@ import type { LlmProvider } from "../llm/provider.ts";
 import { describeUsage, LlmStats } from "../llm/usage.ts";
 import { DEFAULT_SPECTATOR, type Spectator } from "../monkey/spectator.ts";
 import { SEVERITIES } from "../oracles/finding.ts";
-import { ActionLogError } from "../replay/log.ts";
-import { ReplayError, replayActionLog } from "../replay/replay.ts";
 import { buildReport, type Report, writeReport } from "../report/report.ts";
-import { describeFinding, planRuns, type RoleOutcome, type RunLlm, runAllRoles } from "../run.ts";
+import { planRuns, type RoleOutcome, type RunLlm, runAllRoles } from "../run.ts";
 import { readVersion } from "../version.ts";
-
-export interface CliIo {
-  stdout: (text: string) => void;
-  stderr: (text: string) => void;
-  env?: NodeJS.ProcessEnv;
-  /** Replaces the provider named in the config; tests use it. */
-  llmProvider?: (llm: LlmConfig, log: (line: string) => void) => LlmProvider;
-}
+import { type CliIo, launchHint, load, withStopSignal } from "./common.ts";
+import { replay } from "./replay.ts";
 
 const USAGE = `Usage: monkey <command> [options]
 
@@ -133,25 +125,6 @@ function spectatorOf(values: { watch?: boolean; "slow-mo"?: string }): Spectator
   return { slowMoMs, highlightMs: slowMoMs === 0 ? 0 : Math.max(300, 2 * slowMoMs) };
 }
 
-/** Adds a hint when a visible browser could not be opened. */
-function launchHint(message: string, spectator: Spectator | undefined): string {
-  if (spectator === undefined || !/x ?server|display|headed/i.test(message)) return message;
-  // Playwright appends pages of browser logs; the first line says enough.
-  return `${message.split("\n")[0]}\n  hint: --watch opens a visible browser and needs a display; without one (CI, containers) run it under xvfb-run`;
-}
-
-async function load(command: string, configFile: string, io: CliIo): Promise<LoadedConfig | undefined> {
-  try {
-    return await loadConfig(configFile, io.env === undefined ? {} : { env: io.env });
-  } catch (error) {
-    if (error instanceof ConfigError) {
-      io.stderr(`monkey ${command}: ${error.message}\n`);
-      return undefined;
-    }
-    throw error;
-  }
-}
-
 /**
  * Creates the provider and runs its preflight. Returns the LLM for the run, `undefined` without `llm` or when a
  * failed preflight is allowed (`llm.required: false`), or an exit code when the run must not start.
@@ -214,25 +187,6 @@ async function run(configFile: string, io: CliIo, spectator?: Spectator): Promis
   });
 }
 
-/** Aborts the signal passed to `body` on SIGINT while it runs. */
-async function withStopSignal(
-  command: string,
-  io: CliIo,
-  body: (signal: AbortSignal) => Promise<ExitCode>,
-): Promise<ExitCode> {
-  const abort = new AbortController();
-  const onSignal = () => {
-    io.stderr(`monkey ${command}: stopping after the current step\n`);
-    abort.abort();
-  };
-  process.once("SIGINT", onSignal);
-  try {
-    return await body(abort.signal);
-  } finally {
-    process.off("SIGINT", onSignal);
-  }
-}
-
 function printRunPlan({ config, seedGenerated }: LoadedConfig, io: CliIo): void {
   if (config.seeds === undefined) {
     io.stdout(`seed: ${config.seed}${seedGenerated ? ' (generated; set "seed" in the config to reuse it)' : ""}\n`);
@@ -274,6 +228,8 @@ async function runAndReport({ loaded, llm, spectator, io }: RunContext, signal: 
     .map((severity) => `${report.counts[severity]} ${severity}`)
     .join(", ");
   io.stdout(`findings: ${total}${total === 0 ? "" : ` (${counts})`}\n`);
+  const { pages, unvisited } = report.coverage;
+  io.stdout(`coverage: ${pages.length} pages visited, ${unvisited.length} linked pages never visited\n`);
   io.stdout(`report: ${paths.html}\n`);
   return runExitCode(total, incompleteRuns(outcomes, loaded), io);
 }
@@ -302,62 +258,6 @@ function runExitCode(findings: number, incomplete: string[], io: CliIo): ExitCod
   }
   io.stdout(findings > 0 ? "exit 1: findings present\n" : "exit 0: no findings\n");
   return findings > 0 ? ExitCode.Findings : ExitCode.NoFindings;
-}
-
-interface ReplayOptions {
-  logFile: string;
-  configFile: string | undefined;
-  strict: boolean;
-  io: CliIo;
-  spectator: Spectator | undefined;
-}
-
-async function replay(options: ReplayOptions): Promise<ExitCode> {
-  const { io, spectator } = options;
-  return await withStopSignal("replay", io, async (signal) => {
-    try {
-      return await replayAndReport(options, signal);
-    } catch (error) {
-      return replayFailure(error, spectator, io);
-    }
-  });
-}
-
-async function replayAndReport(
-  { logFile, configFile, strict, io, spectator }: ReplayOptions,
-  signal: AbortSignal,
-): Promise<ExitCode> {
-  const { outcome, original, added } = await replayActionLog(logFile, {
-    ...(configFile === undefined ? {} : { config: configFile }),
-    strict,
-    env: io.env ?? process.env,
-    log: (line) => io.stdout(`${line}\n`),
-    signal,
-    ...(spectator === undefined ? {} : { spectator }),
-  });
-  if (outcome.result === undefined || outcome.result.stopReason === "error") return ExitCode.Error;
-  for (const finding of original) {
-    const verdict = finding.reproduced ? "reproduced    " : "not reproduced";
-    io.stdout(`${verdict}  ${finding.id} ${finding.severity} ${finding.oracle}: ${finding.message}\n`);
-  }
-  for (const finding of added) io.stdout(`new             ${describeFinding(finding)}\n`);
-  const reproduced = original.filter((finding) => finding.reproduced).length;
-  io.stdout(`reproduced: ${reproduced} of ${original.length}\n`);
-  return reproduced > 0 ? ExitCode.Findings : ExitCode.NoFindings;
-}
-
-/** Reports expected replay errors and launch failures with a hint; rethrows anything else. */
-function replayFailure(error: unknown, spectator: Spectator | undefined, io: CliIo): ExitCode {
-  if (error instanceof ConfigError || error instanceof ActionLogError || error instanceof ReplayError) {
-    io.stderr(`monkey replay: ${error.message}\n`);
-    return ExitCode.Error;
-  }
-  const message = error instanceof Error ? error.message : String(error);
-  if (launchHint(message, spectator) !== message) {
-    io.stderr(`monkey replay: ${launchHint(message, spectator)}\n`);
-    return ExitCode.Error;
-  }
-  throw error;
 }
 
 function parse(argv: string[]) {

@@ -249,6 +249,13 @@ describe("report of a run against the fixture site", () => {
     assert.equal(report.roles[0]?.trace, "user/trace.zip");
     assert.equal(report.roles[0]?.actionLog, "user/actions.json");
     assert.ok(report.findings.every((f) => f.screenshot?.startsWith("user/screenshots/")));
+    // The broken link and the contact form are where the seeded bugs are; coverage names them without the host.
+    const pages = report.coverage.pages.map((p) => p.page);
+    assert.ok(
+      ["/", "/form", "/missing-page"].every((page) => pages.includes(page)),
+      pages.join(", "),
+    );
+    assert.equal(report.roles[0]?.pages, pages.length);
 
     // Every text file in the report directory, the HTML with its embedded screenshots included.
     const secrets = [CREDENTIALS.username, CREDENTIALS.password, SECRET_EMAIL, site.url, new URL(site.url).host];

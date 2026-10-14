@@ -51,7 +51,10 @@ describe("monkey run against the fixture site", () => {
     assert.match(stdout, /^seed: 4\n\[user\] starting\n/);
     assert.match(stdout, /\[user\] 8 steps in [\d.]+s, \d+ states, \d+ failed actions, stopped: maxSteps, 1 finding\n/);
     assert.match(stdout, /\[user\] {3}F1 medium http4xx: GET \/missing-page responded 404 Not Found \(step \d\)\n/);
-    assert.match(stdout, /\nfindings: 1 \(1 medium\)\nreport: .*out-ok[\\/]report\.html\nexit 1: findings present\n$/);
+    assert.match(
+      stdout,
+      /\nfindings: 1 \(1 medium\)\ncoverage: [1-9]\d* pages visited, \d+ linked pages never visited\nreport: .*out-ok[\\/]report\.html\nexit 1: findings present\n$/,
+    );
     assert.ok((await stat(join(dir, "out-ok", "user", "trace.zip"))).size > 0);
   });
 
@@ -77,7 +80,10 @@ describe("monkey run against the fixture site", () => {
     const { code, stdout } = await run({ limits: { maxSteps: 2 }, report: { dir: "out-clean" } });
     assert.equal(code, 0, stdout);
     assert.match(stdout, /\[anonymous\] 2 steps .*, 0 findings\n/);
-    assert.match(stdout, /\nfindings: 0\nreport: .*report\.html\nexit 0: no findings\n$/);
+    assert.match(
+      stdout,
+      /\nfindings: 0\ncoverage: \d+ pages visited, \d+ linked pages never visited\nreport: .*report\.html\nexit 0: no findings\n$/,
+    );
   });
 
   it("uses safe directory names for roles", () => {

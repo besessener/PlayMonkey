@@ -26,6 +26,7 @@ der Exit-Code so ist, wie er ist:
 ```text
 llm: 14 calls (1 failed), 81234 in / 912 out tokens (60110 cached), 5 handoffs, 12 actions, 1 fallback, p95 2310 ms
 findings: 5 (2 high, 2 medium, 1 low)
+coverage: 12 pages visited, 2 linked pages never visited
 report: …/monkey-report/report.html
 exit 1: findings present
 ```
@@ -44,7 +45,14 @@ nichts aus dem Netz. Sie zeigt:
   der Läufe, die es gefunden haben, dann danach, wie oft es auftrat. Jede zeigt ihr Orakel, ihre Meldung und Seite,
   **found in** (die Rollen, z. B. „admin, user“), die Läufe mit ihren Befund-Ids pro Lauf und, aus dem ersten Lauf,
   der es gefunden hat, die **steps to reproduce** (die letzten `findings.lastActions` Aktionen, ausgeschrieben mit
-  ihren dauerhaften Locatoren), den Screenshot und die Details, die das Orakel festgehalten hat.
+  ihren dauerhaften Locatoren), den Screenshot und die Details, die das Orakel festgehalten hat;
+- die **Coverage**: eine Zeile pro Seite, auf der ein Lauf gehandelt hat (Schritte, Läufe), und die Seiten, zu denen
+  ein Lauf Links gesehen, die aber keiner erreicht hat. So fällt auf, wenn ein Lauf zum Beispiel nie bis zur Kasse
+  kam.
+
+Seiten heißen in der Coverage wie in den Dedup-Schlüsseln: URL ohne Query und Fragment, IDs als `:n` und `:id`, der
+eigene Origin weggelassen (siehe [Deduplizierung](../explanation/orakel.md#deduplizierung)). Als erreichbar zählen nur
+Links, denen der Monkey folgen darf (`stayOnDomain`, `scope`).
 
 Alles, was angezeigt wird, stammt von der getesteten Seite oder aus der Konfiguration, daher ist alles HTML-escaped.
 Links zu Traces und Videos sind relativ; halte das Verzeichnis also zusammen, wenn du es verschiebst.
@@ -59,10 +67,11 @@ Links zu Traces und Videos sind relativ; halte das Verzeichnis also zusammen, we
 | `seed` | Der Seed des Laufs; mit `seeds` der erste davon. |
 | `seeds` | Nur mit `seeds` in der Konfiguration: alle. |
 | `config` | Die Konfiguration mit eingesetzten Standardwerten, jeder geheime Wert als `***` maskiert. |
-| `roles[]` | Ein Eintrag pro Lauf, in der Reihenfolge der Konfiguration (Rollen, dann Seeds), egal in welcher Reihenfolge sie fertig wurden: `role`, `seed`, `steps`, `durationMs`, `stopReason` (`maxSteps`, `maxMinutes`, `aborted`, `error`), `error`, `states`, `failedActions`, `findings` (Anzahl), `blockedNavigations` und die Pfade `actionLog`, `trace`, `videos`. Ein Lauf, der sich nicht anmelden konnte oder abgestürzt ist, hat nur `role`, `seed`, `error`, `findings: 0` und leere `videos`. |
+| `roles[]` | Ein Eintrag pro Lauf, in der Reihenfolge der Konfiguration (Rollen, dann Seeds), egal in welcher Reihenfolge sie fertig wurden: `role`, `seed`, `steps`, `durationMs`, `stopReason` (`maxSteps`, `maxMinutes`, `aborted`, `error`), `error`, `states`, `failedActions`, `pages` (Seiten der Coverage), `findings` (Anzahl), `blockedNavigations` und die Pfade `actionLog`, `trace`, `videos`. Ein Lauf, der sich nicht anmelden konnte oder abgestürzt ist, hat nur `role`, `seed`, `error`, `findings: 0` und leere `videos`. |
 | `findings[]` | Die Befunde jedes Laufs, pro Lauf dedupliziert, wie in [Orakel und Befunde](../explanation/orakel.md#befundmodell) beschrieben, dazu der `seed` des Laufs und `screenshot` als Pfad. Sortiert nach Schweregrad, dann Vorkommen, dann Reihenfolge der Läufe. Ids (`F1`, …) zählen pro Lauf. |
 | `aggregated[]` | Die Befunde über alle Läufe, einer pro Dedup-Schlüssel: `key`, `oracle`, `severity`, `message`, `url` (des ersten Laufs, der ihn gefunden hat), `occurrences` (Summe), `roles` (eindeutig, Reihenfolge der Konfiguration) und `runs[]` (`role`, `seed`, `id`). Sortiert wie im HTML. |
 | `counts` | Zusammengefasste Befunde pro Schweregrad: `critical`, `high`, `medium`, `low`. |
+| `coverage` | `pages[]` (`page`, `steps` summiert über die Läufe, `runs`: wie viele Läufe dort gehandelt haben), sortiert nach Seite, und `unvisited[]`: Seiten, zu denen ein Lauf Links gesehen hat und die keiner erreicht hat. |
 | `llm` | Nur mit `llm` in der Konfiguration; siehe unten. |
 
 Pfade sind relativ zum Berichtsverzeichnis.

@@ -4,21 +4,22 @@ import type { Browser } from "playwright";
 import { launchBrowser } from "./auth/browser.ts";
 import { ANONYMOUS_ROLE, LoginError, openRoleSession, type RoleSession } from "./auth/session.ts";
 import type { AuthRole, LoadedConfig } from "./config/config.ts";
-import { maskSecrets, type Secrets } from "./config/secrets.ts";
 import { DebugLog } from "./llm/debug-log.ts";
 import { LlmBreaker, LlmDriver } from "./llm/driver.ts";
 import { PromptPlaceholders } from "./llm/placeholders.ts";
 import type { LlmProvider } from "./llm/provider.ts";
 import { StuckDetector } from "./llm/stuck.ts";
 import { describeUsage, type LlmStats } from "./llm/usage.ts";
-import { type Action, describeAction } from "./monkey/actions.ts";
-import { describeEvent, removeDownloads } from "./monkey/events.ts";
+import { CoverageTracker, type RunCoverage } from "./monkey/coverage.ts";
+import { removeDownloads } from "./monkey/events.ts";
 import { type ReplayPlan, type RunResult, runMonkey, type StepRecord } from "./monkey/loop.ts";
 import { UrlScope } from "./monkey/scope.ts";
 import type { Spectator } from "./monkey/spectator.ts";
 import type { Finding } from "./oracles/finding.ts";
 import { Oracles } from "./oracles/oracles.ts";
 import { ActionLogWriter } from "./replay/log.ts";
+import { describeFinding, describeStep, maskFinding, plural, summarize } from "./run-text.ts";
+import type { Snapshot } from "./snapshot/snapshot.ts";
 
 export interface RoleOutcome {
   role: string;
@@ -36,6 +37,8 @@ export interface RoleOutcome {
   /** Playwright trace and videos of the run's context; absent when the run could not start. */
   tracePath?: string;
   videoPaths?: string[];
+  /** The pages the run acted on; absent when the run could not start. Not masked. */
+  coverage?: RunCoverage;
 }
 
 export interface RunAllOptions {
@@ -211,6 +214,11 @@ async function runSession(run: RoleRun, session: RoleSession): Promise<RoleOutco
   });
   const writer = options.actionLog ? await createActionLog(run) : undefined;
   const advisor = createAdvisor(run, oracles);
+  const coverage = new CoverageTracker({
+    origin: new URL(config.baseUrl).origin,
+    stayOnDomain: config.stayOnDomain,
+    scope: new UrlScope(config.scope),
+  });
   const downloadDir = join(options.outputDir, "downloads");
   let outcome: RoleOutcome | undefined;
   try {
@@ -221,7 +229,7 @@ async function runSession(run: RoleRun, session: RoleSession): Promise<RoleOutco
       ...(options.replay === undefined ? {} : { replay: options.replay }),
       ...(advisor === undefined ? {} : { advisor }),
       ...(options.spectator === undefined ? {} : { spectator: options.spectator }),
-      onStep: stepHandler(run, session, oracles, writer),
+      onStep: stepHandler(run, session, { oracles, coverage, writer }),
     });
     const findings = await collectFindings(run, result, oracles, writer);
     if (advisor !== undefined && options.llm !== undefined) log(describeUsage(options.llm.stats.role(label)));
@@ -233,6 +241,7 @@ async function runSession(run: RoleRun, session: RoleSession): Promise<RoleOutco
       findings,
       blockedNavigations: session.events.length,
       ...(writer === undefined ? {} : { actionLog: writer.file }),
+      coverage: coverage.summary(),
     };
   } finally {
     const artifacts = await session.close();
@@ -284,16 +293,23 @@ function createAdvisor(run: RoleRun, oracles: Oracles): LlmDriver | undefined {
   });
 }
 
+/** What a run's steps feed: the oracles, the coverage and the action log. */
+interface StepSinks {
+  oracles: Oracles;
+  coverage: CoverageTracker;
+  writer: ActionLogWriter | undefined;
+}
+
 /** Checks every step with the oracles, logs it when skipped or in spectator mode, and appends it to the log. */
 function stepHandler(
   run: RoleRun,
   session: RoleSession,
-  oracles: Oracles,
-  writer: ActionLogWriter | undefined,
-): (record: StepRecord) => Promise<void> {
+  { oracles, coverage, writer }: StepSinks,
+): (record: StepRecord, snapshot: Snapshot) => Promise<void> {
   const { log, options } = run;
   const { secrets } = run.loaded;
-  return async (record) => {
+  return async (record, snapshot) => {
+    coverage.record(record, snapshot);
     const pages = session.context.pages();
     await oracles.check(record, pages[record.result.tab] ?? pages[0]);
     if (record.skipped === true) log(`step ${record.step} skipped: ${secrets.mask(record.result.error ?? "")}`);
@@ -319,42 +335,7 @@ async function collectFindings(
   return findings;
 }
 
-/** One line per step in spectator mode, e.g. `step 12 llm: click getByRole('link', { name: 'Home' }) -> failed: …`. */
-export function describeStep(record: StepRecord): string {
-  const { action, locator } = record;
-  // The durable locator says more than the short-lived ref.
-  const text = describeAction(
-    locator === undefined || !("ref" in action) ? action : ({ ...action, ref: locator } as Action),
-  );
-  const outcome = record.result.ok ? "" : ` -> failed: ${record.result.error ?? "unknown error"}`;
-  const events = record.events === undefined ? "" : ` [${record.events.map(describeEvent).join("; ")}]`;
-  return `step ${record.step} ${record.source}: ${text}${outcome}${events}`;
-}
-
 /** A directory name for a role: safe characters only. */
 export function roleDirectory(role: string): string {
   return role.replace(/[^A-Za-z0-9._-]/g, "_") || "_";
-}
-
-function summarize(result: RunResult): string {
-  const seconds = (result.durationMs / 1000).toFixed(1);
-  const stop = result.stopReason === "error" ? `error: ${result.error}` : result.stopReason;
-  const skipped = result.skippedActions > 0 ? `, ${result.skippedActions} skipped` : "";
-  return `${result.steps} steps in ${seconds}s, ${result.states} states, ${result.failedActions} failed actions${skipped}, stopped: ${stop}`;
-}
-
-/** Masks everything a page could have echoed; the screenshot path is a local file path, like the trace path. */
-export function maskFinding(finding: Finding, secrets: Secrets): Finding {
-  const { screenshotPath, ...rest } = finding;
-  return { ...maskSecrets(rest, secrets), ...(screenshotPath === undefined ? {} : { screenshotPath }) };
-}
-
-/** One line per finding, e.g. `F1 high pageerror: Error: boom (step 12, 3×)`. */
-export function describeFinding(finding: Finding): string {
-  const times = finding.occurrences > 1 ? `, ${finding.occurrences}×` : "";
-  return `${finding.id} ${finding.severity} ${finding.oracle}: ${finding.message} (step ${finding.step}${times})`;
-}
-
-export function plural(count: number, noun: string): string {
-  return `${count} ${noun}${count === 1 ? "" : "s"}`;
 }

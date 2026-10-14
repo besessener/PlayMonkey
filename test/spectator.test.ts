@@ -9,7 +9,8 @@ import { runCli } from "../src/cli/cli.ts";
 import { parseConfig } from "../src/config/config.ts";
 import type { StepRecord } from "../src/monkey/loop.ts";
 import type { ActionLog } from "../src/replay/log.ts";
-import { describeStep, runRole } from "../src/run.ts";
+import { runRole } from "../src/run.ts";
+import { describeStep } from "../src/run-text.ts";
 import { launchChromium } from "./helpers/browser.ts";
 
 async function cli(argv: string[], env: NodeJS.ProcessEnv = {}) {
