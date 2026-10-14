@@ -16,6 +16,7 @@ export interface RawConfig {
   limits?: { maxSteps?: number; maxMinutes?: number };
   browser?: { engine?: Engine; viewport?: [number, number]; headless?: boolean };
   stayOnDomain?: boolean;
+  scope?: { allow?: string[]; deny?: string[] };
   auth?: RawAuth[];
   testData?: Record<string, string>;
   llm?: RawLlm;
@@ -139,6 +140,29 @@ export const configSchema: JSONSchemaType<RawConfig> = {
       nullable: true,
       default: DEFAULTS.stayOnDomain,
       description: "Keep the monkey on the origin of baseUrl.",
+    },
+    scope: {
+      type: "object",
+      nullable: true,
+      additionalProperties: false,
+      required: [],
+      description: "Which pages the monkey may open: regular expressions matched against the full URL.",
+      properties: {
+        allow: {
+          type: "array",
+          items: nonEmptyString,
+          nullable: true,
+          default: DEFAULTS.scope.allow,
+          description: "When not empty, only URLs matching one of these patterns are opened.",
+        },
+        deny: {
+          type: "array",
+          items: nonEmptyString,
+          nullable: true,
+          default: DEFAULTS.scope.deny,
+          description: "URLs matching one of these patterns are never opened.",
+        },
+      },
     },
     auth: {
       type: "array",

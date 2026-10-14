@@ -38,7 +38,48 @@ function semanticIssues(raw: unknown): Issue[] {
   if (typeof raw.baseUrl === "string" && !isHttpUrl(raw.baseUrl)) {
     issues.push({ path: ["baseUrl"], message: "must be an absolute http(s) URL" });
   }
-  return [...issues, ...llmIssues(raw.llm), ...ignoreRulesIssues(raw.findings), ...authIssues(raw.auth)];
+  return [
+    ...issues,
+    ...scopeIssues(raw.scope, raw.baseUrl),
+    ...llmIssues(raw.llm),
+    ...ignoreRulesIssues(raw.findings),
+    ...authIssues(raw.auth),
+  ];
+}
+
+/** Every pattern is a valid regular expression, and `baseUrl` itself is in scope. */
+function scopeIssues(scope: unknown, baseUrl: unknown): Issue[] {
+  if (!isObject(scope)) return [];
+  const allow = patternList(scope.allow);
+  const deny = patternList(scope.deny);
+  const invalid = [
+    ...allow.invalid.map((index) => ["allow", index]),
+    ...deny.invalid.map((index) => ["deny", index]),
+  ].map(([key, index]) => ({
+    path: ["scope", key as string, index as number],
+    message: "is not a valid regular expression",
+  }));
+  if (invalid.length > 0 || typeof baseUrl !== "string") return invalid;
+  const issues: Issue[] = [];
+  if (allow.valid.length > 0 && !allow.valid.some((pattern) => pattern.test(baseUrl))) {
+    issues.push({ path: ["scope", "allow"], message: "does not allow baseUrl, where every run starts" });
+  }
+  if (deny.valid.some((pattern) => pattern.test(baseUrl))) {
+    issues.push({ path: ["scope", "deny"], message: "denies baseUrl, where every run starts" });
+  }
+  return issues;
+}
+
+/** The valid patterns of a list, and the indexes of the invalid ones. Non-strings are the schema's business. */
+function patternList(list: unknown): { valid: RegExp[]; invalid: number[] } {
+  const result: { valid: RegExp[]; invalid: number[] } = { valid: [], invalid: [] };
+  if (!Array.isArray(list)) return result;
+  for (const [index, pattern] of list.entries()) {
+    if (typeof pattern !== "string") continue;
+    if (isRegExp(pattern)) result.valid.push(new RegExp(pattern));
+    else result.invalid.push(index);
+  }
+  return result;
 }
 
 function llmIssues(llm: unknown): Issue[] {

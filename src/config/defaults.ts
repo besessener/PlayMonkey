@@ -5,6 +5,7 @@ export const DEFAULTS = {
   limits: { maxSteps: 500, maxMinutes: 20 },
   browser: { engine: "chromium" as Engine, viewport: [1280, 800] as [number, number], headless: true },
   stayOnDomain: true,
+  scope: { allow: [] as string[], deny: [] as string[] },
   parallel: 1,
   oracle: true,
   report: { dir: "./monkey-report", keepDownloads: false },

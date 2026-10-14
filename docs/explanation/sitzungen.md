@@ -36,6 +36,22 @@ Seite auf der Fehlerseite des Browsers, und eine Antwort mit 204 ließ den Klick
 warten. Service Worker sind in diesem Modus blockiert, weil sie das Request-Routing umgehen; das Routing schaltet
 außerdem den HTTP-Cache ab.
 
+## scope
+
+`scope.allow` und `scope.deny` sind reguläre Ausdrücke, die gegen die vollständige URL geprüft werden. Ist `allow`
+nicht leer, darf der Monkey nur Seiten öffnen, deren URL zu einem Muster daraus passt; eine URL, die zu einem Muster
+aus `deny` passt, öffnet er nie. So hältst du ihn von Seiten wie `/admin/delete-all` fern oder beschränkst einen Lauf
+auf `/shop`. `baseUrl` muss im Scope liegen, sonst lehnt die Validierung die Konfiguration ab.
+
+Der Scope wirkt an drei Stellen: Links außerhalb sind keine Kandidaten des Monkeys, `navigate` des LLM dorthin ist eine
+ungültige Antwort, und dieselbe Route wie bei `stayOnDomain` bricht Navigationen der obersten Ebene dorthin ab
+(`blocked-navigation`). Landet eine Seite trotzdem außerhalb, über eine Weiterleitung oder eine Navigation im Client,
+die die Route nicht sieht, schickt der Lauf sie zurück zu `baseUrl`.
+
+Der Scope gilt für Seiten, nicht für Anfragen: `fetch`, XHR und Subressourcen laufen weiter, auch an URLs aus `deny`.
+Ein Button, der per `fetch` alles löscht, bleibt erreichbar; der Scope ist eine Steuerung, kein Schutzgeländer (siehe
+[Grundregeln](grundregeln.md)).
+
 ## Trace und Video
 
 Jede Rolle zeichnet einen Playwright-Trace mit Screenshots und DOM-Snapshots und ein Video der Seite auf. Beim

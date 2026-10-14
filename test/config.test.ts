@@ -63,6 +63,7 @@ describe("parseConfig", () => {
       limits: { maxSteps: 500, maxMinutes: 20 },
       browser: { engine: "chromium", viewport: [1280, 800], headless: true },
       stayOnDomain: true,
+      scope: { allow: [], deny: [] },
       auth: [],
       testData: {},
       oracles: {

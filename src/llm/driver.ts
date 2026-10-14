@@ -1,6 +1,7 @@
 import type { LlmConfig } from "../config/config.ts";
 import { type Action, describeAction } from "../monkey/actions.ts";
 import type { StepRecord } from "../monkey/loop.ts";
+import type { UrlScope } from "../monkey/scope.ts";
 import { serializeSnapshot } from "../snapshot/serialize.ts";
 import type { Snapshot } from "../snapshot/snapshot.ts";
 import type { DebugEntry, DebugLog } from "./debug-log.ts";
@@ -43,6 +44,8 @@ export interface LlmDriverOptions {
   findings: () => string[];
   /** Origin the run must stay on, or undefined when `stayOnDomain` is off. */
   origin?: string;
+  /** URLs the run may open; absent when `scope` is not restricted. */
+  scope?: UrlScope;
   debugLog?: DebugLog;
   log: (line: string) => void;
   now?: () => number;
@@ -253,6 +256,9 @@ export class LlmDriver {
     }
     if (this.#o.origin !== undefined && target.origin !== this.#o.origin) {
       throw new LlmError("invalid", "tool navigate: the URL leaves the site under test (stayOnDomain)");
+    }
+    if (this.#o.scope !== undefined && !this.#o.scope.allows(target.href)) {
+      throw new LlmError("invalid", "tool navigate: the URL is outside the configured scope");
     }
     return { type: "navigate", url: target.href };
   }

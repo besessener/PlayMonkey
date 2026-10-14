@@ -52,6 +52,8 @@ dort ein Schlüssel steht, der auf dieser Seite fehlt.
 | `browser.viewport` | `[width, height]`, Integer ≥ 1 | `[1280, 800]` | Viewport in CSS-Pixeln. |
 | `browser.headless` | boolean | `true` | Den Browser ohne Fenster ausführen. |
 | `stayOnDomain` | boolean | `true` | Navigationen zu anderen Origins als dem von `baseUrl` nicht folgen. |
+| `scope.allow` | Array regulärer Ausdrücke | `[]` | Ist es nicht leer, öffnet der Monkey nur Seiten, deren vollständige URL zu einem der Muster passt; siehe [scope](../explanation/sitzungen.md#scope). |
+| `scope.deny` | Array regulärer Ausdrücke | `[]` | Seiten, deren vollständige URL zu einem der Muster passt, öffnet der Monkey nie, z. B. `["/logout", "/admin/"]`. |
 | `auth` | Array | `[]` (eine anonyme Rolle) | Rollen, unter denen gelaufen wird; siehe unten. |
 | `auth[].name` | string, Pflicht | – | Eindeutiger Rollenname. |
 | `auth[].loginUrl` | string | – | Pfad der Anmeldeseite, relativ zu `baseUrl`. Pflicht mit `fields`. |
@@ -137,6 +139,7 @@ Befunde](../explanation/orakel.md).
 - **Unbekannte Schlüssel werden abgelehnt**, nicht nur mit einer Warnung bedacht: Ein Tippfehler wie `maxStep` fiele
   sonst stillschweigend auf einen Standardwert zurück. Nur `testData` und `auth[].fields` nehmen beliebige Schlüssel.
 - **`null` wird abgelehnt**; lass einen Schlüssel weg, um seinen Standardwert zu bekommen.
+- **`scope`:** Jedes Muster muss ein gültiger regulärer Ausdruck sein, und `baseUrl` muss im Scope liegen.
 - **Ignorierregeln** brauchen `url` oder `message`, und beide müssen gültige reguläre Ausdrücke von JavaScript sein;
   um ein Orakel ganz abzuschalten, nutze `oracles.<name>: false`.
 - **Relative Pfade** (`auth[].storageState`, `report.dir`) werden gegen das Verzeichnis der Konfigurationsdatei

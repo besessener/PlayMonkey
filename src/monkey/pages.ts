@@ -2,6 +2,7 @@ import type { Page } from "playwright";
 import type { Config } from "../config/config.ts";
 import { type Snapshot, snapshot } from "../snapshot/snapshot.ts";
 import { installPopupProbe, type Tabs } from "./executor.ts";
+import type { UrlScope } from "./scope.ts";
 
 /** What the run loop's page handling needs: which page it acts in, and where it goes back to. */
 export interface RunPages {
@@ -9,6 +10,8 @@ export interface RunPages {
   readonly tabs: Tabs;
   /** Origin the run stays on, or undefined when `stayOnDomain` is off. */
   readonly origin: string | undefined;
+  /** URLs the run may be on. */
+  readonly scope: UrlScope;
   /** A crashed page throws on every call; it is closed and the run continues (the crash oracle reports it). */
   readonly crashed: WeakSet<Page>;
 }
@@ -34,11 +37,14 @@ export async function pageForStep({ config, tabs, crashed }: RunPages): Promise<
 }
 
 /**
- * With `stayOnDomain`, brings a page that left the site back: the first tab goes to `baseUrl`, any other tab is
- * closed. True when the step must start over in the first tab.
+ * Brings a page that left the site (`stayOnDomain`) or the `scope` back: the first tab goes to `baseUrl`, any other
+ * tab is closed. True when the step must start over in the first tab. The navigation guard blocks most of these;
+ * redirects and client-side navigations get past it.
  */
-export async function leftSite({ config, tabs, origin }: RunPages, page: Page): Promise<boolean> {
-  if (origin === undefined || isOn(page.url(), origin)) return false;
+export async function leftSite({ config, tabs, origin, scope }: RunPages, page: Page): Promise<boolean> {
+  const url = page.url();
+  const outOfScope = scope.restricted && /^https?:/.test(url) && !scope.allows(url);
+  if (!outOfScope && (origin === undefined || isOn(url, origin))) return false;
   if (tabs.current > 0) {
     // A popup that left the site (or never reached it): close it and go on in the first tab.
     await page.close().catch(() => undefined);

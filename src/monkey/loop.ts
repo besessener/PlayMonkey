@@ -8,6 +8,7 @@ import { PageEvents, type StepEvent } from "./events.ts";
 import { type ActionResult, executeAction, type Tabs, type Targets } from "./executor.ts";
 import { closeExtraTabs, leftSite, openStartPage, pageForStep, type RunPages, readPage } from "./pages.ts";
 import { Random } from "./random.ts";
+import { UrlScope } from "./scope.ts";
 import type { Spectator } from "./spectator.ts";
 
 /** One executed step, handed to the action log. */
@@ -147,6 +148,7 @@ function startRun(context: BrowserContext, options: RunOptions): Run {
   const random = new Random(config.seed);
   const exploration = new Exploration();
   const origin = config.stayOnDomain ? new URL(config.baseUrl).origin : undefined;
+  const scope = new UrlScope(config.scope);
   const tabs: Tabs = { context, current: 0 };
   const crashed = new WeakSet<Page>();
   const watch = (page: Page) => {
@@ -169,6 +171,7 @@ function startRun(context: BrowserContext, options: RunOptions): Run {
     random,
     exploration,
     origin,
+    scope,
     tabs,
     crashed,
     watch,
@@ -252,7 +255,7 @@ async function nextAction(run: Run, page: Page, snap: Snapshot, advisor: StepAdv
 }
 
 function monkeyAction(run: Run, page: Page, snap: Snapshot): { action: Action; elementKey?: string } {
-  const { config, origin } = run;
+  const { config, origin, scope } = run;
   const viewport = page.viewportSize() ?? {
     width: config.browser.viewport[0],
     height: config.browser.viewport[1],
@@ -261,6 +264,7 @@ function monkeyAction(run: Run, page: Page, snap: Snapshot): { action: Action; e
     weights: config.monkey.weights,
     testData: config.testData,
     ...(origin === undefined ? {} : { origin }),
+    ...(scope.restricted ? { scope } : {}),
     tabCount: run.context.pages().length,
     currentTab: run.tabs.current,
     viewport,
