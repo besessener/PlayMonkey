@@ -329,7 +329,7 @@ describe("the lab: hard parts of real pages", () => {
     );
     assert.ok(outcome.actionLog !== undefined);
     const log = JSON.parse(await readFile(outcome.actionLog, "utf8")) as ActionLog;
-    assert.equal(log.version, 2);
+    assert.equal(log.version, 3);
     assert.deepEqual(
       log.actions.map((a) => a.type),
       ["click", "click", "click", "hover", "navigate", "click", "navigate", "drag", "dblclick"],
