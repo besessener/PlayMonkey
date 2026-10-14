@@ -113,6 +113,7 @@ Labor verlinken dorthin, andere Läufe erreichen sie also nie; `test/faults.test
 | `/lab/faults/busy` | Ein Button „Recalculate“, der die Seite einfriert (Endlosschleife), ebenso jeder Tastendruck. |
 | `/lab/faults/guard` | Eine Checkbox „I changed something“, danach fragt die Seite per `beforeunload` vor dem Verlassen. |
 | `/lab/faults/bad-link` | Ein Link mit der ungültigen Adresse `http://` und ein gültiger. |
+| `/lab/faults/login` | Ein Anmeldeformular (`username`, `password`, „Log in“), das an `/lab/faults/session` geht. Falsche Zugangsdaten zeigen das Formular dort noch einmal, mit Status 200; richtige setzen dasselbe Sitzungscookie wie `/login` und leiten auf `/account` weiter. |
 
 Eingebaute Fehler:
 
@@ -126,7 +127,9 @@ Eingebaute Fehler:
 Jeder kommt genau einmal, auch wenn der Monkey die Seite mehrmals besucht oder von einer anderen Seite her kommt. Die
 Warnung von `/lab/faults/guard` ist kein Fehler: Ein `back`, bei dem der Monkey sie ablehnt, ist kein `hang`. Der
 ungültige Link von `/lab/faults/bad-link` ist ein Fehler der Seite, den kein Orakel meldet, der aber den Lauf nicht
-beenden darf. Eine eingefrorene Seite wird geschlossen und ersetzt, und der Lauf geht weiter.
+beenden darf. Eine eingefrorene Seite wird geschlossen und ersetzt, und der Lauf geht weiter. Die Anmeldung unter
+`/lab/faults/login` ist kein Fehler der Seite, sondern prüft PlayMonkey: `test/session.test.ts` erwartet, dass
+falsche Zugangsdaten dort scheitern, obwohl die URL danach eine andere ist.
 
 ## Der Demo-Shop
 

@@ -119,6 +119,24 @@ describe("role sessions against the fixture site", () => {
     assert.ok(Date.now() - started < 4000, `took ${Date.now() - started}ms`);
   });
 
+  it("fails a wrong login whose form comes back at the URL it was posted to, and accepts the right one", async () => {
+    const role = (name: string, password: string) => ({ ...fieldsRole(name, password), loginUrl: "/lab/faults/login" });
+    const loaded = load(
+      [role("wrong", "${WRONG_PASS}"), role("right", "${FIXTURE_PASS}")],
+      {},
+      {
+        ...PASSWORD_ENV,
+        WRONG_PASS: "Wr0ng-Passw0rd!",
+      },
+    );
+    const error = await errorOf(openSession(loaded, 0));
+    assert.equal(
+      error.message,
+      'role "wrong": login did not succeed: the login form is still shown at /lab/faults/session after submitting (check the credentials and the fields)',
+    );
+    assert.equal(await signedIn(await openSession(loaded, 1)), true);
+  });
+
   it("fails clearly when a login field does not exist", async () => {
     const role = { ...fieldsRole(), fields: { username: "${FIXTURE_USER}", otp: "123" } };
     const error = await errorOf(openSession(load([role]), 0));

@@ -8,10 +8,14 @@ sodass Cookies und Speicher nie zwischen Rollen übergehen. Ohne Einträge in `a
 PlayMonkey öffnet `baseUrl + loginUrl`, füllt jedes Feld aus, klickt `submit` und entscheidet, ob die Anmeldung
 geklappt hat:
 
-- **Erfolg**, wenn die Seite die Login-URL verlassen hat (verglichen mit dem Ort, an dem der Browser tatsächlich
+- **Fehlschlag**, solange alle Felder aus `fields` noch sichtbar auf der Seite stehen, egal welche URL der Browser
+  zeigt und ob sich ein Cookie geändert hat. Viele Anwendungen schicken das Formular an eine andere URL (`GET /login`,
+  `POST /session`) und zeigen es bei falschen Zugangsdaten dort noch einmal an; die URL allein hielte das für einen
+  Erfolg.
+- **Erfolg** sonst, wenn die Seite die Login-URL verlassen hat (verglichen mit dem Ort, an dem der Browser tatsächlich
   gelandet ist, falls die Login-URL selbst weiterleitet), oder, bei Single-Page-Apps, die ohne Navigation anmelden,
   wenn sich ein Cookie geändert hat und der Absende-Button verschwunden ist.
-- **Fehlschlag** sonst. Der Versuch ist entschieden, sobald die nächste Seite lädt, sodass ein falsches Passwort
+- **Fehlschlag** in allen anderen Fällen. Der Versuch ist entschieden, sobald die nächste Seite lädt, sodass ein falsches Passwort
   sofort scheitert, statt auf einen Timeout zu warten. Nach der Empfehlung von Playwright wartet er auf die URL und
   das Load-Event, nicht auf „network idle“.
 
@@ -24,6 +28,30 @@ ein Werkzeugfehler (Exit-Code 2), dessen Meldung die Rolle und den Grund nennt, 
 Eine Rolle mit `storageState` lädt eine Storage-State-Datei von Playwright. Die Datei wird zuerst geprüft (lesbar,
 JSON, hat ein Array `cookies`), sodass ein Fehler eine klare Meldung ergibt statt eines Stack-Traces von Playwright.
 Es wird keine Anmeldeanfrage gestellt.
+
+## Verlorene Sitzung
+
+Eine Sitzung kann mitten im Lauf verschwinden: Der Storage State ist abgelaufen, oder der Monkey klickt „Log out“.
+Damit eine Rolle nicht unbemerkt als anonymer Besucher weiterläuft, prüft PlayMonkey bei jeder angemeldeten Rolle
+nach jedem Schritt, ob der Schritt auf einer Anmeldeseite stattfand, auch ohne LLM. Als Anmeldeseite gilt der Pfad der
+`loginUrl` einer Formular-Rolle oder eine Seite mit einem Passwortfeld und einem Button oder Link „Log in“, „Sign in“,
+„Anmelden“ oder „Einloggen“.
+
+Landet die Rolle dort, hält PlayMonkey ein Info-Event `session-lost` mit der maskierten URL fest, schreibt eine Warnung
+ins Log und meldet die Rolle wieder an: Eine Formular-Rolle meldet sich wie beim Start in einem eigenen Kontext ohne
+Trace oder Video an, eine Rolle mit `storageState` liest ihre Datei noch einmal. Die Cookies daraus kommen in den
+Kontext des Laufs, und die Seite öffnet `baseUrl`, sodass der nächste Schritt angemeldet beginnt. `localStorage` wird
+dabei nicht wiederhergestellt; eine Anwendung, die ihre Sitzung nur dort hält, bleibt abgemeldet.
+
+Ein Event gibt es pro Ankunft auf einer Anmeldeseite, nicht pro Schritt dort. Eine erneute Anmeldung gilt als
+gescheitert, wenn sie einen Fehler wirft oder der nächste Schritt wieder auf einer Anmeldeseite stattfindet. Nach drei
+gescheiterten Versuchen in Folge versucht es PlayMonkey in diesem Lauf nicht mehr, schreibt das einmal ins Log und
+lässt die Rolle abgemeldet weiterlaufen; der Lauf selbst bricht nie deswegen ab. Am Ende steht die Zahl der Verluste
+im Log (`session lost 1 time`) und als `sessionLosses` im [Bericht](../reference/bericht.md).
+
+Eine Anwendung, die ihre Anmeldeseite auch angemeldeten Besuchern zeigt, löst das ebenfalls aus, wenn der Monkey dort
+hinklickt. Das kostet eine überflüssige Anmeldung und ein Event, aber keinen Befund. Mit LLM greift auf einer
+Anmeldeseite zusätzlich der Auslöser `loginWall` (siehe [LLM](llm.md)).
 
 ## stayOnDomain
 

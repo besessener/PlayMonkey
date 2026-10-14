@@ -17,7 +17,7 @@ Problem in einem deduplizierten Befund, und am Ende des Laufs steht ein Bericht.
 | --- | --- | --- |
 | `src/cli/` | Argumente parsen (`node:util` `parseArgs`), Unterbefehle, Exit-Codes | umgesetzt |
 | `src/config/` | JSON Schema, Auflösung von `${VAR}`, Validierung, Standardwerte, Maskierung von Secrets | umgesetzt |
-| `src/auth/` | Browserstart, ein Kontext pro Rolle, Anmeldung, `stayOnDomain` und `scope`, Trace und Video | umgesetzt |
+| `src/auth/` | Browserstart, ein Kontext pro Rolle, Anmeldung und erneute Anmeldung nach verlorener Sitzung, `stayOnDomain` und `scope`, Trace und Video | umgesetzt |
 | `src/snapshot/` | Seiten-Snapshot mit Element-Refs, Snapshot-Hash, Serialisierer für das LLM | umgesetzt |
 | `src/monkey/` | Zufallsgenerator für Aktionen mit Seed, Ausführung und Schleife des Laufs | umgesetzt |
 | `src/run.ts`, `src/run-plan.ts` | Plant die Läufe (Rollen × Seeds) und führt jeweils `parallel` davon gleichzeitig aus: Sitzung, Monkey oder Replay, Orakel, Aktionsprotokoll, Artefakte | umgesetzt |

@@ -2,6 +2,7 @@ import { mkdir, rm } from "node:fs/promises";
 import { join } from "node:path";
 import type { Browser } from "playwright";
 import { launchBrowser } from "./auth/browser.ts";
+import { SessionKeeper, sessionLosses } from "./auth/relogin.ts";
 import {
   ANONYMOUS_ROLE,
   LoginError,
@@ -39,6 +40,8 @@ export interface RoleOutcome {
   /** Deduplicated, in order of discovery; masked. Empty when the run could not start. */
   findings: Finding[];
   blockedNavigations: number;
+  /** How often the role landed on a login page and was logged in again; absent when the run could not start. */
+  sessionLosses?: number;
   /** The run's `actions.json`, when one was written. */
   actionLog?: string;
   /** Playwright trace and videos of the run's context; absent when the run could not start. */
@@ -246,9 +249,11 @@ async function exploreSession(run: RoleRun, session: RoleSession, downloadDir: s
     ...(options.replay === undefined ? {} : { replay: options.replay }),
     ...(advisor === undefined ? {} : { advisor }),
     ...(options.spectator === undefined ? {} : { spectator: options.spectator }),
-    onStep: stepHandler(run, session, { oracles, coverage, writer }),
+    onStep: stepHandler(run, session, { oracles, coverage, writer, keeper: createKeeper(run, session) }),
   });
   const findings = await collectFindings(run, result, oracles, writer);
+  const losses = sessionLosses(session.events);
+  if (losses > 0) log(`session lost ${losses} ${losses === 1 ? "time" : "times"}`);
   if (advisor !== undefined && options.llm !== undefined) log(describeUsage(options.llm.stats.role(label)));
   if (writer !== undefined) log(`actions: ${writer.file}`);
   return {
@@ -256,7 +261,8 @@ async function exploreSession(run: RoleRun, session: RoleSession, downloadDir: s
     seed: config.seed,
     result,
     findings,
-    blockedNavigations: session.events.length,
+    blockedNavigations: session.events.filter((event) => event.kind === "blocked-navigation").length,
+    sessionLosses: losses,
     ...(writer === undefined ? {} : { actionLog: writer.file }),
     coverage: coverage.summary(),
   };
@@ -316,25 +322,46 @@ function createAdvisor(run: RoleRun, oracles: Oracles): LlmDriver | undefined {
   });
 }
 
-/** What a run's steps feed: the oracles, the coverage and the action log. */
+/** What a run's steps feed: the oracles, the coverage, the action log and the keeper of a logged-in role. */
 interface StepSinks {
   oracles: Oracles;
   coverage: CoverageTracker;
   writer: ActionLogWriter | undefined;
+  keeper: SessionKeeper | undefined;
 }
 
-/** Checks every step with the oracles, logs it when skipped or in spectator mode, and appends it to the log. */
+/** Logs a role in again when it lands on a login page; none for the anonymous role. */
+function createKeeper({ role, log, loaded }: RoleRun, session: RoleSession): SessionKeeper | undefined {
+  const { config, secrets } = loaded;
+  if (role === undefined || session.relogin === undefined) return undefined;
+  return new SessionKeeper({
+    relogin: session.relogin,
+    events: session.events,
+    secrets,
+    baseUrl: config.baseUrl,
+    ...(role.kind === "fields" ? { loginUrl: new URL(role.loginUrl, config.baseUrl).href } : {}),
+    navigationTimeoutMs: config.monkey.actionTimeoutMs * 4,
+    log,
+  });
+}
+
+/**
+ * Checks every step with the oracles, logs in again when the step was taken on a login page, logs the step when
+ * skipped or in spectator mode, and appends it to the log.
+ */
 function stepHandler(
   run: RoleRun,
   session: RoleSession,
-  { oracles, coverage, writer }: StepSinks,
+  { oracles, coverage, writer, keeper }: StepSinks,
 ): (record: StepRecord, snapshot: Snapshot) => Promise<void> {
   const { log, options } = run;
   const { secrets } = run.loaded;
   return async (record, snapshot) => {
     coverage.record(record, snapshot);
     const pages = session.context.pages();
-    await oracles.check(record, pages[record.result.tab] ?? pages[0]);
+    const page = pages[record.result.tab] ?? pages[0];
+    await oracles.check(record, page);
+    await keeper?.check(snapshot, page);
     if (record.skipped === true) log(`step ${record.step} skipped: ${secrets.mask(record.result.error ?? "")}`);
     else if (options.spectator !== undefined) log(describeStep(record, secrets));
     await writer?.append(record);

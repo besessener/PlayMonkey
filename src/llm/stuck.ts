@@ -1,3 +1,4 @@
+import { isLoginPage, pathOf } from "../auth/login-page.ts";
 import type { RawHandoff } from "../config/llm-schema.ts";
 import type { StepRecord } from "../monkey/loop.ts";
 import { blockingUi } from "../snapshot/blocking.ts";
@@ -22,8 +23,6 @@ export interface Stuck {
 /** Text a form shows when it rejects its input. */
 const VALIDATION_TEXT =
   /\b(invalid|required|is not valid|must (be|contain|not)|please (enter|provide|fill|select|choose)|ungültig|erforderlich|pflichtfeld|bitte (geben|füllen|wählen))\b/i;
-const PASSWORD_FIELD = /\b(password|passwort|kennwort|passphrase)\b/i;
-const LOGIN_BUTTON = /\b(log ?in|sign ?in|anmelden|einloggen)\b/i;
 
 export interface StuckOptions {
   /** The role logged in at the start (form login or storageState). */
@@ -68,7 +67,7 @@ export class StuckDetector {
     }
 
     // Edge-triggered: fires when the role arrives on a login page, not on every step it stays there.
-    const onLoginPage = this.#options.authenticated && this.#isLoginPage(snapshot);
+    const onLoginPage = this.#options.authenticated && isLoginPage(snapshot, this.#options.loginUrl);
     this.#loginWall = onLoginPage && !this.#onLoginPage;
     this.#onLoginPage = onLoginPage;
   }
@@ -122,16 +121,6 @@ export class StuckDetector {
     this.#invalidForms = 0;
     this.#loginWall = false;
   }
-
-  #isLoginPage(snapshot: Snapshot): boolean {
-    const { loginUrl } = this.#options;
-    if (loginUrl !== undefined && pathOf(snapshot.url) === pathOf(loginUrl)) return true;
-    const password = snapshot.elements.some((e) => e.role === "textbox" && PASSWORD_FIELD.test(e.name));
-    const button = snapshot.elements.some(
-      (e) => (e.role === "button" || e.role === "link") && LOGIN_BUTTON.test(e.name),
-    );
-    return password && button;
-  }
 }
 
 export function showsValidationErrors(snapshot: Snapshot): boolean {
@@ -140,12 +129,4 @@ export function showsValidationErrors(snapshot: Snapshot): boolean {
 
 function hasForm(snapshot: Snapshot): boolean {
   return snapshot.elements.some((element) => element.role === "textbox" || element.role === "combobox");
-}
-
-function pathOf(url: string): string {
-  try {
-    return new URL(url).pathname;
-  } catch {
-    return url;
-  }
 }

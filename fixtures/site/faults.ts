@@ -1,10 +1,12 @@
-import { layout } from "./html.ts";
-import type { Response, Route } from "./pages.ts";
+import { randomUUID } from "node:crypto";
+import { escapeHtml, layout } from "./html.ts";
+import type { Request, Response, Route, SiteState } from "./pages.ts";
 
 /**
  * Pages whose bugs stop a page or a connection: an error page with status 200, a route that never answers, a server
- * that drops the connection, a page that freezes, an unsaved-changes guard and a malformed link. Neither the home page
- * nor the lab links here, so other runs never reach these pages; tests start at `/lab/faults` or go to them directly.
+ * that drops the connection, a page that freezes, an unsaved-changes guard, a malformed link and a login that fails at
+ * another URL. Neither the home page nor the lab links here, so other runs never reach these pages; tests start at
+ * `/lab/faults` or go to them directly.
  */
 export const FAULT_PAGES: { path: string; link: string }[] = [
   { path: "/lab/faults/soft-404", link: "Old offer" },
@@ -13,7 +15,11 @@ export const FAULT_PAGES: { path: string; link: string }[] = [
   { path: "/lab/faults/busy", link: "Busy page" },
   { path: "/lab/faults/guard", link: "Unsaved changes" },
   { path: "/lab/faults/bad-link", link: "Malformed link" },
+  { path: "/lab/faults/login", link: "Log in elsewhere" },
 ];
+
+/** The session cookie of `/login` in pages.ts; importing it from there would be an import cycle. */
+const SESSION_COOKIE = "sid";
 
 const page = (title: string, body: string, status = 200): Response => ({
   status,
@@ -23,7 +29,11 @@ const page = (title: string, body: string, status = 200): Response => ({
 
 const get = (path: string, handle: () => Response): Route => ({ method: "GET", path, handle });
 
-export function faultRoutes(): Route[] {
+export function faultRoutes(state: SiteState): Route[] {
+  return [...pageRoutes(), ...loginRoutes(state)];
+}
+
+function pageRoutes(): Route[] {
   return [
     get("/lab/faults", () =>
       page(
@@ -68,4 +78,34 @@ export function faultRoutes(): Route[] {
       page("Malformed link", '<p><a href="http://">Broken address</a> <a href="/lab/faults/soft-404">Offer</a></p>'),
     ),
   ];
+}
+
+/** A login whose form posts to another URL, where a wrong login renders the form again with status 200. */
+function loginRoutes(state: SiteState): Route[] {
+  return [
+    get("/lab/faults/login", () => page("Log in", loginForm())),
+    { method: "POST", path: "/lab/faults/session", handle: (request) => logIn(state, request) },
+  ];
+}
+
+function loginForm(error?: string): string {
+  return `${error === undefined ? "" : `<p class="error" role="alert">${escapeHtml(error)}</p>`}
+<form method="post" action="/lab/faults/session">
+  <label>Username <input name="username" autocomplete="username"></label>
+  <label>Password <input name="password" type="password" autocomplete="current-password"></label>
+  <button type="submit">Log in</button>
+</form>`;
+}
+
+function logIn(state: SiteState, request: Request): Response {
+  const { username, password } = state.credentials;
+  if (request.form.get("username") !== username || request.form.get("password") !== password) {
+    return page("Log in", loginForm("Invalid username or password."));
+  }
+  const sid = randomUUID();
+  state.sessions.set(sid, username);
+  return {
+    status: 303,
+    headers: { location: "/account", "set-cookie": `${SESSION_COOKIE}=${sid}; Path=/; HttpOnly; SameSite=Lax` },
+  };
 }

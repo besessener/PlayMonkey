@@ -236,7 +236,7 @@ export function createRoutes(state: SiteState): Route[] {
     ...formRoutes(state),
     ...bugPageRoutes(),
     ...labRoutes(),
-    ...faultRoutes(),
+    ...faultRoutes(state),
     ...shopRoutes(state),
   ];
   return routes;

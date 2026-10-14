@@ -39,7 +39,7 @@ eine Übergabe. Die Schwellen stehen unter `llm.handoff`.
 | Auslöser | Greift, wenn |
 | --- | --- |
 | `blockingUi` | Ein Dialog (`role=dialog` oder `alertdialog`, auch ein offenes `<dialog>`) offen ist oder die Seite Cookies oder Consent erwähnt und einen Button wie „Accept“ oder „Reject“ hat. |
-| `loginWall` | Eine angemeldete Rolle auf ihrer `loginUrl` landet oder auf einer Seite mit Passwortfeld und einem Button „Log in“ oder „Sign in“: Die Sitzung ist vermutlich abgelaufen. Greift einmal pro Ankunft. |
+| `loginWall` | Eine angemeldete Rolle auf ihrer `loginUrl` landet oder auf einer Seite mit Passwortfeld und einem Button „Log in“ oder „Sign in“: Die Sitzung ist vermutlich abgelaufen. Greift einmal pro Ankunft. Unabhängig davon meldet PlayMonkey die Rolle selbst wieder an (siehe [Sitzungen](sitzungen.md#verlorene-sitzung)). |
 | `invalidForm` | `invalidForm` Absendungen in Folge (ein Button-Klick oder Enter auf einer Seite mit Formular) auf demselben Pfad mit einem Validierungstext wie „required“ oder „please enter a valid …“ enden. |
 | `failedActions` | Die letzten `failedActions` Aktionen des Monkeys alle fehlgeschlagen sind (Elemente wurden nie bedienbar, Timeouts). |
 | `noStateChange` | Sich die Seite `noStateChange` Schritte lang überhaupt nicht verändert hat. |
