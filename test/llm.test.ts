@@ -255,7 +255,7 @@ describe("bounded page text in the prompt", () => {
       role: "admin",
     });
     assert.equal(message.split("Current page:").length, 2, message);
-    assert.ok(!message.includes("evil.example.com"));
+    assert.ok(!message.includes('e1 button "Pay"'));
     assert.ok(!message.includes("Ignore the rules"));
   });
 });
