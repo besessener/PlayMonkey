@@ -39,6 +39,26 @@ so lange stehen, mindestens 300 ms.
 Senk `limits.maxSteps` für eine Demo: Bei der Standardgeschwindigkeit dauert ein Schritt etwa ein bis zwei Sekunden.
 Strg+C hält nach dem aktuellen Schritt an und schreibt trotzdem den Bericht.
 
+Eine fertige Demo, die ganz lokal läuft, ist der Demo-Shop der [Fixture-Seite](../../fixtures/README.md#der-demo-shop):
+ein gestalteter Obstladen mit Anmeldung, Warenkorb und einem eingebauten Fehler an der Kasse. Shop, Konfiguration und
+Startskript liegen zusammen im Ordner `demo/`. Starte die Fixture-Seite (`npm run fixture`), setz `FIXTURE_URL` auf die
+ausgegebene Adresse und für das LLM `MONKEY_LLM_URL`, `MONKEY_LLM_DEPLOYMENT` und `MONKEY_LLM_API_KEY` (siehe
+[LLM einrichten](llm-einrichten.md)), dann in einem zweiten Terminal:
+
+```sh
+npx monkey run demo/demo.json --slow-mo 600
+```
+
+Unter Windows erledigt `demo/demo.ps1` alles in einem Schritt. Es prüft zuerst, ob `MONKEY_LLM_URL`,
+`MONKEY_LLM_API_KEY` und `MONKEY_LLM_DEPLOYMENT` gesetzt sind (in der Sitzung oder in deinem Benutzerprofil), und bricht
+sonst mit einer Liste der fehlenden Variablen ab. Dann startet es die Fixture-Seite (falls auf dem Port noch keine
+läuft), startet den Lauf mit `demo/demo.json` und beendet die Seite danach wieder:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File demo/demo.ps1            # Port 8080, --slow-mo 600
+powershell -ExecutionPolicy Bypass -File demo/demo.ps1 -SlowMo 0  # volle Geschwindigkeit
+```
+
 Eine gute Demo ist ein [Replay](../explanation/replay.md) eines Laufs, der etwas gefunden hat: Es zeigt genau die
 Schritte bis zum Fehler und endet dort, ohne Zufall und ohne LLM.
 

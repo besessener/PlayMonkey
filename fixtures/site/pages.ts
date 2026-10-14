@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { shopRoutes } from "../../demo/shop.ts";
 import { escapeHtml, layout } from "./html.ts";
 import { labRoutes } from "./lab.ts";
 
@@ -230,6 +231,7 @@ export function createRoutes(state: SiteState): Route[] {
     ...formRoutes(state),
     ...bugPageRoutes(),
     ...labRoutes(),
+    ...shopRoutes(state),
   ];
   return routes;
 }
