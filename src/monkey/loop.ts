@@ -128,6 +128,8 @@ interface Run extends RunPages {
   step: number;
   failedActions: number;
   skippedActions: number;
+  /** An `offline` action took the context offline; the next step brings it back. */
+  offline: boolean;
 }
 
 /** What a step does, and how: chosen by the monkey or the LLM, or recorded for replay. */
@@ -179,6 +181,7 @@ function startRun(context: BrowserContext, options: RunOptions): Run {
     step: 0,
     failedActions: 0,
     skippedActions: 0,
+    offline: false,
   };
 }
 
@@ -278,8 +281,16 @@ async function replayedAction(run: Run, page: Page, replay: ReplayPlan): Promise
   return { action, source, locator, toLocator, targets };
 }
 
-/** Executes the action, or skips it when replay cannot find its element. */
-async function executeStep(run: Run, page: Page, { action, locator, targets }: Choice): Promise<ActionResult> {
+/** Executes the action, or skips it when replay cannot find its element; ends an `offline` step after the next one. */
+async function executeStep(run: Run, page: Page, choice: Choice): Promise<ActionResult> {
+  const wasOffline = run.offline;
+  const result = await runAction(run, page, choice);
+  run.offline = choice.action.type === "offline" && result.ok;
+  if (wasOffline && !run.offline) await run.context.setOffline(false);
+  return result;
+}
+
+async function runAction(run: Run, page: Page, { action, locator, targets }: Choice): Promise<ActionResult> {
   if (typeof targets === "string") {
     run.skippedActions++;
     return { ok: false, error: targets, navigated: false, url: page.url(), tab: run.tabs.current };

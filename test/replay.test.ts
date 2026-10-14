@@ -217,7 +217,7 @@ describe("action log and replay against the fixture site", () => {
     const logFile = outcome?.actionLog ?? "";
     const text = await readFile(logFile, "utf8");
     const log = JSON.parse(text) as ActionLog;
-    assert.equal(log.version, 2);
+    assert.equal(log.version, 3);
     assert.equal(log.baseUrl, "${FIXTURE_URL}");
     assert.equal(log.actions.length, 300);
     assert.deepEqual(log.findings.map((f) => f.key).sort(), keys);
@@ -282,9 +282,9 @@ describe("action log and replay against the fixture site", () => {
       await writeFile(file, typeof content === "string" ? content : JSON.stringify(content));
       return file;
     };
-    const v3 = await cli(["replay", await write("v3", { version: 3, actions: [] })]);
-    assert.equal(v3.code, 2);
-    assert.match(v3.stderr, /unsupported version 3; this monkey reads versions 1 and 2/);
+    const v4 = await cli(["replay", await write("v4", { version: 4, actions: [] })]);
+    assert.equal(v4.code, 2);
+    assert.match(v4.stderr, /unsupported version 4; this monkey reads versions 1, 2 and 3/);
 
     const base = { version: 1, seed: 1, baseUrl: site.url, role: "anonymous", viewport: [800, 600], placeholders: [] };
     const bad = await cli([

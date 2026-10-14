@@ -15,7 +15,9 @@ export type Action =
   | { type: "back" }
   | { type: "navigate"; url: string }
   | { type: "setViewport"; width: number; height: number }
-  | { type: "switchTab"; index: number };
+  | { type: "switchTab"; index: number }
+  /** Takes the browser offline for the next step; it is back online after that step. */
+  | { type: "offline" };
 
 export type ElementAction = Extract<Action, { ref: string }>;
 
@@ -45,7 +47,8 @@ export function describeAction(action: Action): string {
     case "scroll":
       return `scroll ${action.deltaY}`;
     case "back":
-      return "back";
+    case "offline":
+      return action.type;
     case "navigate":
       return `navigate ${action.url}`;
     case "setViewport":

@@ -34,6 +34,7 @@ export interface Config {
   stayOnDomain: boolean;
   /** Regular expressions; an empty `allow` allows every URL. */
   scope: { allow: string[]; deny: string[] };
+  network: { latencyMs: number };
   auth: AuthRole[];
   testData: Record<string, string>;
   llm?: LlmConfig;
@@ -187,6 +188,7 @@ function normalize(raw: RawConfig, seed: number, baseDir: string): Config {
       allow: [...(raw.scope?.allow ?? DEFAULTS.scope.allow)],
       deny: [...(raw.scope?.deny ?? DEFAULTS.scope.deny)],
     },
+    network: { latencyMs: raw.network?.latencyMs ?? DEFAULTS.network.latencyMs },
     auth: (raw.auth ?? []).map((role) => normalizeRole(role, baseDir)),
     testData: { ...raw.testData },
     oracles: Object.fromEntries(ORACLES.map((name) => [name, raw.oracles?.[name] ?? DEFAULTS.oracle])) as Record<

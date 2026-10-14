@@ -105,7 +105,7 @@ function candidatesByType(
   for (const element of snapshot.elements) {
     for (const candidate of elementCandidates(element, snapshot.url, options)) add(candidate);
   }
-  for (const type of ["press", "scroll", "back", "setViewport"] as const) add({ type });
+  for (const type of ["press", "scroll", "back", "setViewport", "offline"] as const) add({ type });
   if (exploration.urls.length > 0) add({ type: "navigate" });
   if (options.tabCount > 1) add({ type: "switchTab" });
   return byType;
@@ -202,7 +202,8 @@ function globalAction(type: ActionType, exploration: Exploration, random: Random
     case "press":
       return { type: "press", key: random.pick(KEYS) };
     case "back":
-      return { type: "back" };
+    case "offline":
+      return { type };
     case "navigate":
       return { type: "navigate", url: random.pick(exploration.urls) };
     case "setViewport": {

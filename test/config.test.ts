@@ -64,6 +64,7 @@ describe("parseConfig", () => {
       browser: { engine: "chromium", viewport: [1280, 800], headless: true },
       stayOnDomain: true,
       scope: { allow: [], deny: [] },
+      network: { latencyMs: 0 },
       auth: [],
       testData: {},
       oracles: {
@@ -98,6 +99,7 @@ describe("parseConfig", () => {
           navigate: 1,
           setViewport: 0.2,
           switchTab: 1,
+          offline: 0,
         },
       },
     });

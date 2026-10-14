@@ -15,6 +15,7 @@ export const LAB_PAGES: { path: string; link: string }[] = [
   { path: "/lab/upload", link: "Upload" },
   { path: "/lab/download", link: "Download" },
   { path: "/lab/widgets", link: "Widgets" },
+  { path: "/lab/news", link: "News" },
 ];
 
 /** Bytes of the broken download that arrive before the connection drops (seeded bug). */
@@ -166,6 +167,16 @@ const WIDGETS_BODY = `<style>
   for (const type of ["pointerup", "pointerleave", "pointercancel"]) hold.addEventListener(type, () => clearTimeout(timer));
 </script>`;
 
+// Seeded bug: the request is never checked for failure, so without a network the rejection goes uncaught.
+const NEWS_BODY = `<button type="button" id="load">Load news</button>
+<p id="news" role="status">No news loaded.</p>
+<script>
+  document.getElementById("load").addEventListener("click", async () => {
+    const response = await fetch("/lab/news.json");
+    document.getElementById("news").textContent = (await response.json()).headline;
+  });
+</script>`;
+
 function labPage(path: string, title: string, body: string): Route {
   return { method: "GET", path, handle: () => page(title, body) };
 }
@@ -288,6 +299,16 @@ function popupFileAndWidgetRoutes(): Route[] {
       }),
     },
     labPage("/lab/widgets", "Widgets", WIDGETS_BODY),
+    labPage("/lab/news", "News", NEWS_BODY),
+    {
+      method: "GET",
+      path: "/lab/news.json",
+      handle: () => ({
+        status: 200,
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ headline: "Bananas are back in stock" }),
+      }),
+    },
   ];
 }
 

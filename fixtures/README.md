@@ -77,6 +77,7 @@ einzubeziehen (`/lab` verlinkt auf `/`).
 | `/lab/upload` | Ein Dateifeld, eines für mehrere Dateien und ein Button, der ein verstecktes Dateifeld öffnet; listet die gewählten Dateien auf. |
 | `/lab/download` | Ein funktionierender Download (`report.csv`, 29 Bytes) und ein kaputter. |
 | `/lab/widgets` | Ein Hover-Menü, Doppelklick zum Bearbeiten, ein Kontextmenü, Drag-and-drop, langes Drücken. |
+| `/lab/news` | Ein Button „Load news“, der per `fetch` `/lab/news.json` lädt und die Schlagzeile anzeigt. |
 
 Eingebaute Fehler im Labor:
 
@@ -85,6 +86,10 @@ Eingebaute Fehler im Labor:
 | L1 | Nicht abgefangene Exception in einem Iframe | Labor → „Frames“ → „Crash in frame“ (im inneren Frame) | `pageerror` | high | `Seeded bug: frame handler crashed` + erster Stack-Frame |
 | L2 | Nicht abgefangene Exception beim Laden eines Popups | Labor → „Popups“ → „Details in a new tab“ oder „Open a window“ | `pageerror` | high | `Seeded bug: popup failed to initialise` + erster Stack-Frame |
 | L3 | Download bricht mitten in der Datei ab | Labor → „Download“ → „Download the export“ | `download` | medium | `/lab/files/export.zip` |
+| L4 | Fehlgeschlagene Anfrage wird nicht abgefangen | Labor → „News“ → Aktion `offline` → „Load news“ | `pageerror` | high | `TypeError: Failed to fetch` + erster Stack-Frame |
+
+L4 tritt nur ohne Netz auf, also nur mit der Aktion `offline`, die standardmäßig aus ist; online ist „Load news“ eine
+Kontrolle. `test/network.test.ts` prüft beides.
 
 `test/lab.test.ts` geht jede Laborseite mit vorgegebenen Aktionen durch die echte Laufschleife ab;
 `test/chaos.test.ts` lässt 20 Seeds auf das Labor und die Hauptseite los und prüft, dass kein Lauf abstürzt, hängt

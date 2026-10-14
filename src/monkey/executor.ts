@@ -227,6 +227,10 @@ async function actOnPage({ page, timeoutMs, state }: ActionContext, action: Page
     case "setViewport":
       await page.setViewportSize({ width: action.width, height: action.height });
       break;
+    case "offline":
+      // The run loop goes back online after the next step.
+      await page.context().setOffline(true);
+      break;
     default:
       unhandled(action);
   }

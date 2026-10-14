@@ -8,10 +8,10 @@ import type { Finding } from "../oracles/finding.ts";
 
 /**
  * Version 2 added the actions `dblclick`, `rightclick`, `hover`, `longPress` and `drag` (with `toRef` and
- * `toLocator`) and the `events` of a step. Version 1 logs are a subset and still read.
+ * `toLocator`) and the `events` of a step; version 3 the action `offline`. Older logs are a subset and still read.
  */
-export const ACTION_LOG_VERSION = 2;
-const READABLE_VERSIONS: readonly number[] = [1, 2];
+export const ACTION_LOG_VERSION = 3;
+const READABLE_VERSIONS: readonly number[] = [1, 2, 3];
 
 /** Fields of a logged action that hold free text, where secret values are replaced by their placeholders. */
 const TEXT_FIELDS = ["value", "url", "key", "locator", "toLocator", "pageUrl", "error"] as const;
@@ -157,7 +157,7 @@ export async function readActionLog(
   if (!isObject(json)) return fail("not a PlayMonkey action log");
   if (typeof json.version !== "number" || !READABLE_VERSIONS.includes(json.version)) {
     return fail(
-      `unsupported version ${JSON.stringify(json.version)}; this monkey reads versions ${READABLE_VERSIONS.join(" and ")}`,
+      `unsupported version ${JSON.stringify(json.version)}; this monkey reads versions ${READABLE_VERSIONS.slice(0, -1).join(", ")} and ${READABLE_VERSIONS.at(-1)}`,
     );
   }
   if (!(Array.isArray(json.placeholders) && json.placeholders.every((name) => typeof name === "string"))) {
@@ -244,6 +244,7 @@ function checkActionFields(entry: Record<string, unknown>): string | undefined {
     navigate: { url: "string" },
     setViewport: { width: "number", height: "number" },
     switchTab: { index: "number" },
+    offline: {},
   };
   const expected = typeof entry.type === "string" ? fields[entry.type] : undefined;
   if (expected === undefined) return `unknown action type ${JSON.stringify(entry.type)}`;
@@ -288,7 +289,8 @@ export function toAction(entry: LoggedAction): Action {
     case "scroll":
       return { type: "scroll", deltaY: entry.deltaY };
     case "back":
-      return { type: "back" };
+    case "offline":
+      return { type: entry.type };
     case "navigate":
       return { type: "navigate", url: entry.url };
     case "setViewport":

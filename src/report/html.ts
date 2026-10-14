@@ -213,6 +213,8 @@ export function describeStep(entry: ActionContext): string {
       return `Resize the window to ${e(action.width)}×${e(action.height)}${where}`;
     case "switchTab":
       return `Switch to tab ${e(action.index + 1)}`;
+    case "offline":
+      return `Go offline for the next step${where}`;
   }
 }
 
