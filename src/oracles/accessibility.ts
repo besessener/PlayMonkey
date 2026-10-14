@@ -1,5 +1,6 @@
 import axe from "axe-core";
 import type { Page } from "playwright";
+import { TIMEOUT, withTimeout } from "../monkey/timeout.ts";
 import type { Signal } from "./finding.ts";
 import { normalizeUrl } from "./keys.ts";
 
@@ -7,8 +8,6 @@ import { normalizeUrl } from "./keys.ts";
 const TAGS = ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"];
 /** Elements listed per violation in the finding's details. */
 const MAX_TARGETS = 5;
-/** An audit that failed or ran out of time. */
-const TIMED_OUT = Symbol("timed out");
 
 interface Violation {
   id: string;
@@ -65,8 +64,9 @@ export class AccessibilityAudit {
       () => undefined,
       () => undefined,
     );
-    const violations = await withTimeout(running, timeoutMs).catch((): typeof TIMED_OUT => TIMED_OUT);
-    if (violations === TIMED_OUT) return [];
+    const violations = await withTimeout(running, timeoutMs).catch((): typeof TIMEOUT => TIMEOUT);
+    // A failed audit says as little as one that ran out of time.
+    if (violations === TIMEOUT) return [];
     this.#audited.add(path);
     return violations.map((violation) => ({
       severity: violation.impact === "critical" || violation.impact === "serious" ? "medium" : "low",
@@ -86,7 +86,7 @@ export class AccessibilityAudit {
   /** True once the previous audit has settled: axe runs one audit at a time per page. */
   async #idle(timeoutMs: number): Promise<boolean> {
     if (this.#running === undefined) return true;
-    if ((await withTimeout(this.#running, timeoutMs)) === TIMED_OUT) return false;
+    if ((await withTimeout(this.#running, timeoutMs)) === TIMEOUT) return false;
     this.#running = undefined;
     return true;
   }
@@ -97,21 +97,4 @@ async function run(page: Page): Promise<Violation[]> {
   // Evaluates to undefined, not to axe itself, which Playwright would try to serialize.
   if ((await page.evaluate("typeof globalThis.axe")) === "undefined") await page.evaluate(`${axe.source}\n;undefined`);
   return await page.evaluate<Violation[]>(AUDIT);
-}
-
-/** The promise's value, or `TIMED_OUT` after `ms`. */
-async function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T | typeof TIMED_OUT> {
-  let timer: NodeJS.Timeout | undefined;
-  try {
-    return await Promise.race([
-      promise,
-      new Promise<typeof TIMED_OUT>((resolve) => {
-        timer = setTimeout(() => resolve(TIMED_OUT), ms);
-      }),
-    ]);
-  } finally {
-    clearTimeout(timer);
-    // An audit that outlived its time settles when the page navigates or closes; nobody waits for it any more.
-    promise.catch(() => undefined);
-  }
 }

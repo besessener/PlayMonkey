@@ -92,9 +92,16 @@ export class StaleRefError extends Error {
   }
 }
 
-/** Takes a snapshot of the page's top-level document, open shadow roots and iframes. */
-export async function snapshot(page: Page): Promise<Snapshot> {
-  const roots = (await page.ariaSnapshotJSON({ mode: "ai", boxes: true })) as (AriaNode | string)[];
+/**
+ * Takes a snapshot of the page's top-level document, open shadow roots and iframes. `timeoutMs` bounds the aria
+ * snapshot; the other page calls have no timeout of their own, so callers bound the whole call as well.
+ */
+export async function snapshot(page: Page, timeoutMs?: number): Promise<Snapshot> {
+  const roots = (await page.ariaSnapshotJSON({
+    mode: "ai",
+    boxes: true,
+    ...(timeoutMs === undefined ? {} : { timeout: timeoutMs }),
+  })) as (AriaNode | string)[];
   const viewport =
     page.viewportSize() ??
     (await page.evaluate<{ width: number; height: number }>("({ width: innerWidth, height: innerHeight })"));

@@ -6,31 +6,18 @@ import { after, before, describe, it } from "node:test";
 import type { Browser } from "playwright";
 import { BROKEN_DOWNLOAD_BYTES } from "../fixtures/site/lab.ts";
 import { type Fixture, startFixture } from "../fixtures/site/server.ts";
-import { openRoleSession } from "../src/auth/session.ts";
 import { parseConfig } from "../src/config/config.ts";
 import { ACTION_TYPES, type ActionType } from "../src/config/values.ts";
-import type { Action } from "../src/monkey/actions.ts";
 import { chooseAction, Exploration } from "../src/monkey/chooser.ts";
 import type { StepEvent } from "../src/monkey/events.ts";
-import { type PlannedAction, runMonkey, type StepRecord } from "../src/monkey/loop.ts";
+import type { PlannedAction } from "../src/monkey/loop.ts";
 import { Random } from "../src/monkey/random.ts";
-import { Oracles } from "../src/oracles/oracles.ts";
 import { type ActionLog, readActionLog } from "../src/replay/log.ts";
 import { replayActionLog } from "../src/replay/replay.ts";
 import { runRole } from "../src/run.ts";
 import { snapshot } from "../src/snapshot/snapshot.ts";
 import { launchChromium } from "./helpers/browser.ts";
-
-/** A scripted step: the action and the durable locator(s) it acts on. */
-const step = (action: Action, locator?: string, toLocator?: string): PlannedAction => ({
-  action,
-  source: "monkey",
-  ...(locator === undefined ? {} : { locator }),
-  ...(toLocator === undefined ? {} : { toLocator }),
-});
-const click = (locator: string) => step({ type: "click", ref: "x" }, locator);
-const button = (name: string) => `getByRole('button', { name: '${name}' })`;
-const link = (name: string) => `getByRole('link', { name: '${name}' })`;
+import { button, click, drive as driveRun, link, step } from "./helpers/drive.ts";
 
 describe("the lab: hard parts of real pages", () => {
   let site: Fixture;
@@ -46,43 +33,8 @@ describe("the lab: hard parts of real pages", () => {
     await site?.close();
   });
 
-  /**
-   * Runs scripted actions through the real loop (as a replay plan), with the stayOnDomain guard, the page events and
-   * the oracles. The context stays open for assertions; close it with `done`.
-   */
-  async function drive(path: string, actions: PlannedAction[], extra: Record<string, unknown> = {}) {
-    const { config, secrets } = parseConfig(
-      JSON.stringify({ baseUrl: `${site.url}${path}`, seed: 1, monkey: { actionTimeoutMs: 2000 }, ...extra }),
-    );
-    const outputDir = await mkdtemp(join(dir, "drive-"));
-    const session = await openRoleSession(browser, undefined, {
-      config,
-      secrets,
-      outputDir,
-      trace: false,
-      video: false,
-    });
-    const oracles = new Oracles(session.context, {
-      config,
-      role: "anonymous",
-      screenshotDir: join(outputDir, "shots"),
-    });
-    const records: StepRecord[] = [];
-    const downloadDir = join(outputDir, "downloads");
-    const result = await runMonkey(session.context, {
-      config,
-      downloadDir,
-      replay: { strict: true, actions },
-      onStep: async (record) => {
-        records.push(record);
-        const pages = session.context.pages();
-        await oracles.check(record, pages[record.result.tab] ?? pages[0]);
-      },
-    });
-    const findings = await oracles.finish();
-    const events = records.flatMap((record) => record.events ?? []);
-    return { result, records, findings, events, context: session.context, downloadDir, done: () => session.close() };
-  }
+  const drive = (path: string, actions: PlannedAction[], extra: Record<string, unknown> = {}) =>
+    driveRun({ browser, baseUrl: `${site.url}${path}`, dir, actions, extra });
 
   it("answers every native dialog, also one that blocks the page from loading", async () => {
     const run = await drive("/lab/dialogs", [
@@ -175,9 +127,12 @@ describe("the lab: hard parts of real pages", () => {
       // The off-site popup was blocked by stayOnDomain and closed; the monkey went on in the first tab.
       assert.equal(external?.result.ok, true);
       assert.ok(run.records.slice(3).every((r) => !/example\.invalid/.test(r.url)));
-      const keys = [...new Set(run.findings.map((f) => `${f.oracle}|${f.message}`))];
-      assert.deepEqual(keys, ["pageerror|Error: Seeded bug: popup failed to initialise"]);
-      assert.ok(run.findings.every((f) => f.occurrences >= 1));
+      // Both ways into the popup (the link and window.open with a query) are one bug, reported once.
+      const [finding, ...others] = run.findings;
+      assert.deepEqual(others, []);
+      assert.equal(finding?.oracle, "pageerror");
+      assert.match(finding?.key ?? "", /^pageerror\|Error: Seeded bug: popup failed to initialise\|/);
+      assert.ok((finding?.occurrences ?? 0) >= 2, `${finding?.occurrences} occurrences`);
       assert.ok(run.context.pages().length <= 3, `${run.context.pages().length} tabs open`);
       assert.ok(run.context.pages().every((p) => p.url().startsWith(site.url)));
     } finally {

@@ -314,9 +314,10 @@ describe("oracles in the browser", () => {
         route.fulfill({ contentType: "text/html", body: "<title>Page not found</title><h1>Oops</h1>" }),
       );
       await page.goto("/gone");
-      const [finding] = await check();
-      assert.equal(finding?.oracle, "errorPage");
-      assert.equal(finding?.message, "error page on /gone (status 200): Page not found");
+      assert.deepEqual(
+        (await check()).map((f) => `${f.oracle} ${f.message}`),
+        ["errorPage error page on /gone (status 200): Page not found"],
+      );
     });
     await withWatch("/missing-page", { oracles: { http4xx: false } }, async ({ check }) => {
       const findings = await check();
@@ -333,7 +334,7 @@ describe("oracles in the browser", () => {
         // Never answered.
       });
       const result = await executeAction({ context, current: 0 }, { type: "navigate", url: `${site.url}/never` }, 300);
-      assert.equal(result.hang, true);
+      assert.equal(result.hang, `${site.url}/never`);
       await oracles.check({ ...record(1, page, false), result }, page);
       await page.goto("/clean");
       await page.evaluate("setTimeout(() => { for (;;) {} }, 0)");

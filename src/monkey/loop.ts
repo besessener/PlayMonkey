@@ -1,15 +1,16 @@
 import type { BrowserContext, Page } from "playwright";
 import type { Config } from "../config/config.ts";
-import { findElement } from "../replay/locator.ts";
-import { durableLocator, type Snapshot } from "../snapshot/snapshot.ts";
-import { type Action, isElementAction } from "./actions.ts";
-import { chooseAction, Exploration } from "./chooser.ts";
+import type { Snapshot } from "../snapshot/snapshot.ts";
+import type { Action } from "./actions.ts";
+import { Exploration } from "./chooser.ts";
 import { PageEvents, type StepEvent } from "./events.ts";
-import { type ActionResult, executeAction, type Tabs, type Targets } from "./executor.ts";
-import { closeExtraTabs, leftSite, openStartPage, pageForStep, type RunPages, readPage } from "./pages.ts";
+import { type ActionResult, executeAction, type Tabs } from "./executor.ts";
+import { type Choice, type ChoosingRun, nextAction } from "./next-action.ts";
+import { closeExtraTabs, leftSite, openStartPage, pageForStep, readPage } from "./pages.ts";
 import { Random } from "./random.ts";
 import { UrlScope } from "./scope.ts";
 import type { Spectator } from "./spectator.ts";
+import { STOPPED, untilDeadline } from "./timeout.ts";
 
 /** One executed step, handed to the action log. */
 export interface StepRecord {
@@ -69,7 +70,7 @@ export interface RunOptions {
   config: Config;
   /** Receives every step right after it was executed. */
   onStep?: (record: StepRecord, snapshot: Snapshot) => void | Promise<void>;
-  /** Stops the run before the next step, e.g. on Ctrl+C. */
+  /** Stops the run, e.g. on Ctrl+C: before the next step, or during one that does not finish. */
   signal?: AbortSignal;
   /** Clock for the time limit; tests replace it. */
   now?: () => number;
@@ -97,6 +98,7 @@ export interface StepAdvisor {
  * Runs the seeded random monkey in the context's first page until `maxSteps`, `maxMinutes` or the signal. Failed
  * actions are recorded and the run continues; only losing the browser itself ends it with `error`. With `replay`,
  * it executes the recorded actions instead, with the same page handling (stayOnDomain, crashes) as the original run.
+ * A step still running at `maxMinutes` or the signal is abandoned, so a page that never answers cannot hold the run.
  *
  * Native dialogs, file choosers and downloads are handled on every page (`PageEvents`). When an action opens a
  * popup, the monkey continues in it; a popup that left the site is closed, and beyond `monkey.maxTabs` open tabs the
@@ -115,7 +117,7 @@ export async function runMonkey(context: BrowserContext, options: RunOptions): P
 }
 
 /** The state of one run, shared by its steps. */
-interface Run extends RunPages {
+interface Run extends ChoosingRun {
   readonly context: BrowserContext;
   readonly options: RunOptions;
   readonly now: () => number;
@@ -125,21 +127,13 @@ interface Run extends RunPages {
   readonly exploration: Exploration;
   readonly watch: (page: Page) => void;
   readonly events: PageEvents;
+  /** The run has ended; an abandoned step must not record anything any more. */
+  stopped: boolean;
   step: number;
   failedActions: number;
   skippedActions: number;
   /** An `offline` action took the context offline; the next step brings it back. */
   offline: boolean;
-}
-
-/** What a step does, and how: chosen by the monkey or the LLM, or recorded for replay. */
-interface Choice {
-  action: Action;
-  source: ActionSource;
-  locator: string | undefined;
-  toLocator: string | undefined;
-  /** Replay: the recorded elements, or why one cannot be found. */
-  targets: Targets | string;
 }
 
 function startRun(context: BrowserContext, options: RunOptions): Run {
@@ -152,12 +146,13 @@ function startRun(context: BrowserContext, options: RunOptions): Run {
   const origin = config.stayOnDomain ? new URL(config.baseUrl).origin : undefined;
   const scope = new UrlScope(config.scope);
   const tabs: Tabs = { context, current: 0 };
-  const crashed = new WeakSet<Page>();
+  const unusable = new WeakSet<Page>();
   const watch = (page: Page) => {
-    page.once("crash", () => crashed.add(page));
+    page.once("crash", () => unusable.add(page));
   };
   for (const page of context.pages()) watch(page);
   context.on("page", watch);
+  context.setDefaultTimeout(config.monkey.actionTimeoutMs);
   const events = new PageEvents(context, {
     seed: config.seed,
     timeoutMs: config.monkey.actionTimeoutMs,
@@ -175,9 +170,10 @@ function startRun(context: BrowserContext, options: RunOptions): Run {
     origin,
     scope,
     tabs,
-    crashed,
+    unusable,
     watch,
     events,
+    stopped: false,
     step: 0,
     failedActions: 0,
     skippedActions: 0,
@@ -198,33 +194,60 @@ function finish(run: Run, stopReason: StopReason, error?: string): RunResult {
 }
 
 async function loop(run: Run): Promise<RunResult> {
-  const { context, options, tabs, events } = run;
   // Dialogs of the start page belong to the first step.
-  events.beginStep(1, recordedEvents(run, 0));
-  await openStartPage(run);
+  run.events.beginStep(1, recordedEvents(run, 0));
+  const started = await untilStopped(run, openStartPage(run));
+  if (started === STOPPED) return stop(run);
 
   while (true) {
-    const stop = limitReached(run);
-    if (stop !== undefined) return finish(run, stop);
-    const page = await pageForStep(run);
-    if (page === undefined) return finish(run, "error", "all pages were closed");
-    tabs.current = Math.max(0, context.pages().indexOf(page));
-    events.beginStep(run.step + 1, recordedEvents(run, run.step));
-    if (await leftSite(run, page)) continue;
-    const snap = await readPage(run, page);
-    if (snap === undefined) continue;
-    const isNewState = run.exploration.visit(snap.url, snap.hash);
-    const advisor = options.replay === undefined ? options.advisor : undefined;
-    advisor?.observe(snap, isNewState);
-    const choice = await nextAction(run, page, snap, advisor);
-
-    run.step++;
-    if (typeof choice.targets === "string" && options.replay?.strict === true) {
-      return finish(run, "error", `step ${run.step}: ${choice.targets}`);
-    }
-    const result = await executeStep(run, page, choice);
-    await recordStep(run, { snap, choice, result, advisor });
+    const limit = limitReached(run);
+    if (limit !== undefined) return finish(run, limit);
+    const ended = await untilStopped(run, step(run));
+    if (ended === STOPPED) return stop(run);
+    if (ended !== undefined) return ended;
   }
+}
+
+/** One step: the page, its snapshot, the choice, the action and its record. A result ends the run. */
+async function step(run: Run): Promise<RunResult | undefined> {
+  const { context, options, tabs, events } = run;
+  const page = await pageForStep(run);
+  if (page === undefined) return finish(run, "error", "all pages were closed");
+  tabs.current = Math.max(0, context.pages().indexOf(page));
+  events.beginStep(run.step + 1, recordedEvents(run, run.step));
+  if (await leftSite(run, page)) return undefined;
+  const snap = await readPage(run, page);
+  if (snap === undefined) return undefined;
+  const isNewState = run.exploration.visit(snap.url, snap.hash);
+  const advisor = options.replay === undefined ? options.advisor : undefined;
+  advisor?.observe(snap, isNewState);
+  const choice = await nextAction(run, page, snap, advisor);
+  // Choosing can take long (the LLM): a limit reached meanwhile ends the run before the action.
+  const limit = limitReached(run);
+  if (limit !== undefined) return finish(run, limit);
+
+  run.step++;
+  if (typeof choice.targets === "string" && options.replay?.strict === true) {
+    return finish(run, "error", `step ${run.step}: ${choice.targets}`);
+  }
+  const result = await executeStep(run, page, choice);
+  await recordStep(run, { snap, choice, result, advisor });
+  return undefined;
+}
+
+/** The work's result, or `STOPPED` when the signal or `maxMinutes` comes first. */
+function untilStopped<T>(run: Run, work: Promise<T>): Promise<T | typeof STOPPED> {
+  const { signal } = run.options;
+  return untilDeadline(work, {
+    ms: Math.max(0, run.deadline - run.now()),
+    ...(signal === undefined ? {} : { signal }),
+  });
+}
+
+/** Ends the run while a step is still in progress; that step records nothing any more. */
+function stop(run: Run): RunResult {
+  run.stopped = true;
+  return finish(run, run.options.signal?.aborted === true ? "aborted" : "maxMinutes");
 }
 
 function recordedEvents(run: Run, index: number): StepEvent[] | undefined {
@@ -240,45 +263,6 @@ function limitReached(run: Run): "aborted" | "end" | "maxSteps" | "maxMinutes" |
   } else if (run.step >= run.config.limits.maxSteps) return "maxSteps";
   if (run.now() >= run.deadline) return "maxMinutes";
   return undefined;
-}
-
-/** The next action: the advisor's, else the recorded one in replay, else the monkey's. */
-async function nextAction(run: Run, page: Page, snap: Snapshot, advisor: StepAdvisor | undefined): Promise<Choice> {
-  const advised = await advisor?.choose(snap, run.step + 1);
-  const { replay } = run.options;
-  if (advised === undefined && replay !== undefined) return await replayedAction(run, page, replay);
-  const choice: { action: Action; elementKey?: string } =
-    advised === undefined ? monkeyAction(run, page, snap) : { action: advised };
-  const { action } = choice;
-  const locator = isElementAction(action) ? await durableLocator(page, action.ref).catch(() => undefined) : undefined;
-  if (choice.elementKey !== undefined) run.exploration.recordAction(`${snap.url}#${snap.hash}`, choice.elementKey);
-  const toLocator =
-    action.type === "drag" ? await durableLocator(page, action.toRef).catch(() => undefined) : undefined;
-  return { action, source: advised === undefined ? "monkey" : "llm", locator, toLocator, targets: {} };
-}
-
-function monkeyAction(run: Run, page: Page, snap: Snapshot): { action: Action; elementKey?: string } {
-  const { config, origin, scope } = run;
-  const viewport = page.viewportSize() ?? {
-    width: config.browser.viewport[0],
-    height: config.browser.viewport[1],
-  };
-  return chooseAction(snap, run.exploration, run.random, {
-    weights: config.monkey.weights,
-    testData: config.testData,
-    ...(origin === undefined ? {} : { origin }),
-    ...(scope.restricted ? { scope } : {}),
-    tabCount: run.context.pages().length,
-    currentTab: run.tabs.current,
-    viewport,
-  });
-}
-
-async function replayedAction(run: Run, page: Page, replay: ReplayPlan): Promise<Choice> {
-  const planned = replay.actions[run.step] as PlannedAction;
-  const { action, source, locator, toLocator } = planned;
-  const targets = isElementAction(action) ? await findTargets(page, planned, run.config.monkey.actionTimeoutMs) : {};
-  return { action, source, locator, toLocator, targets };
 }
 
 /** Executes the action, or skips it when replay cannot find its element; ends an `offline` step after the next one. */
@@ -315,8 +299,9 @@ interface ExecutedStep {
 async function recordStep(run: Run, { snap, choice, result, advisor }: ExecutedStep): Promise<void> {
   const { action, source, locator, toLocator, targets } = choice;
   const stepEvents = await run.events.collect();
+  if (run.stopped) return;
   run.tabs.current = result.tab;
-  await closeExtraTabs(run.tabs, run.config.monkey.maxTabs);
+  await closeExtraTabs(run.tabs, run.config.monkey);
   result.tab = run.tabs.current;
   const record: StepRecord = {
     step: run.step,
@@ -332,13 +317,4 @@ async function recordStep(run: Run, { snap, choice, result, advisor }: ExecutedS
   };
   advisor?.record(record, snap);
   await run.options.onStep?.(record, snap);
-}
-
-/** Replay: the recorded element of an action and, for `drag`, its drop target; or why one cannot be found. */
-async function findTargets(page: Page, planned: PlannedAction, timeoutMs: number): Promise<Targets | string> {
-  const element = await findElement(page, planned.locator, timeoutMs);
-  if (typeof element === "string") return element;
-  if (planned.action.type !== "drag") return { element };
-  const to = await findElement(page, planned.toLocator, timeoutMs);
-  return typeof to === "string" ? `drop target: ${to}` : { element, to };
 }
