@@ -4,7 +4,7 @@ import type { Browser } from "playwright";
 import { launchBrowser } from "../auth/browser.ts";
 import { runRole } from "../run.ts";
 import { ddmin } from "./ddmin.ts";
-import type { ActionLog, LoggedAction, LoggedFinding } from "./log.ts";
+import { type ActionLog, FINDING_ID, type LoggedAction, type LoggedFinding } from "./log.ts";
 import { type PreparedReplay, prepareReplay, ReplayError, toPlanned } from "./replay.ts";
 
 export interface ShrinkOptions {
@@ -150,6 +150,7 @@ class Shrinker {
       actions: indexes.map((index, position) => ({ ...(raw.actions[index] as LoggedAction), step: position + 1 })),
       findings: [{ ...original, step }],
     };
+    if (!FINDING_ID.test(finding.id)) throw new ReplayError(`finding id ${JSON.stringify(finding.id)} is not like F1`);
     await mkdir(outDir, { recursive: true });
     const file = join(outDir, `${finding.id}.actions.json`);
     await writeFile(file, `${JSON.stringify(log, null, 2)}\n`);

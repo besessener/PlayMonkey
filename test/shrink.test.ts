@@ -59,11 +59,15 @@ describe("monkey shrink against the fixture site", () => {
   let browser: Browser;
   let dir: string;
   let logFile: string;
+  let config: string;
   before(async () => {
     site = await startFixture();
     browser = await launchChromium();
     dir = await mkdtemp(join(tmpdir(), "monkey-shrink-"));
     logFile = await record();
+    // A missing element costs a whole action timeout, and shrinking misses many on purpose.
+    config = join(dir, "fast.json");
+    await writeFile(config, JSON.stringify({ baseUrl: "${FIXTURE_URL}", monkey: { actionTimeoutMs: 1000 } }));
   });
   after(async () => {
     await browser?.close();
@@ -123,9 +127,6 @@ describe("monkey shrink against the fixture site", () => {
   }
 
   it("shortens the way to the finding to the two actions it needs, and the result replays", async () => {
-    // A missing element costs a whole action timeout, and shrinking misses many on purpose.
-    const config = join(dir, "fast.json");
-    await writeFile(config, JSON.stringify({ baseUrl: "${FIXTURE_URL}", monkey: { actionTimeoutMs: 1000 } }));
     const { code, stdout } = await cli(["shrink", "--config", config, logFile]);
     assert.equal(code, 1, stdout);
     assert.match(stdout, /^F1 http5xx: POST \/form responded 500 Internal Server Error\n/);
@@ -147,19 +148,28 @@ describe("monkey shrink against the fixture site", () => {
       [["F1", "http5xx|POST /form 500", 2]],
     );
 
-    const replayed = await cli(["replay", shrunk]);
+    const replayed = await cli(["replay", "--config", config, shrunk]);
     assert.equal(replayed.code, 1, replayed.stdout);
     assert.match(replayed.stdout, /\nreproduced: 1 of 1\n$/);
   });
 
   it("says when the budget ran out before the result was minimal", async () => {
-    const { code, stdout } = await cli(["shrink", "--finding", "F1", "--max-replays", "2", logFile]);
+    const { code, stdout } = await cli([
+      "shrink",
+      "--finding",
+      "F1",
+      "--max-replays",
+      "2",
+      "--config",
+      config,
+      logFile,
+    ]);
     assert.equal(code, 1, stdout);
     assert.match(stdout, /\nshrunk {2}F1 http5xx: 8 -> \d actions \(stopped early, may shrink further\), 2 replays\n$/);
   });
 
   it("rejects an unknown finding, a bad budget and options of other commands", async () => {
-    const unknown = await cli(["shrink", "--finding", "F9", logFile]);
+    const unknown = await cli(["shrink", "--finding", "F9", "--config", config, logFile]);
     assert.equal(unknown.code, 2);
     assert.match(unknown.stderr, /^monkey shrink: no finding F9 in the log; it has F1\n/);
 

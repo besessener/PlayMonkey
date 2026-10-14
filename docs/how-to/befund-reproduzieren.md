@@ -57,4 +57,7 @@ von beidem nicht ab, deshalb ist Replay der verlässliche Weg.
 ## Befunde aus der CI
 
 Lade das Artefakt `monkey-report` des CI-Laufs herunter (siehe [In der CI ausführen](in-ci-ausfuehren.md)), entpacke
-es und spiel seine `actions.json` gegen dieselbe Testumgebung ab, mit denselben gesetzten Umgebungsvariablen.
+es und spiel seine `actions.json` mit deiner Konfiguration (`--config`) gegen dieselbe Testumgebung ab, mit denselben
+gesetzten Umgebungsvariablen. Das Artefakt eines Pull Requests aus einem Fork bestimmt der Fork; Replay setzt deshalb
+nur Variablen deiner Konfiguration ein und lehnt Protokolle ab, die deine Website verlassen würden (siehe
+[Fremde Protokolle](../explanation/replay.md#fremde-protokolle)).

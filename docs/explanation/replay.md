@@ -11,10 +11,12 @@ monkey replay monkey-report/user/actions.json --config config.json
 
 ## Was Replay tut
 
-1. Liest das Protokoll, prüft seine `version` und löst seine Platzhalter `${VAR}` aus der Umgebung auf.
+1. Liest das Protokoll, prüft seine `version` und löst seine Platzhalter `${VAR}` aus der Umgebung auf, aber nur
+   die, die auch deine Konfiguration verwendet (siehe [Fremde Protokolle](#fremde-protokolle)).
 2. Öffnet einen frischen Browserkontext für die aufgezeichnete Rolle, angemeldet so, wie die Konfiguration es
-   beschreibt. Ohne `--config` lassen sich nur anonyme Protokolle abspielen; Browser- und Orakel-Einstellungen sind
-   dann die Standardwerte. `baseUrl`, Viewport und Seed kommen immer aus dem Protokoll.
+   beschreibt. Ohne `--config` lassen sich nur anonyme Protokolle ohne Platzhalter abspielen; Browser- und
+   Orakel-Einstellungen sind dann die Standardwerte. `baseUrl`, Viewport und Seed kommen immer aus dem Protokoll,
+   wobei `baseUrl` auf dem Origin der `baseUrl` deiner Konfiguration liegen muss.
 3. Führt die Aktionen der Reihe nach durch dieselbe Schleife wie `monkey run` aus, mit demselben Umgang mit Seiten:
    Eine Seite, die den Origin der Website verlassen hat, wird zurück zu `baseUrl` geschickt, eine abgestürzte Seite
    wird ersetzt.
@@ -23,6 +25,25 @@ monkey replay monkey-report/user/actions.json --config config.json
 
 Kein LLM ist beteiligt, und Replay braucht weder eine `llm`-Konfiguration noch Netzwerkzugang zu einem LLM:
 LLM-Entscheidungen stehen als gewöhnliche Aktionen im Protokoll.
+
+## Fremde Protokolle
+
+Ein Aktionsprotokoll ist eine Eingabe von außen: Das Artefakt `monkey-report` eines CI-Laufs für einen Pull Request
+aus einem Fork bestimmt der Fork. Replay und Shrink behandeln jedes Protokoll deshalb als nicht vertrauenswürdig:
+
+- **Platzhalter:** Aufgelöst werden nur Variablen, die deine Konfiguration (`--config`) selbst verwendet. Ein
+  Protokoll, das eine andere Variable braucht, wird mit ihrem Namen abgelehnt, auch wenn sie in deiner Umgebung
+  gesetzt ist; so kann es sich keine Umgebungsvariable aussuchen. Ohne `--config` wird gar nichts aufgelöst, und ein
+  Protokoll mit Platzhaltern braucht `--config`.
+- **Origin:** Die `baseUrl` des Protokolls muss eine `http(s)`-URL sein und mit `--config` auf demselben Origin
+  (Schema, Host, Port) liegen wie die `baseUrl` deiner Konfiguration. Sonst bricht Replay ab, bevor ein Browser startet
+  oder sich jemand anmeldet; deine Zugangsdaten gehen also nur an deine eigene Testumgebung.
+- **`navigate`:** Jede `navigate`-Aktion muss dieselben Prüfungen bestehen wie ein Ziel, das das LLM wählt: nur
+  `http(s)`, mit `stayOnDomain` nur auf dem Origin der Website und innerhalb von `scope`. Eine Aktion, die das nicht
+  tut, lässt Replay das ganze Protokoll ablehnen und nennt ihren Schritt.
+- **Befund-Ids:** Ids müssen die Form `F1`, `F2`, … haben, weil Shrink sie als Dateinamen verwendet.
+
+Alles davon endet mit `2` und einer Meldung, die Ursache und nächsten Schritt nennt.
 
 ## Elemente wiederfinden
 
@@ -53,8 +74,9 @@ reproduced: 1 of 2
 
 Jeder aufgezeichnete Befund ist `reproduced` oder `not reproduced`; Befunde, die die Aufzeichnung nicht hatte,
 erscheinen als `new`. Der Exit-Code ist `1`, wenn mindestens ein aufgezeichneter Befund reproduziert wurde, `0`, wenn
-keiner, und `2` bei Fehlern (unlesbares Protokoll, nicht unterstützte Version, fehlende Variable, fehlgeschlagene
-Anmeldung, Abdrift mit `--strict`). Replay schreibt seinen Trace, sein Video und seine Screenshots nach `replay/`
+keiner, und `2` bei Fehlern (unlesbares Protokoll, nicht unterstützte Version, eine Variable, die das Protokoll braucht und
+deine Konfiguration nicht verwendet, ein Protokoll, das die [Prüfungen](#fremde-protokolle) nicht besteht,
+fehlgeschlagene Anmeldung, Abdrift mit `--strict`). Replay schreibt seinen Trace, sein Video und seine Screenshots nach `replay/`
 neben dem Protokoll.
 
 ## Kürzen: `monkey shrink`

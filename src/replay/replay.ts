@@ -6,7 +6,15 @@ import { maskSecrets, Secrets } from "../config/secrets.ts";
 import type { PlannedAction } from "../monkey/loop.ts";
 import type { Spectator } from "../monkey/spectator.ts";
 import { type RoleOutcome, runRole } from "../run.ts";
-import { type ActionLog, type LoggedAction, type LoggedFinding, readActionLog, toAction } from "./log.ts";
+import {
+  type ActionLog,
+  ActionLogError,
+  type LoggedAction,
+  type LoggedFinding,
+  readActionLog,
+  toAction,
+} from "./log.ts";
+import { isHttpUrl, replayVariables, untrustedLogProblem } from "./trust.ts";
 
 export interface ReplayOptions {
   /** Config file for login, browser and oracle settings; needed to replay a role that logs in. */
@@ -47,17 +55,16 @@ export interface PreparedReplay {
 
 /**
  * Reads an action log and the config for its role. The recorded run decides where and at which size the actions
- * happen; the config adds login, browser and oracle settings.
+ * happen; the config adds login, browser and oracle settings. The log is untrusted: it gets only the variables the
+ * config uses and must stay on the config's site.
  */
 export async function prepareReplay(
   file: string,
   options: Pick<ReplayOptions, "config" | "env">,
 ): Promise<PreparedReplay> {
-  const { log, secrets: logSecrets } = await readActionLog(file, options.env);
-  const loaded: LoadedConfig =
-    options.config === undefined
-      ? parseConfig(JSON.stringify({ baseUrl: log.baseUrl, seed: log.seed }), { env: {} })
-      : await loadConfig(options.config, { env: options.env });
+  const given = options.config === undefined ? undefined : await loadConfig(options.config, { env: options.env });
+  const { log, secrets: logSecrets } = await readActionLog(file, replayVariables(options.env, given?.secrets));
+  const loaded = given ?? configFromLog(file, log);
   const config: Config = {
     ...loaded.config,
     baseUrl: log.baseUrl,
@@ -65,6 +72,8 @@ export async function prepareReplay(
     browser: { ...loaded.config.browser, viewport: log.viewport },
   };
   const secrets = new Secrets([...loaded.secrets.entries, ...logSecrets]);
+  const problem = untrustedLogProblem(log, loaded.config, secrets);
+  if (problem !== undefined) throw new ActionLogError(file, problem);
   const role = config.auth.find((r) => r.name === log.role);
   if (role === undefined && log.role !== ANONYMOUS_ROLE) {
     throw new ReplayError(
@@ -74,6 +83,12 @@ export async function prepareReplay(
     );
   }
   return { log, loaded: { config, secrets }, role };
+}
+
+/** Default settings on the log's own site, for a replay without `--config`. */
+function configFromLog(file: string, log: ActionLog): LoadedConfig {
+  if (!isHttpUrl(log.baseUrl)) throw new ActionLogError(file, `baseUrl ${log.baseUrl} is not an http(s) URL`);
+  return parseConfig(JSON.stringify({ baseUrl: log.baseUrl, seed: log.seed }), { env: {} });
 }
 
 /** A logged action as a step of a replay plan. */

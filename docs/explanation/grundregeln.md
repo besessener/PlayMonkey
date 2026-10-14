@@ -22,6 +22,10 @@ Umgebungsvariablen aufgelöst, nie aus Dateien gelesen. Jeder eingesetzte Wert w
 Fehlermeldungen und Berichten als `***` maskiert. Fehlermeldungen nennen den Konfigurationspfad und die Variable, nie
 einen Wert.
 
+Ein Aktionsprotokoll entscheidet nie, welche Variablen eingesetzt werden: Replay löst nur die auf, die deine
+Konfiguration verwendet, und nur auf dem Origin ihrer `baseUrl` (siehe
+[Fremde Protokolle](replay.md#fremde-protokolle)).
+
 Traces und Videos sind die Ausnahme: Playwright kann sie nicht schwärzen, und sie enthalten die Basis-URL, das
 Sitzungs-Cookie, Request-Header und jeden Wert, den der Monkey eingetippt hat. Die bei einer Anmeldung eingetippten
 Werte erreichen sie nie (die Anmeldung läuft in einem eigenen, nicht aufgezeichneten Browserkontext). Behandle

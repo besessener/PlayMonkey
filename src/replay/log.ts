@@ -1,6 +1,6 @@
 import { readFile, rename, writeFile } from "node:fs/promises";
 import { resolvePlaceholders } from "../config/placeholders.ts";
-import type { Secrets } from "../config/secrets.ts";
+import { Secrets } from "../config/secrets.ts";
 import type { Action } from "../monkey/actions.ts";
 import type { StepEvent } from "../monkey/events.ts";
 import type { StepRecord } from "../monkey/loop.ts";
@@ -32,6 +32,9 @@ export type LoggedAction = Action & {
   /** Dialogs answered, files uploaded and downloads during the step; replay gives the same answers. */
   events?: StepEvent[];
 };
+
+/** Finding ids are `F1`, `F2`, …; shrink uses them in file names. */
+export const FINDING_ID = /^F\d+$/;
 
 /** What replay compares against. */
 export type LoggedFinding = Pick<Finding, "id" | "oracle" | "severity" | "key" | "message" | "step">;
@@ -143,8 +146,9 @@ export class ActionLogWriter {
 }
 
 /**
- * Reads and checks an action log and resolves its placeholders from `env`. Returns the log with real values and
- * the resolved values, which must be masked in all output.
+ * Reads and checks an action log and resolves its placeholders from `env`, which holds only the variables the replay
+ * may fill in (see `replayVariables`). Returns the log with real values and the resolved values, which must be
+ * masked in all output.
  */
 export async function readActionLog(
   file: string,
@@ -167,11 +171,14 @@ export async function readActionLog(
   const names = new Set(json.placeholders as string[]);
   const { value, secrets, missing } = resolvePlaceholders(json, env, names);
   if (missing.length > 0) {
-    const variables = [...new Set(missing.map(({ name }) => name))].join(", ");
-    fail(`environment variable${missing.length > 1 ? "s" : ""} ${variables} not set; the log needs them for replay`);
+    const variables = [...new Set(missing.map(({ name }) => name))].sort();
+    fail(
+      `the log needs ${variables.join(", ")}, but replay fills in only variables that the --config file uses; pass the config of the recorded run`,
+    );
   }
   const problem = checkLog(value as Record<string, unknown>);
-  if (problem !== undefined) fail(problem);
+  // The log may put a placeholder anywhere, so a message quoting it can contain a resolved value.
+  if (problem !== undefined) fail(new Secrets(secrets).mask(problem));
   return { log: value as ActionLog, secrets };
 }
 
@@ -202,10 +209,16 @@ function checkLog(log: Record<string, unknown>): string | undefined {
     if (problem !== undefined) return `actions[${index}]: ${problem}`;
   }
   for (const [index, entry] of (log.findings as unknown[]).entries()) {
-    if (!isObject(entry) || typeof entry.key !== "string" || typeof entry.id !== "string") {
-      return `findings[${index}]: needs id and key`;
-    }
+    const problem = checkFinding(entry);
+    if (problem !== undefined) return `findings[${index}]: ${problem}`;
   }
+  return undefined;
+}
+
+/** Returns why `entry` is not a logged finding, or undefined. */
+function checkFinding(entry: unknown): string | undefined {
+  if (!isObject(entry) || typeof entry.key !== "string" || typeof entry.id !== "string") return "needs id and key";
+  if (!FINDING_ID.test(entry.id)) return `id must look like F1, got ${JSON.stringify(entry.id)}`;
   return undefined;
 }
 
