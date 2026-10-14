@@ -371,6 +371,15 @@ describe("secret masking", () => {
     assert.equal(secrets.mask(`login with ${SECRET} failed`), "login with *** failed");
   });
 
+  it("masks a secret also URL-encoded, form-encoded and JSON-escaped", () => {
+    const { secrets } = parse(fullConfig, { ...ENV, ADMIN_PASS: 'p@ss word"\\x' });
+    const value = 'p@ss word"\\x';
+    assert.equal(secrets.mask(`/search?q=${encodeURIComponent(value)}`), "/search?q=***");
+    assert.equal(secrets.mask(`/search?${new URLSearchParams({ q: value })}`), "/search?q=***");
+    assert.equal(secrets.mask(JSON.stringify({ value })), '{"value":"***"}');
+    assert.equal(secrets.toPlaceholders(`?q=${encodeURIComponent(value)}`), "?q=${ADMIN_PASS}");
+  });
+
   it("never puts a secret value into error messages", () => {
     const env = { ...ENV, ENGINE: SECRET, URL: SECRET, NAME: SECRET };
     let message = "";
