@@ -66,6 +66,7 @@ Es gibt den Seed aus, eine Zusammenfassung je Rolle, jeden Befund und wo der Ber
 ```sh
 monkey run config.json         # explore the site and report findings
 monkey replay actions.json     # re-execute a recorded run, without an LLM
+monkey shrink actions.json     # shorten the way to each finding to the fewest actions
 monkey preflight config.json   # check the configured LLM endpoint
 monkey run config.json --watch # spectator mode: watch it live, e.g. for a demo
 ```

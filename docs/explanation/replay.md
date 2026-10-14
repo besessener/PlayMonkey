@@ -56,3 +56,42 @@ erscheinen als `new`. Der Exit-Code ist `1`, wenn mindestens ein aufgezeichneter
 keiner, und `2` bei Fehlern (unlesbares Protokoll, nicht unterstützte Version, fehlende Variable, fehlgeschlagene
 Anmeldung, Abdrift mit `--strict`). Replay schreibt seinen Trace, sein Video und seine Screenshots nach `replay/`
 neben dem Protokoll.
+
+## Kürzen: `monkey shrink`
+
+Ein Zufallslauf erreicht einen Fehler oft über einen langen Umweg. `monkey shrink` sucht den kürzesten Weg, der ihn
+noch auslöst:
+
+```sh
+monkey shrink monkey-report/user/actions.json --config config.json
+```
+
+Für jeden Befund des Protokolls (oder nur `--finding F2`) nimmt es die Aktionen bis zu seinem Schritt und spielt
+immer kleinere Teilfolgen davon ab, jede in einem frischen, angemeldeten Kontext, ohne LLM, Trace und Video. Eine
+Teilfolge, in der die Orakel den Dedup-Schlüssel des Befunds wieder melden, ersetzt die bisherige. Das ist **Delta
+Debugging** (`ddmin` von Andreas Zeller): erst große Stücke weglassen, dann immer kleinere, bis keine einzelne Aktion
+mehr fehlen darf. Die Reihenfolge bleibt erhalten, und keine Teilfolge wird zweimal abgespielt.
+
+Zuerst prüft ein Replay mit allen Aktionen bis zum Befund, ob er sich überhaupt reproduzieren lässt; wenn nicht, gibt
+es nichts zu kürzen. `--max-replays` (Standard 60, inklusive dieser Prüfung) begrenzt die Replays pro Befund; ist das
+Budget aufgebraucht oder drückst du Strg+C, bleibt das kürzeste Ergebnis bis dahin, mit dem Hinweis
+`stopped early, may shrink further`.
+
+```text
+F1 http5xx: POST /form responded 500 Internal Server Error
+  replay 1: 8 actions, reproduced
+  replay 2: 4 actions, gone
+  …
+  8 -> 2 actions: monkey-report/user/shrink/F1.actions.json
+shrunk  F1 http5xx: 8 -> 2 actions, 11 replays
+```
+
+Das Ergebnis ist ein gewöhnliches Aktionsprotokoll, `shrink/<id>.actions.json` neben dem Eingabeprotokoll, mit den
+Schritten neu durchnummeriert, nur diesem Befund und denselben Platzhaltern; `monkey replay` spielt es ab. Der
+Exit-Code ist `1`, wenn mindestens ein Befund reproduziert und gekürzt wurde, `0`, wenn keiner reproduziert wurde,
+und `2` bei denselben Fehlern wie bei Replay oder einem unbekannten `--finding`.
+
+Gekürzt wird mit Replay ohne `--strict`: Fehlt einer Teilfolge eine Vorbedingung, findet sie Elemente nicht, und
+jedes fehlende Element kostet `monkey.actionTimeoutMs`. Eine Konfiguration mit kürzerem Timeout für `--config`
+beschleunigt das Kürzen deutlich. Ein Fehler, der vom Timing abhängt, kann sich beim Kürzen anders verhalten;
+spiel das Ergebnis dann ein paar Mal ab.

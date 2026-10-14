@@ -105,7 +105,7 @@ describe("spectator mode", () => {
     assert.match(bad.stderr, /--slow-mo expects milliseconds/);
     const preflight = await cli(["preflight", config, "--watch"]);
     assert.equal(preflight.code, 2);
-    assert.match(preflight.stderr, /--watch and --slow-mo belong to run and replay/);
+    assert.match(preflight.stderr, /--(watch|slow-mo) belongs to run and replay/);
     assert.match((await cli(["--help"])).stdout, /-w, --watch {12}run, replay: spectator mode/);
   });
 

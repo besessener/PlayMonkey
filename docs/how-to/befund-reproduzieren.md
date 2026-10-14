@@ -31,7 +31,18 @@ heißt, dass mindestens einer wieder aufgetreten ist. Mit `--watch` kannst du [z
 `--strict` hält Replay beim ersten Element an, das nicht mehr da ist. Wie es funktioniert und was Drift bedeutet:
 [Replay](../explanation/replay.md).
 
-## 4. Oder den Seed erneut ausführen
+## 4. Den Weg kürzen
+
+```sh
+npx monkey shrink monkey-report/user/actions.json --config config.json
+```
+
+`monkey shrink` sucht für jeden Befund die wenigsten Aktionen, die ihn noch auslösen, und schreibt sie als
+`shrink/F1.actions.json` neben das Protokoll. Aus zwanzig Zufallsschritten werden so oft zwei oder drei, die du in
+einem Ticket beschreiben oder mit `monkey replay` zeigen kannst. Wie es funktioniert:
+[Kürzen](../explanation/replay.md#kürzen-monkey-shrink).
+
+## 5. Oder den Seed erneut ausführen
 
 Der Seed wird zu Beginn jedes Laufs ausgegeben und in `report.json` und `actions.json` gespeichert. Mit demselben
 Seed, derselben Konfiguration und einer unveränderten Seite geht der zufällige Monkey dieselben Schritte:
