@@ -31,7 +31,7 @@ feststeckt.
   ([Grundregeln](docs/explanation/grundregeln.md)). Kein Testfall-Generator, kein visueller Regressionstest, kein
   Lasttest.
 
-> **Stand:** Version 0.5.0: der Zufalls-Monkey mit Seed, mit Orakeln, Berichten und Replay; Claude auf Microsoft
+> **Stand:** Version 0.6.0: der Zufalls-Monkey mit Seed, mit Orakeln, Berichten und Replay; Claude auf Microsoft
 > Foundry oder jeder OpenAI-kompatible Endpunkt als LLM für festgefahrene Situationen; Cookie-Banner, native Dialoge,
 > iframes, Popups, Datei-Uploads und -Downloads werden behandelt; parallele Läufe je Rolle und Seed; ein CI-Beispiel.
 
@@ -41,7 +41,7 @@ Voraussetzungen: Node.js 26 oder neuer und ein Playwright-Browser. Installiere P
 Projekt als Dev-Abhängigkeit:
 
 ```sh
-npm install --save-dev github:besessener/PlayMonkey#v0.5.0
+npm install --save-dev github:besessener/PlayMonkey#v0.6.0
 npx playwright install chromium          # on Linux CI: add --with-deps
 ```
 
