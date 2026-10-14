@@ -257,8 +257,9 @@ describe("report of a run against the fixture site", () => {
     );
     assert.equal(report.roles[0]?.pages, pages.length);
 
-    // Every text file in the report directory, the HTML with its embedded screenshots included.
-    const secrets = [CREDENTIALS.username, CREDENTIALS.password, SECRET_EMAIL, site.url, new URL(site.url).host];
+    // Every text file in the report directory, the HTML with its embedded screenshots included. The site's URL comes
+    // from ${SITE_URL} too, but it is no credential, so it may appear.
+    const secrets = [CREDENTIALS.username, CREDENTIALS.password, SECRET_EMAIL];
     const files = (await readdir(reportDir, { recursive: true })).filter((file) =>
       [".json", ".html"].includes(extname(file)),
     );

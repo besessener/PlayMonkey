@@ -37,7 +37,8 @@ so lange stehen, mindestens 300 ms.
 | Einen langen Lauf im Auge behalten | `--slow-mo 0`: volle Geschwindigkeit, keine Umrandung, trotzdem sichtbar mit Schrittzeilen |
 
 Senk `limits.maxSteps` für eine Demo: Bei der Standardgeschwindigkeit dauert ein Schritt etwa ein bis zwei Sekunden.
-Strg+C hält nach dem aktuellen Schritt an und schreibt trotzdem den Bericht.
+Strg+C hält nach dem aktuellen Schritt an und schreibt trotzdem den Bericht mit den Befunden bis dahin; weil der Lauf
+nicht fertig wurde, endet `monkey` mit `2`. Ein zweites Strg+C beendet sofort, ohne Bericht.
 
 Eine fertige Demo, die ganz lokal läuft, ist der Demo-Shop der [Fixture-Seite](../../fixtures/README.md#der-demo-shop):
 ein gestalteter Obstladen mit Anmeldung, Warenkorb und einem eingebauten Fehler an der Kasse. Shop, Konfiguration und

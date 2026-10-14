@@ -57,7 +57,7 @@ dort ein Schlüssel steht, der auf dieser Seite fehlt.
 | `network.latencyMs` | integer 0 … 60000 | `0` | Verzögerung jeder Anfrage des Laufs in Millisekunden; siehe [Netzwerk](../explanation/monkey.md#netzwerk). |
 | `auth` | Array | `[]` (eine anonyme Rolle) | Rollen, unter denen gelaufen wird; siehe unten. |
 | `auth[].name` | string, Pflicht | – | Eindeutiger Rollenname. |
-| `auth[].loginUrl` | string | – | Pfad der Anmeldeseite, relativ zu `baseUrl`. Pflicht mit `fields`. |
+| `auth[].loginUrl` | string | – | Adresse der Anmeldeseite, aufgelöst gegen `baseUrl` wie ein Link: `/login` hängt am Origin, `login` ersetzt den letzten Pfadabschnitt von `baseUrl` (außer `baseUrl` endet auf `/`); siehe [Anmeldung einrichten](../how-to/anmeldung-einrichten.md). Pflicht mit `fields`. |
 | `auth[].fields` | Objekt aus Strings | – | Felder des Anmeldeformulars, die ausgefüllt werden: Schlüssel → Wert. |
 | `auth[].submit` | string | – | Selektor des Absende-Buttons der Anmeldung. Pflicht mit `fields`. |
 | `auth[].storageState` | string | – | Storage-State-Datei von Playwright, relativ zur Konfigurationsdatei. |
@@ -68,7 +68,7 @@ dort ein Schlüssel steht, der auf dieser Seite fehlt.
 | `llm.deployment` | string | – | Name des Deployments, wird als Modell genutzt. Pflicht in `llm`. |
 | `llm.apiKey` | string | – | API-Key; nutze einen `${VAR}`-Platzhalter. Pflicht in `llm`. |
 | `llm.required` | boolean | `true` | Ein fehlgeschlagener [Preflight](../how-to/llm-einrichten.md#fehlerbehebung) endet mit Code `2`; `false` warnt und läuft als reiner Zufalls-Monkey. |
-| `llm.timeoutMs` | integer ≥ 1000 | `60000` | Zeitlimit einer LLM-Anfrage in Millisekunden. |
+| `llm.timeoutMs` | integer ≥ 1000 | `60000` | Zeitlimit einer LLM-Anfrage in Millisekunden, insgesamt: einschließlich der Wiederholungen nach `llm.maxRetries` und des Lesens der Antwort. Höchstens bis `limits.maxMinutes` des Laufs. Ein Überschreiten öffnet den Circuit Breaker sofort. |
 | `llm.maxRetries` | integer 0 … 10 | `2` | Wiederholungen einer Anfrage nach einem Rate Limit (429), einem Server- oder Verbindungsfehler, mit exponentiellem Backoff. Andere Fehler werden nicht wiederholt. |
 | `llm.maxCalls` | integer ≥ 0 | unbegrenzt | Budget: LLM-Aufrufe pro `monkey run`, über alle Rollen und Seeds, auch wenn sie parallel laufen (laufende Aufrufe zählen mit). Ist es aufgebraucht, laufen die Läufe als reiner Monkey weiter, und der Bericht sagt das. |
 | `llm.maxTokens` | integer ≥ 0 | unbegrenzt | Budget: Tokens pro `monkey run`, über alle Rollen und Seeds (Eingabe, Ausgabe, Cache-Lese- und -Schreibzugriffe). Parallel bereits laufende Aufrufe können es um ihre eigenen Tokens überschreiten. |
@@ -83,10 +83,10 @@ dort ein Schlüssel steht, der auf dieser Seite fehlt.
 | `llm.handoff.loginWall` | boolean | `true` | Übergeben, wenn eine angemeldete Rolle auf einer Anmeldeseite landet (abgelaufene Sitzung). |
 | `llm.handoff.maxDecisions` | integer ≥ 1 | `3` | Aufeinanderfolgende LLM-Entscheidungen pro Übergabe; danach übernimmt wieder der Monkey. |
 | `llm.handoff.cooldownSteps` | integer ≥ 0 | `5` | Monkey-Schritte nach einer Übergabe, bevor die nächste beginnen kann. |
-| `llm.breaker.failures` | integer ≥ 1 | `3` | Fehlgeschlagene LLM-Entscheidungen in Folge, über alle Läufe, die den Circuit Breaker öffnen. |
+| `llm.breaker.failures` | integer ≥ 1 | `3` | Fehlgeschlagene LLM-Entscheidungen in Folge, über alle Läufe, die den Circuit Breaker öffnen. Ein `timeout` oder ein nicht erreichbarer Endpunkt öffnet ihn sofort. |
 | `llm.breaker.pauseSteps` | integer ≥ 1 | `20` | Schritte ohne LLM, solange der Breaker offen ist, gezählt in den eigenen Schritten jedes Laufs; ein Auslösen pausiert jeden Lauf. |
 | `llm.pricing` | Objekt | fehlt | Preise pro Million Tokens für **geschätzte** Kosten im Bericht. Es gibt keine eingebauten Preise. |
-| `llm.pricing.inputPerMTok` | number ≥ 0 | – | Preis pro Million Eingabe-Tokens. Pflicht in `pricing`. |
+| `llm.pricing.inputPerMTok` | number ≥ 0 | – | Preis pro Million Eingabe-Tokens, die weder aus dem Prompt-Cache gelesen noch in ihn geschrieben werden. Pflicht in `pricing`. |
 | `llm.pricing.outputPerMTok` | number ≥ 0 | – | Preis pro Million Ausgabe-Tokens (Thinking eingeschlossen). Pflicht in `pricing`. |
 | `llm.pricing.cacheReadPerMTok` | number ≥ 0 | `inputPerMTok` | Preis pro Million Tokens, die aus dem Prompt-Cache gelesen werden. |
 | `llm.pricing.cacheWritePerMTok` | number ≥ 0 | `inputPerMTok` | Preis pro Million Tokens, die in den Prompt-Cache geschrieben werden. |
@@ -158,5 +158,9 @@ Strings (`"https://${HOST}/app"`). Namen entsprechen `[A-Za-z_][A-Za-z0-9_]*`. E
 ersetzt, und es gibt keine Escape-Syntax. Eine nicht gesetzte Variable ist ein Fehler, der den Pfad in der
 Konfiguration und die Variable nennt; eine leere wird als leer verwendet.
 
-Jeder eingesetzte Wert wird in Konsolenausgabe, Fehlermeldungen und Berichten als `***` maskiert. Secrets kommen nur
-aus der Umgebung, nie aus Dateien.
+Secrets sind die Werte, die an diesen Stellen eingesetzt werden: in `auth[].fields`, in `testData` und in
+`llm.apiKey`. Sie werden in Konsolenausgabe, Fehlermeldungen, Aktionsprotokollen und Berichten als `***` maskiert,
+auch URL-kodiert oder in JSON-Strings, und Prompts bekommen nur Platzhalter. Werte an anderen Stellen, etwa ein Host in
+`baseUrl`, ein Port oder ein Rollenname, sind gewöhnliche Konfiguration und erscheinen, wie sie sind; sie zu
+maskieren, würde Befunde, Dedup-Schlüssel und Rollennamen verstümmeln. Gehört ein Wert geheim gehalten, steht er an
+einer der drei Stellen. Secrets kommen nur aus der Umgebung, nie aus Dateien.

@@ -3,17 +3,20 @@ import { describe, it } from "node:test";
 import { type LlmConfig, parseConfig } from "../src/config/config.ts";
 import { AnthropicFoundryProvider } from "../src/llm/anthropic-foundry.ts";
 import { OpenAiProvider } from "../src/llm/openai.ts";
-import type { DecideInput, LlmError, LlmProvider } from "../src/llm/provider.ts";
+import { type DecideInput, LlmError, type LlmProvider } from "../src/llm/provider.ts";
+import { LlmStats } from "../src/llm/usage.ts";
 import { connectionError, json, mockFetch } from "./helpers/http.ts";
 
 const KEY = "sk-conformance-0123456789abcdef";
+/** Every backend's tool call answer bills 1000 uncached input, 30 output, 600 cache read and 100 cache write tokens. */
+const TOTAL_TOKENS = 1730;
 
 /** How one backend speaks HTTP: enough to script the same conversations against every backend. */
 interface Backend {
   name: string;
   llm: Record<string, unknown>;
   create(llm: LlmConfig, fetch: typeof globalThis.fetch): LlmProvider;
-  /** A successful answer calling one tool; the usage is 1000 input, 30 output, 600 cached tokens. */
+  /** A successful answer calling one tool, billing `TOTAL_TOKENS`. */
   toolCall(name: string, args: unknown): Response;
   textOnly(text: string): Response;
   error(status: number, message: string): Response;
@@ -71,7 +74,7 @@ function anthropicMessage(content: unknown[], stopReason: string): Response {
     content,
     stop_reason: stopReason,
     stop_details: null,
-    usage: { input_tokens: 1000, output_tokens: 30, cache_read_input_tokens: 600 },
+    usage: { input_tokens: 1000, output_tokens: 30, cache_read_input_tokens: 600, cache_creation_input_tokens: 100 },
   });
 }
 
@@ -84,7 +87,12 @@ function openAiResponse(output: unknown[]): Response {
     status: "completed",
     incomplete_details: null,
     output,
-    usage: { input_tokens: 1000, output_tokens: 30, total_tokens: 1030, input_tokens_details: { cached_tokens: 600 } },
+    usage: {
+      input_tokens: 1700,
+      output_tokens: 30,
+      total_tokens: TOTAL_TOKENS,
+      input_tokens_details: { cached_tokens: 600, cache_write_tokens: 100 },
+    },
   });
 }
 
@@ -96,10 +104,10 @@ function chatCompletion(message: Record<string, unknown>, finishReason: string):
     model: "deployment",
     choices: [{ index: 0, finish_reason: finishReason, message: { role: "assistant", content: null, ...message } }],
     usage: {
-      prompt_tokens: 1000,
+      prompt_tokens: 1700,
       completion_tokens: 30,
-      total_tokens: 1030,
-      prompt_tokens_details: { cached_tokens: 600 },
+      total_tokens: TOTAL_TOKENS,
+      prompt_tokens_details: { cached_tokens: 600, cache_write_tokens: 100 },
     },
   });
 }
@@ -139,11 +147,26 @@ for (const backend of BACKENDS) {
       );
       const result = await p.decide(input);
       assert.deepEqual(result.decision, { type: "fill", ref: "e3", value: "{{testData.email}}" });
-      assert.deepEqual(result.usage, { inputTokens: 1000, outputTokens: 30, cachedTokens: 600 });
+      assert.deepEqual(result.usage, { inputTokens: 1000, outputTokens: 30, cachedTokens: 600, cacheWriteTokens: 100 });
       assert.equal(result.retries, 0);
       assert.equal(requests.length, 1);
       assert.equal(requests[0]?.body.model, "deployment");
       assert.ok(!JSON.stringify(requests[0]?.body).includes(KEY));
+    });
+
+    it("counts each billed token once, for the budget and the cost", async () => {
+      const pricing = { inputPerMTok: 1, outputPerMTok: 10, cacheReadPerMTok: 0.1, cacheWritePerMTok: 1.25 };
+      const llm = setup({ maxTokens: TOTAL_TOKENS + 1, pricing });
+      const { provider: p } = provider(llm, backend.toolCall("back", {}));
+      const { usage } = await p.decide(input);
+      const stats = new LlmStats(llm, backend.name);
+      stats.call("anonymous", { ok: true, usage, latencyMs: 1, retries: 0 });
+
+      // 1000 * 1 + 30 * 10 + 600 * 0.1 + 100 * 1.25 per million tokens.
+      assert.equal(stats.report().total.estimatedCost, 0.001_485);
+      assert.equal(stats.budgetProblem(), undefined, "one token of the budget is left");
+      stats.call("anonymous", { ok: true, usage: { inputTokens: 1, outputTokens: 0 }, latencyMs: 1, retries: 0 });
+      assert.match(stats.budgetProblem() ?? "", /llm\.maxTokens/);
     });
 
     it("rejects calls outside the schema or the snapshot, keeping the usage", async () => {
@@ -204,6 +227,35 @@ for (const backend of BACKENDS) {
         assert.match(error.message, /ECONNREFUSED/);
         return true;
       });
+    });
+
+    it("cancels the request and its retries when the signal aborts", async () => {
+      // Like a real fetch on a black-holed endpoint: no answer until the request's signal aborts.
+      const hang = (init?: RequestInit) =>
+        new Promise<Response>((_, reject) => {
+          init?.signal?.addEventListener("abort", () => reject(init.signal?.reason), { once: true });
+        });
+      const { provider: p, requests } = provider(setup({ maxRetries: 2 }), hang, hang, hang);
+      const controller = new AbortController();
+      setTimeout(() => controller.abort(), 20);
+      await assert.rejects(p.decide(input, { signal: controller.signal }), LlmError);
+      assert.equal(requests.length, 1);
+    });
+
+    it("gives the preflight one time limit, retries included", async () => {
+      const hang = (init?: RequestInit) =>
+        new Promise<Response>((_, reject) => {
+          init?.signal?.addEventListener("abort", () => reject(init.signal?.reason), { once: true });
+        });
+      const { provider: p } = provider(
+        { ...setup({ maxRetries: 10 }), timeoutMs: 50 },
+        ...Array.from({ length: 11 }, () => hang),
+      );
+      const started = performance.now();
+      const result = await p.preflight();
+      assert.ok(performance.now() - started < 2000);
+      assert.equal(result.ok, false);
+      if (!result.ok) assert.equal(result.error.kind, "timeout");
     });
 
     it("passes the preflight only with a ping tool call", async () => {

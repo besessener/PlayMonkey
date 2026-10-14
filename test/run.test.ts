@@ -3,9 +3,13 @@ import { mkdtemp, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { after, before, describe, it } from "node:test";
+import type { Browser, BrowserContext, BrowserContextOptions } from "playwright";
 import { FIXTURE_CREDENTIALS, type Fixture, startFixture } from "../fixtures/site/server.ts";
 import { runCli } from "../src/cli/cli.ts";
-import { roleDirectory } from "../src/run.ts";
+import { parseConfig } from "../src/config/config.ts";
+import { runRole } from "../src/run.ts";
+import { roleDirectory } from "../src/run-plan.ts";
+import { launchChromium } from "./helpers/browser.ts";
 
 describe("monkey run against the fixture site", () => {
   let site: Fixture;
@@ -90,5 +94,81 @@ describe("monkey run against the fixture site", () => {
     assert.equal(roleDirectory("admin"), "admin");
     assert.equal(roleDirectory("../evil role"), ".._evil_role");
     assert.equal(roleDirectory(""), "_");
+  });
+});
+
+describe("closing a run's session", () => {
+  let site: Fixture;
+  let browser: Browser;
+  let dir: string;
+  before(async () => {
+    site = await startFixture();
+    browser = await launchChromium();
+    dir = await mkdtemp(join(tmpdir(), "monkey-close-"));
+  });
+  after(async () => {
+    await browser?.close();
+    await site?.close();
+  });
+
+  /** The shared browser, with `patch` applied to every context it creates. */
+  function patched(patch: (context: BrowserContext) => void): { browser: Browser; created: BrowserContext[] } {
+    const created: BrowserContext[] = [];
+    const wrapper = {
+      newContext: async (contextOptions: BrowserContextOptions) => {
+        const context = await browser.newContext(contextOptions);
+        patch(context);
+        created.push(context);
+        return context;
+      },
+    } as Browser;
+    return { browser: wrapper, created };
+  }
+
+  const loaded = () => parseConfig(JSON.stringify({ baseUrl: site.url, seed: 4, limits: { maxSteps: 8 } }), {});
+  const options = (outputDir: string, log: (line: string) => void = () => {}) => ({
+    log,
+    outputDir,
+    actionLog: true,
+    artifacts: false,
+  });
+
+  it("keeps the findings of a run whose session fails to close, and logs why", async () => {
+    const { browser: crashing, created } = patched((context) => {
+      const close = context.close.bind(context);
+      context.close = async () => {
+        await close();
+        throw new Error("Target page, context or browser has been closed");
+      };
+    });
+    const lines: string[] = [];
+    const outputDir = join(dir, "close-fails");
+    const outcome = await runRole(
+      crashing,
+      undefined,
+      loaded(),
+      options(outputDir, (line) => lines.push(line)),
+    );
+    // Seed 4 follows the broken link within 8 steps.
+    assert.equal(outcome.result?.stopReason, "maxSteps");
+    assert.equal(outcome.findings.length, 1, lines.join("\n"));
+    assert.equal(outcome.actionLog, join(outputDir, "actions.json"));
+    assert.ok(
+      lines.includes(
+        "[anonymous] closing the session failed, trace and videos may be missing: Target page, context or browser has been closed",
+      ),
+    );
+    assert.equal(created.length, 1);
+    assert.equal(browser.contexts().includes(created[0] as BrowserContext), false);
+    await assert.rejects(stat(join(outputDir, "downloads")), { code: "ENOENT" });
+  });
+
+  it("closes the session when the action log cannot be created", async () => {
+    const blocker = join(dir, "not-a-directory");
+    await writeFile(blocker, "");
+    const { browser: tracked, created } = patched(() => {});
+    await assert.rejects(runRole(tracked, undefined, loaded(), options(join(blocker, "run"))), /ENOTDIR|EEXIST/);
+    assert.equal(created.length, 1);
+    assert.equal(browser.contexts().includes(created[0] as BrowserContext), false);
   });
 });

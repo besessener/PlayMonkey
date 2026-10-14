@@ -71,7 +71,7 @@ Links zu Traces und Videos sind relativ; halte das Verzeichnis also zusammen, we
 | `seed` | Der Seed des Laufs; mit `seeds` der erste davon. |
 | `seeds` | Nur mit `seeds` in der Konfiguration: alle. |
 | `config` | Die Konfiguration mit eingesetzten Standardwerten, jeder geheime Wert als `***` maskiert. |
-| `roles[]` | Ein Eintrag pro Lauf, in der Reihenfolge der Konfiguration (Rollen, dann Seeds), egal in welcher Reihenfolge sie fertig wurden: `role`, `seed`, `steps`, `durationMs`, `stopReason` (`maxSteps`, `maxMinutes`, `aborted`, `error`), `error`, `states`, `failedActions`, `pages` (Seiten der Coverage), `findings` (Anzahl), `blockedNavigations` und die Pfade `actionLog`, `trace`, `videos`. Ein Lauf, der sich nicht anmelden konnte oder abgestürzt ist, hat nur `role`, `seed`, `error`, `findings: 0` und leere `videos`. |
+| `roles[]` | Ein Eintrag pro Lauf, in der Reihenfolge der Konfiguration (Rollen, dann Seeds), egal in welcher Reihenfolge sie fertig wurden: `role`, `seed`, `steps`, `durationMs`, `stopReason` (`maxSteps`, `maxMinutes`, `aborted`, `error`), `error`, `states`, `failedActions`, `pages` (Seiten der Coverage), `findings` (Anzahl), `blockedNavigations`, `sessionLosses` (wie oft die Rolle ihre Sitzung verloren hat, siehe [Sitzungen](../explanation/sitzungen.md#verlorene-sitzung)) und die Pfade `actionLog`, `trace`, `videos`. Ein Lauf, der sich nicht anmelden konnte, abgestürzt ist oder wegen einer Unterbrechung nicht mehr startete (`error`: `not started: interrupted`), hat nur `role`, `seed`, `error`, `findings: 0` und leere `videos`. |
 | `findings[]` | Die Befunde jedes Laufs, pro Lauf dedupliziert, wie in [Orakel und Befunde](../explanation/orakel.md#befundmodell) beschrieben, dazu der `seed` des Laufs und `screenshot` als Pfad. Sortiert nach Schweregrad, dann Vorkommen, dann Reihenfolge der Läufe. Ids (`F1`, …) zählen pro Lauf. |
 | `aggregated[]` | Die Befunde über alle Läufe, einer pro Dedup-Schlüssel: `key`, `oracle`, `severity`, `message`, `url` (des ersten Laufs, der ihn gefunden hat), `occurrences` (Summe), `roles` (eindeutig, Reihenfolge der Konfiguration), `runs[]` (`role`, `seed`, `id`) und, mit `findings.baseline`, `known`. Sortiert wie im HTML. |
 | `baseline` | Nur mit `findings.baseline`: `file` (relativ zum Berichtsverzeichnis), `known` und `new` (Anzahl der Befunde, die die Baseline kennt oder nicht kennt; `new` entscheidet über den Exit-Code) und `unseen[]`: Einträge der Baseline, die dieser Lauf nicht gefunden hat. |
@@ -93,12 +93,17 @@ Pfade sind relativ zum Berichtsverzeichnis.
 | `total`, `roles[]` | Verbrauch des ganzen Aufrufs und pro Lauf (`roles[].role`: die Rolle, oder `role/seed` mit `seeds`), siehe unten. |
 
 Jeder Verbrauchseintrag hat `calls`, `failedCalls`, `errors` (fehlgeschlagene Aufrufe nach Art, z. B.
-`{ "rateLimited": 2 }`), `inputTokens`, `outputTokens`, `cachedTokens` (Cache-Lesezugriffe), `cacheWriteTokens`,
-`retries` (Anfragen, die das SDK wiederholt hat; zählen nicht als Aufrufe), `handoffs` (nach Auslöser, siehe
+`{ "rateLimited": 2 }`), `inputTokens` (Eingabe-Tokens ohne Cache-Zugriffe), `outputTokens`, `cachedTokens`
+(Cache-Lesezugriffe), `cacheWriteTokens` (Cache-Schreibzugriffe), `retries` (Anfragen, die das SDK wiederholt hat;
+zählen nicht als Aufrufe), `handoffs` (nach Auslöser, siehe
 [das LLM](../explanation/llm.md#wann-der-monkey-übergibt)), `actions` (ausgeführte Aktionen, die das LLM gewählt
 hat), `fallbacks` (Schritte, in denen der Monkey gehandelt hat, weil das LLM fehlschlug, nach Fehlerart),
 `breakerTrips`, `avgLatencyMs`, `p95LatencyMs` und, mit `llm.pricing`, `estimatedCost`: eine **Schätzung** in der
 Währung der Preise, keine Rechnung.
+
+Die vier Token-Zahlen überschneiden sich bei jedem Anbieter nicht: OpenAI zählt Cache-Zugriffe in seinen
+Eingabe-Tokens mit, PlayMonkey zieht sie davon ab. Ihre Summe ist, was der Anbieter berechnet und was gegen
+`llm.maxTokens` zählt.
 
 ## `baseline.json`
 
@@ -117,9 +122,15 @@ einmal maskiert.
 
 ## Secrets
 
-`report.json`, `report.html`, `llm-debug.jsonl` und die Konsole maskieren jeden Wert, der aus einem
-`${VAR}`-Platzhalter stammt; `actions.json` speichert stattdessen den Platzhalter, damit sich das Protokoll
-wiederholen lässt. Ein Test lässt die Fixture-Seite mit eigenen Zugangsdaten laufen und durchsucht jede Textdatei des
+`report.json`, `report.html`, `llm-debug.jsonl` und die Konsole maskieren jedes
+[Secret](konfiguration.md#secrets-var), auch URL-kodiert oder in einem JSON-String und bevor ein Wert gekürzt wird;
+`actions.json` speichert stattdessen den Platzhalter, damit sich das Protokoll wiederholen lässt. Dedup-Schlüssel
+werden vor der Deduplizierung maskiert, Rollennamen nie: Sie sind keine Secrets.
+
+Die Screenshots der Befunde (im Ordner `screenshots/` und eingebettet in `report.html`) schwärzen jedes
+Passwortfeld und jedes Feld, dessen Wert ein Secret enthält. Text, den die Seite selbst anzeigt, etwa ein
+zurückgegebener Benutzername, bleibt darauf lesbar, ebenso Felder in Iframes; kann die Seite die Felder nicht rechtzeitig
+markieren, entsteht kein Screenshot. Ein Test lässt die Fixture-Seite mit eigenen Zugangsdaten laufen und durchsucht jede Textdatei des
 Berichtsverzeichnisses danach.
 
 **Traces und Videos sind nicht maskiert.** Playwright kann einen Trace nicht schwärzen, und er zeichnet auf:

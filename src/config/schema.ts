@@ -192,7 +192,11 @@ export const configSchema: JSONSchemaType<RawConfig> = {
         required: ["name"],
         properties: {
           name: { ...nonEmptyString, description: "Unique role name." },
-          loginUrl: { ...nonEmptyString, nullable: true, description: "Login page path, relative to baseUrl." },
+          loginUrl: {
+            ...nonEmptyString,
+            nullable: true,
+            description: "Login page URL, resolved against baseUrl like a link: /path is relative to its origin.",
+          },
           fields: { ...stringMap, nullable: true, minProperties: 1, description: "Login form fields to fill." },
           submit: { ...nonEmptyString, nullable: true, description: "Selector of the login submit button." },
           storageState: {

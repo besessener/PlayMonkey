@@ -7,6 +7,7 @@ import type { Browser } from "playwright";
 import { type Fixture, startFixture } from "../fixtures/site/server.ts";
 import { runCli } from "../src/cli/cli.ts";
 import { parseConfig } from "../src/config/config.ts";
+import { Secrets } from "../src/config/secrets.ts";
 import type { StepRecord } from "../src/monkey/loop.ts";
 import type { ActionLog } from "../src/replay/log.ts";
 import { runRole } from "../src/run.ts";
@@ -81,8 +82,9 @@ describe("spectator mode", () => {
       result: { ok: true, navigated: false, url: "http://localhost/form", tab: 0 },
       ...overrides,
     });
+    const none = new Secrets([]);
     assert.equal(
-      describeStep(record({})),
+      describeStep(record({}), none),
       `step 3 llm: fill getByRole('textbox', { name: 'Email' }) "monkey@test.local"`,
     );
     assert.equal(
@@ -92,8 +94,18 @@ describe("spectator mode", () => {
           source: "monkey",
           result: { ok: false, error: "Timeout 5000ms exceeded.", navigated: false, url: "", tab: 0 },
         }),
+        none,
       ),
       "step 3 monkey: press Enter -> failed: Timeout 5000ms exceeded.",
+    );
+    // A long secret is masked before the value is shortened, so no part of it is left.
+    const token = "tok_A1b2C3d4A1b2C3d4A1b2C3d4A1b2C3d4A1b2C3d4A1b2";
+    assert.equal(
+      describeStep(
+        record({ action: { type: "fill", ref: "e5", value: `${token} and more` } }),
+        new Secrets([{ name: "TOKEN", value: token }]),
+      ),
+      `step 3 llm: fill getByRole('textbox', { name: 'Email' }) "*** and more"`,
     );
   });
 

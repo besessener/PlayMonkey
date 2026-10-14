@@ -75,10 +75,15 @@ Bewusst abgeschaltet:
 
 Erzwungen mit `noRestrictedImports`-Overrides in `biome.json`:
 
-- Die LLM-SDKs (`@anthropic-ai/sdk`, `@anthropic-ai/foundry-sdk`, `openai`) werden nur in `src/llm/` importiert,
-  hinter der Anbieter-Schnittstelle.
+- Die LLM-SDKs (`openai` und alles unter `@anthropic-ai/`, samt Unterpfaden wie `openai/resources/…`) werden nur in
+  `src/llm/` importiert, hinter der Anbieter-Schnittstelle. `test/sdk-imports.test.ts` prüft das zusätzlich über
+  alle Dateien in `src/`.
 - Nur `src/cli/` importiert `src/cli/`.
 - `src/config/` und `src/snapshot/` sind Blätter: Sie importieren kein anderes `src/`-Modul.
+
+Biome führt die Optionen einer Regel aus mehreren passenden Overrides nicht zusammen: Der letzte gewinnt. Deshalb
+überschneiden sich die `includes` der `noRestrictedImports`-Overrides nicht, und jeder wiederholt die SDK-Gruppe.
+Fügst du einen solchen Override für einen Teil von `src/` hinzu, nimm die SDK-Gruppe mit.
 
 ## Pinning
 

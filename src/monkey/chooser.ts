@@ -173,10 +173,19 @@ interface WeightContext {
 function elementWeight(element: SnapshotElement, { keys, stateKey, exploration, pageUrl }: WeightContext): number {
   let weight = 1 / (1 + exploration.actedOn(stateKey, keys.get(element) as string));
   if (element.role === "link" && element.url !== undefined) {
-    const target = new URL(element.url, pageUrl).href;
-    if (!exploration.urls.includes(target)) weight *= UNVISITED_LINK_BONUS;
+    const target = linkTarget(element.url, pageUrl);
+    if (target !== undefined && !exploration.urls.includes(target)) weight *= UNVISITED_LINK_BONUS;
   }
   return weight;
+}
+
+/** The absolute target of a link, or undefined for an `href` that is no valid URL (a defect of the page). */
+function linkTarget(href: string, pageUrl: string): string | undefined {
+  try {
+    return new URL(href, pageUrl).href;
+  } catch {
+    return undefined;
+  }
 }
 
 function elementAction(type: ActionType, element: SnapshotElement, random: Random, options: ChooseOptions): Action {

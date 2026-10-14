@@ -17,12 +17,12 @@ Problem in einem deduplizierten Befund, und am Ende des Laufs steht ein Bericht.
 | --- | --- | --- |
 | `src/cli/` | Argumente parsen (`node:util` `parseArgs`), Unterbefehle, Exit-Codes | umgesetzt |
 | `src/config/` | JSON Schema, Auflösung von `${VAR}`, Validierung, Standardwerte, Maskierung von Secrets | umgesetzt |
-| `src/auth/` | Browserstart, ein Kontext pro Rolle, Anmeldung, `stayOnDomain` und `scope`, Trace und Video | umgesetzt |
+| `src/auth/` | Browserstart, ein Kontext pro Rolle, Anmeldung und erneute Anmeldung nach verlorener Sitzung, `stayOnDomain` und `scope`, Trace und Video | umgesetzt |
 | `src/snapshot/` | Seiten-Snapshot mit Element-Refs, Snapshot-Hash, Serialisierer für das LLM | umgesetzt |
 | `src/monkey/` | Zufallsgenerator für Aktionen mit Seed, Ausführung und Schleife des Laufs | umgesetzt |
-| `src/run.ts` | Plant die Läufe (Rollen × Seeds) und führt jeweils `parallel` davon gleichzeitig aus: Sitzung, Monkey oder Replay, Orakel, Aktionsprotokoll, Artefakte | umgesetzt |
+| `src/run.ts`, `src/run-plan.ts` | Plant die Läufe (Rollen × Seeds) und führt jeweils `parallel` davon gleichzeitig aus: Sitzung, Monkey oder Replay, Orakel, Aktionsprotokoll, Artefakte | umgesetzt |
 | `src/oracles/` | Befunde erkennen und deduplizieren, Screenshots | umgesetzt |
-| `src/replay/` | Schreiben und Lesen des Aktionsprotokolls, Parser für dauerhafte Locators, `monkey replay`, `monkey shrink` (Delta Debugging) | umgesetzt |
+| `src/replay/` | Schreiben und Lesen des Aktionsprotokolls, Parser für dauerhafte Locators, Prüfung fremder Protokolle, `monkey replay`, `monkey shrink` (Delta Debugging) | umgesetzt |
 | `src/report/` | `report.json` und der in sich geschlossene `report.html`, Coverage über alle Läufe | umgesetzt |
 | `src/llm/` | Anbieter-Schnittstelle, Backends `anthropic-foundry` und `openai`, Prompt, Vorabprüfung, Erkennung des Feststeckens, Übergabe, Verbrauch | umgesetzt |
 | `fixtures/site/` | Lokale Seite mit eingebauten Fehlern, die Grundwahrheit für End-to-End-Tests | umgesetzt |

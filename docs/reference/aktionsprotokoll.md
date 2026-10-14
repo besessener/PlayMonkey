@@ -60,7 +60,7 @@ immer vollständiges JSON, auch wenn ein Lauf abgebrochen wird.
 | Feld | Bedeutung |
 | --- | --- |
 | `version` | Formatversion, derzeit `3`. Protokolle der Version 2 (vor der Aktion `offline`) und 1 (vor den Aktionen `dblclick`, `rightclick`, `hover`, `longPress`, `drag` und `events`) werden weiterhin gelesen; andere Versionen lehnt `monkey replay` mit einer klaren Meldung ab. |
-| `seed`, `baseUrl`, `role`, `viewport` | Die Einstellungen des Laufs; Replay nutzt sie statt der aus der Konfiguration. |
+| `seed`, `baseUrl`, `role`, `viewport` | Die Einstellungen des Laufs; Replay nutzt sie statt der aus der Konfiguration. `baseUrl` muss eine `http(s)`-URL auf dem Origin der `baseUrl` aus `--config` sein. |
 | `placeholders` | Variablen, deren Werte das Protokoll als `${VAR}` speichert; siehe unten. |
 | `actions[].step` | 1, 2, … in Ausführungsreihenfolge. |
 | `actions[].source` | `monkey`, oder `llm` für eine Aktion, die das LLM gewählt hat. Replay führt beide gleich aus. |
@@ -71,15 +71,18 @@ immer vollständiges JSON, auch wenn ein Lauf abgebrochen wird.
 | `actions[].events` | Was die Seite während des Schritts verlangt oder ausgegeben hat, in Reihenfolge: `{ "kind": "dialog", "dialog", "message", "accepted", "text"? }` (`text`: was in einen Prompt getippt wurde), `{ "kind": "upload", "files": [names] }` (erzeugte Dateien, siehe [den Monkey](../explanation/monkey.md#seiten-die-etwas-wissen-wollen)) und `{ "kind": "download", "name", "url", "size"? , "failure"? }`. Replay beantwortet Dialoge und Dateiauswahlen genauso. Fehlt, wenn nichts passiert ist. |
 | `actions[].pageUrl`, `snapshotHash` | Der Zustand, in dem die Aktion gewählt wurde. |
 | `actions[].ok`, `error` | Ob die Aktion gelungen ist, und wenn nicht, warum. Eine fehlgeschlagene Aktion wird trotzdem wiederholt. |
-| `findings` | Die Befunde des Laufs (Id, Orakel, Schweregrad, Dedup-Schlüssel, Meldung, Schritt), mit denen Replay vergleicht. |
+| `findings` | Die Befunde des Laufs (Id `F1`, `F2`, …, Orakel, Schweregrad, Dedup-Schlüssel, Meldung, Schritt), mit denen Replay vergleicht. |
 
 ## Secrets und Platzhalter
 
-Jeder Wert, der aus einem `${VAR}`-Platzhalter in der Konfiguration stammt (Passwörter, die Basis-URL der
-Testumgebung, Testdaten), wird in den Freitextfeldern des Protokolls wieder als Platzhalter geschrieben (`baseUrl`,
+Jedes [Secret](konfiguration.md#secrets-var) (Anmeldefelder, Testdaten, API-Key) und jeder Wert, der aus einem
+`${VAR}`-Platzhalter in `baseUrl` stammt (Host und Port der Testumgebung), wird in den Freitextfeldern des
+Protokolls wieder als Platzhalter geschrieben (`baseUrl`,
 `role`, `value`, `url`, `key`, `locator`, `toLocator`, `pageUrl`, `error`, Dialogmeldungen und Prompt-Text, Namen
-und URLs von Downloads, Meldungen und Schlüssel von Befunden). `monkey replay` löst sie wieder aus der Umgebung auf
-und bricht mit dem Namen der Variable ab, wenn eine nicht gesetzt ist.
+und URLs von Downloads, Meldungen und Schlüssel von Befunden). `monkey replay` löst sie wieder aus der Umgebung auf,
+aber nur Variablen, die auch die Konfiguration von `--config` verwendet; braucht das Protokoll eine andere, bricht es
+mit ihrem Namen ab. Ohne `--config` löst es keine auf. So kann ein fremdes Protokoll keine Umgebungsvariable
+auslesen, siehe [Fremde Protokolle](../explanation/replay.md#fremde-protokolle).
 
 Das Protokoll enthält also keine geheimen Werte, und dasselbe Protokoll lässt sich gegen einen anderen Host oder Port
 wiederholen, wenn sich nur die Variable ändert. Passwörter, die bei der Anmeldung eingetippt werden, landen überhaupt

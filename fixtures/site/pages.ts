@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { shopRoutes } from "../../demo/shop.ts";
+import { faultRoutes } from "./faults.ts";
 import { escapeHtml, layout } from "./html.ts";
 import { labRoutes } from "./lab.ts";
 
@@ -24,6 +25,10 @@ export interface Response {
   body?: string;
   /** Drop the connection after sending `body`, although the headers promised more (a broken download). */
   abort?: boolean;
+  /** Never answer; the connection stays open until the server closes. */
+  hold?: boolean;
+  /** Drop the connection before sending anything. */
+  reset?: boolean;
 }
 
 export interface Route {
@@ -231,6 +236,7 @@ export function createRoutes(state: SiteState): Route[] {
     ...formRoutes(state),
     ...bugPageRoutes(),
     ...labRoutes(),
+    ...faultRoutes(state),
     ...shopRoutes(state),
   ];
   return routes;

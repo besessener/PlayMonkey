@@ -4,7 +4,7 @@ import type { Spectator } from "../monkey/spectator.ts";
 import { ActionLogError } from "../replay/log.ts";
 import { ReplayError, replayActionLog } from "../replay/replay.ts";
 import { describeFinding } from "../run-text.ts";
-import { type CliIo, launchHint, withStopSignal } from "./common.ts";
+import { type CliIo, completed, launchHint, withStopSignal } from "./common.ts";
 
 export interface ReplayCommand {
   logFile: string;
@@ -38,7 +38,10 @@ async function replayAndReport(
     signal,
     ...(spectator === undefined ? {} : { spectator }),
   });
-  if (outcome.result === undefined || outcome.result.stopReason === "error") return ExitCode.Error;
+  if (!completed(outcome.result)) {
+    if (signal.aborted) io.stderr("monkey replay: interrupted; the replay did not complete\n");
+    return ExitCode.Error;
+  }
   for (const finding of original) {
     const verdict = finding.reproduced ? "reproduced    " : "not reproduced";
     io.stdout(`${verdict}  ${finding.id} ${finding.severity} ${finding.oracle}: ${finding.message}\n`);

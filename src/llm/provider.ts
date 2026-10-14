@@ -13,7 +13,12 @@ export interface LlmProvider {
    * Asks for the next action. Throws `LlmError` on every failure, including a response without a valid tool call;
    * the error carries the usage of the failed call when there was a response.
    */
-  decide(input: DecideInput): Promise<DecideResult>;
+  decide(input: DecideInput, options?: DecideOptions): Promise<DecideResult>;
+}
+
+export interface DecideOptions {
+  /** Cancels the call, including the SDK's retries and reading the response; `decide` then rejects. */
+  signal?: AbortSignal;
 }
 
 /** Everything the model sees. Contains no secret values: they are replaced by `{{…}}` placeholders. */
@@ -59,6 +64,7 @@ export interface DecideResult {
 }
 
 export interface LlmUsage {
+  /** Input tokens neither read from nor written to the prompt cache; the four counts never overlap. */
   inputTokens: number;
   outputTokens: number;
   /** Input tokens read from the prompt cache, when the provider reports them. */
@@ -90,6 +96,9 @@ export type LlmErrorKind =
 
 /** Kinds that mean the response arrived but was unusable: retried once with the same input. */
 export const RESPONSE_ERRORS: ReadonlySet<LlmErrorKind> = new Set(["invalid", "refusal", "maxTokens"]);
+
+/** Kinds that mean the endpoint is down or not answering: they open the circuit breaker at once. */
+export const OUTAGE_ERRORS: ReadonlySet<LlmErrorKind> = new Set(["timeout", "unreachable"]);
 
 /** A failed LLM call. The message never contains the API key or a secret value. */
 export class LlmError extends Error {

@@ -12,7 +12,8 @@ export const DEFAULT_LOGIN_TIMEOUT_MS = 15_000;
 
 /** Something worth reporting that is not a finding. */
 export interface SessionEvent {
-  kind: "blocked-navigation";
+  /** `session-lost`: an authenticated role landed on a login page (see `SessionKeeper`). */
+  kind: "blocked-navigation" | "session-lost";
   url: string;
   time: string;
 }
@@ -40,7 +41,12 @@ export interface RoleSession {
   page: Page;
   /** Info events such as blocked off-domain navigations, in order. */
   events: SessionEvent[];
-  /** Stops tracing and closes the context, which writes the video. */
+  /**
+   * Logs the role in again, like at the start but in a throwaway context, and adds the session cookies to `context`.
+   * Absent for the anonymous role. Throws `LoginError`.
+   */
+  relogin?: () => Promise<void>;
+  /** Stops tracing and closes the context, which writes the video; the context is closed even when this throws. */
   close(): Promise<SessionArtifacts>;
 }
 
@@ -69,17 +75,11 @@ export async function openRoleSession(
   const name = role?.name ?? ANONYMOUS_ROLE;
   const fail = (reason: string) => new LoginError(secrets.mask(name), secrets.mask(reason));
 
-  let storageState: BrowserContextOptions["storageState"];
-  if (role?.kind === "fields") {
-    storageState = await loginWithFields(browser, role, options, fail);
-  } else if (role?.kind === "storageState") {
-    storageState = await readStorageState(role, fail);
-  }
+  const storageState = role === undefined ? undefined : await roleState(browser, role, options, fail);
 
   const [width, height] = config.browser.viewport;
   const scope = new UrlScope(config.scope);
   const guarded = config.stayOnDomain || scope.restricted;
-  const { latencyMs } = config.network;
   const context = await browser.newContext({
     baseURL: config.baseUrl,
     viewport: { width, height },
@@ -88,9 +88,51 @@ export async function openRoleSession(
       ? {}
       : { recordVideo: { dir: join(options.outputDir, "video"), size: { width, height } } }),
     // Service workers bypass request routing, so they would undermine stayOnDomain, scope and the latency.
-    ...(guarded || latencyMs > 0 ? { serviceWorkers: "block" as const } : {}),
+    ...(guarded || config.network.latencyMs > 0 ? { serviceWorkers: "block" as const } : {}),
   });
+  const events: SessionEvent[] = [];
+  let page: Page;
+  try {
+    page = await prepareContext(context, { options, scope, guarded, events });
+  } catch (error) {
+    // The setup error is the one worth reporting; a failed close must not replace it.
+    await context.close().catch(() => undefined);
+    throw error;
+  }
+  const tracePath = options.trace === false ? undefined : join(options.outputDir, "trace.zip");
+  const session: RoleSession = { role: name, context, page, events, close: () => closeContext(context, tracePath) };
+  if (role !== undefined) {
+    // Only cookies: adding localStorage to open pages would need a navigation per origin.
+    session.relogin = async () => context.addCookies((await roleState(browser, role, options, fail)).cookies);
+  }
+  return session;
+}
 
+type StorageState = Exclude<NonNullable<BrowserContextOptions["storageState"]>, string>;
+
+/** The storage state of a logged-in role: from the login form, or read from its storageState file. */
+function roleState(
+  browser: Browser,
+  role: AuthRole,
+  options: SessionOptions,
+  fail: (reason: string) => LoginError,
+): Promise<StorageState> {
+  return role.kind === "fields" ? loginWithFields(browser, role, options, fail) : readStorageState(role, fail);
+}
+
+/** What `prepareContext` needs besides the context. */
+interface ContextSetup {
+  options: SessionOptions;
+  scope: UrlScope;
+  /** stayOnDomain or a restricted scope: navigations are checked. */
+  guarded: boolean;
+  events: SessionEvent[];
+}
+
+/** Adds the latency, the navigation guard and tracing to a new context and opens its first page. */
+async function prepareContext(context: BrowserContext, { options, scope, guarded, events }: ContextSetup) {
+  const { config, secrets } = options;
+  const { latencyMs } = config.network;
   // Routes run newest first: the guard below aborts blocked navigations before they are delayed.
   if (latencyMs > 0) {
     await context.route("**/*", async (route) => {
@@ -99,47 +141,39 @@ export async function openRoleSession(
       await route.fallback().catch(() => undefined);
     });
   }
-  const events: SessionEvent[] = [];
   if (guarded) {
     const origin = config.stayOnDomain ? new URL(config.baseUrl).origin : undefined;
     const allowed = (url: string) => (origin === undefined || new URL(url).origin === origin) && scope.allows(url);
     await guardNavigations(context, allowed, events, secrets);
   }
+  if (options.trace !== false) await context.tracing.start({ screenshots: true, snapshots: true });
+  return await context.newPage();
+}
 
-  const tracing = options.trace !== false;
-  if (tracing) await context.tracing.start({ screenshots: true, snapshots: true });
-
-  const page = await context.newPage();
-  return {
-    role: name,
-    context,
-    page,
-    events,
-    close: async () => {
-      const artifacts: SessionArtifacts = { videoPaths: [] };
-      if (tracing) {
-        artifacts.tracePath = join(options.outputDir, "trace.zip");
-        await context.tracing.stop({ path: artifacts.tracePath });
-      }
-      const videos = context.pages().flatMap((p) => p.video() ?? []);
-      await context.close();
-      for (const video of videos) artifacts.videoPaths.push(await video.path());
-      return artifacts;
-    },
-  };
+/** Stops tracing into `tracePath`, if given, and closes the context, which writes the videos, even if tracing fails. */
+async function closeContext(context: BrowserContext, tracePath: string | undefined): Promise<SessionArtifacts> {
+  const videos = context.pages().flatMap((page) => page.video() ?? []);
+  try {
+    if (tracePath !== undefined) await context.tracing.stop({ path: tracePath });
+  } finally {
+    await context.close();
+  }
+  const videoPaths = await Promise.all(videos.map((video) => video.path()));
+  return { ...(tracePath === undefined ? {} : { tracePath }), videoPaths };
 }
 
 /**
  * Logs in through the form in a throwaway context (no trace or video, so typed secrets are not recorded) and
- * returns the resulting storage state. Success means the page left the login URL, or a cookie changed and the
- * submit button is gone (single-page apps that log in without navigating).
+ * returns the resulting storage state. It failed while the login fields are still shown, wherever the form was
+ * submitted to; otherwise success means the page left the login URL, or a cookie changed and the submit button is
+ * gone (single-page apps that log in without navigating).
  */
 async function loginWithFields(
   browser: Browser,
   role: FieldsLoginRole,
   options: SessionOptions,
   fail: (reason: string) => LoginError,
-): Promise<NonNullable<BrowserContextOptions["storageState"]>> {
+): Promise<StorageState> {
   const { config } = options;
   const timeout = options.loginTimeoutMs ?? DEFAULT_LOGIN_TIMEOUT_MS;
   const [width, height] = config.browser.viewport;
@@ -154,16 +188,7 @@ async function loginWithFields(
     }
     // Compare against where the browser landed, in case the configured login URL redirects.
     const loginUrl = new URL(page.url());
-
-    for (const [field, value] of Object.entries(role.fields)) {
-      const locator = await findField(page, field);
-      if (locator === undefined) throw fail(`login field "${field}" not found on ${role.loginUrl}`);
-      try {
-        await locator.fill(value);
-      } catch {
-        throw fail(`cannot fill login field "${field}"`);
-      }
-    }
+    await fillFields(page, role, fail);
 
     const submit = page.locator(role.submit);
     if ((await submit.count()) !== 1) throw fail(`submit selector "${role.submit}" must match exactly one element`);
@@ -183,6 +208,12 @@ async function loginWithFields(
     }
     await settled;
 
+    // A rejected login often renders the form again at the URL it was posted to (`/session`, not `/login`).
+    if (await fieldsShown(page, role)) {
+      throw fail(
+        `login did not succeed: the login form is still shown at ${new URL(page.url()).pathname} after submitting (check the credentials and the fields)`,
+      );
+    }
     const leftLoginPage = !onLoginPage(new URL(page.url()));
     const cookieChanged = fingerprint(await context.cookies()) !== cookiesBefore;
     const formGone = !(await submit.isVisible().catch(() => false));
@@ -195,6 +226,28 @@ async function loginWithFields(
   } finally {
     await context.close();
   }
+}
+
+async function fillFields(page: Page, role: FieldsLoginRole, fail: (reason: string) => LoginError): Promise<void> {
+  for (const [field, value] of Object.entries(role.fields)) {
+    const locator = await findField(page, field);
+    if (locator === undefined) throw fail(`login field "${field}" not found on ${role.loginUrl}`);
+    try {
+      await locator.fill(value);
+    } catch {
+      throw fail(`cannot fill login field "${field}"`);
+    }
+  }
+}
+
+/** True when every login field of the role is found and visible on the page. */
+async function fieldsShown(page: Page, role: FieldsLoginRole): Promise<boolean> {
+  for (const field of Object.keys(role.fields)) {
+    // A page still navigating cannot be queried; then the form is not shown either.
+    const locator = await findField(page, field).catch(() => undefined);
+    if (locator === undefined || !(await locator.isVisible().catch(() => false))) return false;
+  }
+  return true;
 }
 
 /**
@@ -215,10 +268,7 @@ async function findField(page: Page, key: string): Promise<Locator | undefined> 
   return undefined;
 }
 
-async function readStorageState(
-  role: StorageStateRole,
-  fail: (reason: string) => LoginError,
-): Promise<NonNullable<BrowserContextOptions["storageState"]>> {
+async function readStorageState(role: StorageStateRole, fail: (reason: string) => LoginError): Promise<StorageState> {
   let text: string;
   try {
     text = await readFile(role.storageState, "utf8");
@@ -231,7 +281,7 @@ async function readStorageState(
     if (state === null || typeof state !== "object" || !Array.isArray((state as { cookies?: unknown }).cookies)) {
       throw new Error("missing cookies array");
     }
-    return state as NonNullable<Exclude<BrowserContextOptions["storageState"], string>>;
+    return state as StorageState;
   } catch {
     throw fail(`storageState file ${role.storageState} is not a Playwright storage state (JSON with "cookies")`);
   }

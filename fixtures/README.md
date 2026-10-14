@@ -88,7 +88,6 @@ Eingebaute Fehler im Labor:
 | L2 | Nicht abgefangene Exception beim Laden eines Popups | Labor → „Popups“ → „Details in a new tab“ oder „Open a window“ | `pageerror` | high | `Seeded bug: popup failed to initialise` + erster Stack-Frame |
 | L3 | Download bricht mitten in der Datei ab | Labor → „Download“ → „Download the export“ | `download` | medium | `/lab/files/export.zip` |
 | L4 | Fehlgeschlagene Anfrage wird nicht abgefangen | Labor → „News“ → Aktion `offline` → „Load news“ | `pageerror` | high | `TypeError: Failed to fetch` + erster Stack-Frame |
-
 | L5 | Bild ohne Alternativtext | Labor → „Gallery“ | `accessibility` | medium | `image-alt` + `/lab/gallery` |
 
 L4 tritt nur ohne Netz auf, also nur mit der Aktion `offline`, die standardmäßig aus ist; online ist „Load news“ eine
@@ -99,6 +98,38 @@ Alle anderen Seiten der Fixture-Seite bestehen die Prüfung ohne Verstoß.
 `test/lab.test.ts` geht jede Laborseite mit vorgegebenen Aktionen durch die echte Laufschleife ab;
 `test/chaos.test.ts` lässt 20 Seeds auf das Labor und die Hauptseite los und prüft, dass kein Lauf abstürzt, hängt
 oder sein Zeitlimit überschreitet.
+
+## Störungen
+
+`/lab/faults` enthält Seiten, auf denen eine Seite oder eine Verbindung stehen bleibt. Weder die Startseite noch das
+Labor verlinken dorthin, andere Läufe erreichen sie also nie; `test/faults.test.ts` startet dort oder geht direkt hin.
+
+| Pfad | Inhalt |
+| --- | --- |
+| `/lab/faults` | Links zu jeder Seite unten. |
+| `/lab/faults/soft-404` | „Not found“ mit Status 200. |
+| `/lab/faults/slow` | Ein Link „Open the report“ auf `/lab/faults/never`, das nie antwortet. |
+| `/lab/faults/reset` | Ein Link „Load the data“ auf `/lab/faults/crash`, wo der Server die Verbindung ohne Antwort abbricht. |
+| `/lab/faults/busy` | Ein Button „Recalculate“, der die Seite einfriert (Endlosschleife), ebenso jeder Tastendruck. |
+| `/lab/faults/guard` | Eine Checkbox „I changed something“, danach fragt die Seite per `beforeunload` vor dem Verlassen. |
+| `/lab/faults/bad-link` | Ein Link mit der ungültigen Adresse `http://` und ein gültiger. |
+| `/lab/faults/login` | Ein Anmeldeformular (`username`, `password`, „Log in“), das an `/lab/faults/session` geht. Falsche Zugangsdaten zeigen das Formular dort noch einmal, mit Status 200; richtige setzen dasselbe Sitzungscookie wie `/login` und leiten auf `/account` weiter. |
+
+Eingebaute Fehler:
+
+| # | Fehler | Klickpfad | Orakel | Schweregrad | Dedup-Schlüssel |
+| - | --- | --- | --- | --- | --- |
+| S1 | Weiche Fehlerseite | Störungen → „Old offer“ | `errorPage` | medium | `/lab/faults/soft-404` + Status `200` |
+| S2 | Seite antwortet nie | Störungen → „Slow report“ → „Open the report“ | `hang` | high | `navigation` + `/lab/faults/never` |
+| S3 | Server bricht die Verbindung ab | Störungen → „Unstable server“ → „Load the data“ | `errorPage` | high | `/lab/faults/crash` + Fehlercode (`net::ERR_EMPTY_RESPONSE`) |
+| S4 | Seite friert ein | Störungen → „Busy page“ → „Recalculate“ oder eine Taste | `hang` | high | `unresponsive` + `/lab/faults/busy` |
+
+Jeder kommt genau einmal, auch wenn der Monkey die Seite mehrmals besucht oder von einer anderen Seite her kommt. Die
+Warnung von `/lab/faults/guard` ist kein Fehler: Ein `back`, bei dem der Monkey sie ablehnt, ist kein `hang`. Der
+ungültige Link von `/lab/faults/bad-link` ist ein Fehler der Seite, den kein Orakel meldet, der aber den Lauf nicht
+beenden darf. Eine eingefrorene Seite wird geschlossen und ersetzt, und der Lauf geht weiter. Die Anmeldung unter
+`/lab/faults/login` ist kein Fehler der Seite, sondern prüft PlayMonkey: `test/session.test.ts` erwartet, dass
+falsche Zugangsdaten dort scheitern, obwohl die URL danach eine andere ist.
 
 ## Der Demo-Shop
 

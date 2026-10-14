@@ -9,7 +9,7 @@ import { runCli } from "../src/cli/cli.ts";
 import { parseConfig } from "../src/config/config.ts";
 import type { ActionLog } from "../src/replay/log.ts";
 import type { Report } from "../src/report/report.ts";
-import { planRuns } from "../src/run.ts";
+import { planRuns } from "../src/run-plan.ts";
 
 const SEEDS = [3, 4, 5];
 

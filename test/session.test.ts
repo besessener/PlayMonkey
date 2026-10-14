@@ -3,7 +3,7 @@ import { mkdtemp, readFile, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { after, before, describe, it } from "node:test";
-import type { Browser } from "playwright";
+import type { Browser, BrowserContext, BrowserContextOptions } from "playwright";
 import { FIXTURE_CREDENTIALS, type Fixture, startFixture } from "../fixtures/site/server.ts";
 import { ANONYMOUS_ROLE, LoginError, openRoleSession, type RoleSession } from "../src/auth/session.ts";
 import { type LoadedConfig, parseConfig } from "../src/config/config.ts";
@@ -119,6 +119,24 @@ describe("role sessions against the fixture site", () => {
     assert.ok(Date.now() - started < 4000, `took ${Date.now() - started}ms`);
   });
 
+  it("fails a wrong login whose form comes back at the URL it was posted to, and accepts the right one", async () => {
+    const role = (name: string, password: string) => ({ ...fieldsRole(name, password), loginUrl: "/lab/faults/login" });
+    const loaded = load(
+      [role("wrong", "${WRONG_PASS}"), role("right", "${FIXTURE_PASS}")],
+      {},
+      {
+        ...PASSWORD_ENV,
+        WRONG_PASS: "Wr0ng-Passw0rd!",
+      },
+    );
+    const error = await errorOf(openSession(loaded, 0));
+    assert.equal(
+      error.message,
+      'role "wrong": login did not succeed: the login form is still shown at /lab/faults/session after submitting (check the credentials and the fields)',
+    );
+    assert.equal(await signedIn(await openSession(loaded, 1)), true);
+  });
+
   it("fails clearly when a login field does not exist", async () => {
     const role = { ...fieldsRole(), fields: { username: "${FIXTURE_USER}", otp: "123" } };
     const error = await errorOf(openSession(load([role]), 0));
@@ -194,5 +212,30 @@ describe("role sessions against the fixture site", () => {
     for (const [name, data] of entries) {
       assert.equal(data.includes(FIXTURE_CREDENTIALS.password), false, `password found in trace entry ${name}`);
     }
+  });
+
+  it("closes the context even when stopping the trace fails", async () => {
+    const session = await openSession(load([]), undefined, { video: false });
+    open.splice(open.indexOf(session), 1);
+    session.context.tracing.stop = () => Promise.reject(new Error("ENOSPC: no space left on device"));
+    await assert.rejects(session.close(), /ENOSPC/);
+    assert.equal(browser.contexts().includes(session.context), false);
+  });
+
+  it("closes the context when the session cannot be set up", async () => {
+    const created: BrowserContext[] = [];
+    const failing = {
+      newContext: async (contextOptions: BrowserContextOptions) => {
+        const context = await browser.newContext(contextOptions);
+        context.newPage = () => Promise.reject(new Error("cannot open a page"));
+        created.push(context);
+        return context;
+      },
+    } as Browser;
+    const loaded = load([]);
+    const options = { config: loaded.config, secrets: loaded.secrets, outputDir: outputRoot, video: false };
+    await assert.rejects(openRoleSession(failing, undefined, options), /cannot open a page/);
+    assert.equal(created.length, 1);
+    assert.equal(browser.contexts().includes(created[0] as BrowserContext), false);
   });
 });

@@ -205,15 +205,34 @@
             "noRestrictedImports": {
               "level": "error",
               "options": {
-                "paths": {
-                  "@anthropic-ai/sdk": "LLM SDKs are imported only in src/llm/, behind the provider interface.",
-                  "@anthropic-ai/foundry-sdk": "LLM SDKs are imported only in src/llm/, behind the provider interface.",
-                  "openai": "LLM SDKs are imported only in src/llm/, behind the provider interface."
-                },
                 "patterns": [
+                  {
+                    "group": ["openai", "openai/**", "@anthropic-ai/**"],
+                    "message": "LLM SDKs are imported only in src/llm/, behind the provider interface."
+                  },
                   {
                     "group": ["./cli/**", "../cli/**"],
                     "message": "Only the CLI entry point imports src/cli/."
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "includes": ["src/cli/**"],
+      "linter": {
+        "rules": {
+          "style": {
+            "noRestrictedImports": {
+              "level": "error",
+              "options": {
+                "patterns": [
+                  {
+                    "group": ["openai", "openai/**", "@anthropic-ai/**"],
+                    "message": "LLM SDKs are imported only in src/llm/, behind the provider interface."
                   }
                 ]
               }
@@ -230,12 +249,11 @@
             "noRestrictedImports": {
               "level": "error",
               "options": {
-                "paths": {
-                  "@anthropic-ai/sdk": "LLM SDKs are imported only in src/llm/, behind the provider interface.",
-                  "@anthropic-ai/foundry-sdk": "LLM SDKs are imported only in src/llm/, behind the provider interface.",
-                  "openai": "LLM SDKs are imported only in src/llm/, behind the provider interface."
-                },
                 "patterns": [
+                  {
+                    "group": ["openai", "openai/**", "@anthropic-ai/**"],
+                    "message": "LLM SDKs are imported only in src/llm/, behind the provider interface."
+                  },
                   {
                     "group": ["../**"],
                     "message": "config/ and snapshot/ are leaves: they import no other src/ module."

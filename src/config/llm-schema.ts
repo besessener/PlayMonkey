@@ -66,7 +66,7 @@ export const llmSchema: JSONSchemaType<RawLlm> & { nullable: true } = {
       minimum: 1000,
       nullable: true,
       default: DEFAULTS.llm.timeoutMs,
-      description: "Timeout of one LLM request in milliseconds.",
+      description: "Time limit of one LLM request in milliseconds, including retries and reading the response.",
     },
     maxRetries: {
       type: "integer",

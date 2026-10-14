@@ -13,10 +13,15 @@ export interface SecretValue {
   value: string;
 }
 
+/** A value substituted from the environment, with where in the document it was substituted. */
+export interface SubstitutedValue extends SecretValue {
+  path: PathSegment[];
+}
+
 export interface ResolveResult {
   value: unknown;
   /** Values substituted from the environment. */
-  secrets: SecretValue[];
+  secrets: SubstitutedValue[];
   missing: MissingVariable[];
 }
 
@@ -30,7 +35,7 @@ export function resolvePlaceholders(
   env: NodeJS.ProcessEnv,
   names?: ReadonlySet<string>,
 ): ResolveResult {
-  const secrets: SecretValue[] = [];
+  const secrets: SubstitutedValue[] = [];
   const missing: MissingVariable[] = [];
 
   const visit = (node: unknown, path: PathSegment[]): unknown => {
@@ -42,7 +47,7 @@ export function resolvePlaceholders(
           missing.push({ path, name });
           return match;
         }
-        secrets.push({ name, value: resolved });
+        secrets.push({ name, value: resolved, path });
         return resolved;
       });
     }

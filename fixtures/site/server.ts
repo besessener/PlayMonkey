@@ -31,6 +31,11 @@ export async function startFixture(options: FixtureOptions = {}): Promise<Fixtur
       })
       .catch(() => serverError())
       .then((response: Response) => {
+        if (response.hold === true) return;
+        if (response.reset === true) {
+          res.destroy();
+          return;
+        }
         res.writeHead(response.status, response.headers);
         if (response.abort === true) {
           res.write(response.body ?? "");

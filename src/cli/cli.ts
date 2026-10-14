@@ -9,9 +9,10 @@ import { DEFAULT_SPECTATOR, type Spectator } from "../monkey/spectator.ts";
 import { SEVERITIES } from "../oracles/finding.ts";
 import { type Baseline, BaselineError, readBaseline } from "../report/baseline.ts";
 import { buildReport, type Report, writeReport } from "../report/report.ts";
-import { planRuns, type RoleOutcome, type RunLlm, runAllRoles } from "../run.ts";
+import { type RoleOutcome, type RunLlm, runAllRoles } from "../run.ts";
+import { planRuns } from "../run-plan.ts";
 import { readVersion } from "../version.ts";
-import { type CliIo, launchHint, load, withStopSignal } from "./common.ts";
+import { type CliIo, completed, launchHint, load, withStopSignal } from "./common.ts";
 import { replay } from "./replay.ts";
 import { DEFAULT_MAX_REPLAYS, shrink } from "./shrink.ts";
 
@@ -45,7 +46,10 @@ Exit codes:
   1  findings present (with findings.baseline: new ones; replay: at least one
      recorded finding recurred; shrink: at least one reproduced and shortened)
   2  tool or config error (also: the LLM preflight failed with llm.required, or a
-     run did not complete; takes precedence over 1)
+     run did not complete, e.g. interrupted; takes precedence over 1)
+
+Ctrl+C, SIGTERM or SIGHUP stop after the current step and still write the report;
+a second one exits at once without it.
 `;
 
 const COMMANDS: Record<string, { argName: string }> = {
@@ -298,10 +302,10 @@ function printLlmUsage({ llm }: Report, io: CliIo): void {
   }
 }
 
-/** Masked labels of the runs that did not complete. */
+/** Masked labels of the runs that did not complete: not started, crashed, ended by an error or interrupted. */
 function incompleteRuns(outcomes: RoleOutcome[], { config, secrets }: LoadedConfig): string[] {
   return outcomes
-    .filter((outcome) => outcome.result === undefined || outcome.result.stopReason === "error")
+    .filter((outcome) => !completed(outcome.result))
     .map((outcome) => secrets.mask(config.seeds === undefined ? outcome.role : `${outcome.role}/${outcome.seed}`));
 }
 

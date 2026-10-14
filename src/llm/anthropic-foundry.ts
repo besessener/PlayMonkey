@@ -9,6 +9,7 @@ import type { LlmConfig } from "../config/config.ts";
 import { buildUserMessage, pingMessage, SYSTEM_PROMPT } from "./prompt.ts";
 import {
   type DecideInput,
+  type DecideOptions,
   type DecideResult,
   type Decision,
   LlmError,
@@ -71,13 +72,16 @@ export class AnthropicFoundryProvider implements LlmProvider {
     this.#tools = ACTION_TOOLS.map(toAnthropicTool);
   }
 
-  async decide(input: DecideInput): Promise<DecideResult> {
-    const message = await this.#send({
-      ...this.#base(),
-      system: [{ type: "text", text: SYSTEM_PROMPT, cache_control: { type: "ephemeral" } }],
-      tools: this.#tools,
-      messages: [{ role: "user", content: buildUserMessage(input) }],
-    });
+  async decide(input: DecideInput, options: DecideOptions = {}): Promise<DecideResult> {
+    const message = await this.#send(
+      {
+        ...this.#base(),
+        system: [{ type: "text", text: SYSTEM_PROMPT, cache_control: { type: "ephemeral" } }],
+        tools: this.#tools,
+        messages: [{ role: "user", content: buildUserMessage(input) }],
+      },
+      options,
+    );
     const usage = mapUsage(message);
     const retries = this.#retries();
     const fail = (kind: LlmErrorKind, reason: string): never => {
@@ -98,11 +102,14 @@ export class AnthropicFoundryProvider implements LlmProvider {
     const started = this.#now();
     const value = `monkey-${started % 100_000}`;
     try {
-      const message = await this.#send({
-        ...this.#base(),
-        tools: [toAnthropicTool(PING_TOOL)],
-        messages: [{ role: "user", content: pingMessage(value) }],
-      });
+      const message = await this.#send(
+        {
+          ...this.#base(),
+          tools: [toAnthropicTool(PING_TOOL)],
+          messages: [{ role: "user", content: pingMessage(value) }],
+        },
+        { signal: AbortSignal.timeout(this.#config.timeoutMs) },
+      );
       const usage = mapUsage(message);
       const call = this.#toolCall(message, (kind, reason) => {
         throw new LlmError(kind, reason, { usage });
@@ -128,10 +135,10 @@ export class AnthropicFoundryProvider implements LlmProvider {
     };
   }
 
-  async #send(params: MessageCreateParamsNonStreaming): Promise<Message> {
+  async #send(params: MessageCreateParamsNonStreaming, options: DecideOptions = {}): Promise<Message> {
     this.#requests = 0;
     try {
-      return await this.#client.messages.create(params);
+      return await this.#client.messages.create(params, { signal: options.signal });
     } catch (error) {
       throw this.#mapError(error);
     }

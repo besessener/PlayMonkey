@@ -1,5 +1,6 @@
 import {
   type DecideInput,
+  type DecideOptions,
   type DecideResult,
   LlmError,
   type LlmProvider,
@@ -8,11 +9,12 @@ import {
 } from "../../src/llm/provider.ts";
 import { parseToolCall } from "../../src/llm/tools.ts";
 
-/** One scripted answer: a tool call, a text-only reply, or a failure. */
+/** One scripted answer: a tool call, a text-only reply, a failure, or none at all (`hang`, ignoring the signal). */
 export type FakeResponse =
   | { tool: string; input?: unknown; usage?: LlmUsage }
   | { text: string; usage?: LlmUsage }
-  | { error: LlmError };
+  | { error: LlmError }
+  | { hang: true };
 
 /** Answers in order; a function answers from the request, e.g. to click a ref of the current snapshot. */
 export type FakeScript = FakeResponse | ((input: DecideInput) => FakeResponse);
@@ -26,6 +28,8 @@ export const FAKE_USAGE: LlmUsage = { inputTokens: 1000, outputTokens: 20, cache
 export class FakeProvider implements LlmProvider {
   readonly name = "fake";
   readonly inputs: DecideInput[] = [];
+  /** The signal of every request, in order. */
+  readonly signals: (AbortSignal | undefined)[] = [];
   readonly #script: FakeScript[];
   readonly #fallback: FakeScript;
   preflightResult: PreflightResult = { ok: true, latencyMs: 1 };
@@ -39,15 +43,21 @@ export class FakeProvider implements LlmProvider {
     return Promise.resolve(this.preflightResult);
   }
 
-  decide(input: DecideInput): Promise<DecideResult> {
+  decide(input: DecideInput, options: DecideOptions = {}): Promise<DecideResult> {
+    this.signals.push(options.signal);
     // A throw inside the executor rejects the promise, as a real backend's failure does.
-    return new Promise((resolve) => resolve(this.#answer(input)));
+    return new Promise((resolve) => {
+      const answer = this.#answer(input);
+      if (answer !== undefined) resolve(answer);
+    });
   }
 
-  #answer(input: DecideInput): DecideResult {
+  /** The scripted answer, or undefined for one that never comes. */
+  #answer(input: DecideInput): DecideResult | undefined {
     this.inputs.push(input);
     const next = this.#script.shift() ?? this.#fallback;
     const response = typeof next === "function" ? next(input) : next;
+    if ("hang" in response) return undefined;
     if ("error" in response) throw response.error;
     const usage = response.usage ?? FAKE_USAGE;
     if ("text" in response) throw new LlmError("invalid", "the response contained text only, no tool call", { usage });

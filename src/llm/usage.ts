@@ -150,6 +150,11 @@ export class LlmStats {
     this.#pending++;
   }
 
+  /** Releases a call reserved with `begin` that was cut off because its run stops; it is not counted. */
+  cancel(): void {
+    if (this.#pending > 0) this.#pending--;
+  }
+
   call(role: string, record: CallRecord): void {
     if (this.#pending > 0) this.#pending--;
     for (const counters of this.#both(role)) {

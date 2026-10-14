@@ -205,9 +205,9 @@ describe("action log and replay against the fixture site", () => {
     });
     for (const finding of findings) {
       assert.equal(finding.role, "user");
-      // baseUrl comes from ${FIXTURE_URL}, so it is masked like every substituted value.
-      assert.match(finding.url, /^\*\*\*\//);
-      assert.doesNotMatch(finding.url, /^\*\*\*\/(clean|login|account)$/);
+      // baseUrl comes from ${FIXTURE_URL}, which is no credential, so it is not masked.
+      assert.ok(finding.url.startsWith(`${site.url}/`), finding.url);
+      assert.doesNotMatch(finding.url, /\/(clean|login|account)$/);
       assert.ok((await stat(finding.screenshotPath ?? "")).size > 0, `${finding.id} has a screenshot`);
       assert.equal(finding.lastActions.length, Math.min(10, finding.step));
       assert.equal(finding.lastActions.at(-1)?.step, finding.step);
@@ -243,8 +243,13 @@ describe("action log and replay against the fixture site", () => {
     assert.ok(log.placeholders.includes("MONKEY_NAME"));
   });
 
-  it("replays without a config and without any LLM, resolving placeholders from the environment", async () => {
-    const result = await replayActionLog(await recordSmallRun(), { strict: false, env: env(site.url), log: () => {} });
+  it("replays without any LLM, resolving the config's placeholders from the environment", async () => {
+    const result = await replayActionLog(await recordSmallRun(), {
+      config: join(dir, "small.json"),
+      strict: false,
+      env: env(site.url),
+      log: () => {},
+    });
     assert.equal(result.outcome.result?.stopReason, "end");
     assert.equal(result.outcome.result?.steps, 20);
     assert.equal(result.outcome.result?.skippedActions, 0);
@@ -252,10 +257,27 @@ describe("action log and replay against the fixture site", () => {
     assert.deepEqual(result.added, []);
   });
 
-  it("names missing environment variables", async () => {
+  it("exits 2 when the replay is interrupted", async () => {
+    let stderr = "";
+    const log = await recordSmallRun();
+    const code = await runCli(["replay", "--config", join(dir, "small.json"), log], {
+      // In-process stand-in for Ctrl+C as the replay starts.
+      stdout: (text) => text.includes("replaying") && process.emit("SIGINT", "SIGINT"),
+      stderr: (text) => {
+        stderr += text;
+      },
+      env: env(site.url),
+    });
+    assert.equal(code, 2);
+    assert.match(stderr, /SIGINT: stopping after the current step/);
+    assert.match(stderr, /interrupted; the replay did not complete\n$/);
+  });
+
+  it("names the variables the log needs that the config does not use, even when they are set", async () => {
+    const config = await writeConfig("url-only", { baseUrl: "${FIXTURE_URL}/form" });
     await assert.rejects(
-      replayActionLog(await recordSmallRun(), { strict: false, env: { FIXTURE_URL: site.url }, log: () => {} }),
-      (error: Error) => error instanceof ActionLogError && /MONKEY_NAME not set/.test(error.message),
+      replayActionLog(await recordSmallRun(), { config, strict: false, env: env(site.url), log: () => {} }),
+      (error: Error) => error instanceof ActionLogError && /the log needs MONKEY_NAME, but/.test(error.message),
     );
   });
 
@@ -267,11 +289,12 @@ describe("action log and replay against the fixture site", () => {
     const drifted = join(dir, "drifted", "actions.json");
     await writeFile(drifted, JSON.stringify(log));
 
-    const lenient = await cli(["replay", drifted]);
+    const config = join(dir, "small.json");
+    const lenient = await cli(["replay", "--config", config, drifted]);
     assert.match(lenient.stdout, new RegExp(`step ${index + 1} skipped: element not found: getByRole`));
     assert.match(lenient.stdout, /20 steps in .*, 1 skipped, stopped: end/);
 
-    const strict = await cli(["replay", "--strict", drifted]);
+    const strict = await cli(["replay", "--strict", "--config", config, drifted]);
     assert.equal(strict.code, 2);
     assert.match(strict.stdout, new RegExp(`stopped: error: step ${index + 1}: element not found`));
   });
@@ -317,7 +340,7 @@ describe("action log and replay against the fixture site", () => {
   it("needs --config to replay a role that logs in", async () => {
     const log = JSON.parse(await readFile(await recordSmallRun(), "utf8")) as ActionLog;
     const file = join(dir, "role.actions.json");
-    await writeFile(file, JSON.stringify({ ...log, role: "admin" }));
+    await writeFile(file, JSON.stringify({ ...log, role: "admin", baseUrl: site.url, placeholders: [] }));
     await assert.rejects(
       replayActionLog(file, { strict: false, env: env(site.url), log: () => {} }),
       (error: Error) => error instanceof ReplayError && /pass --config with that role/.test(error.message),

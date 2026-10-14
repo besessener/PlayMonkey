@@ -108,11 +108,18 @@ aber ihr Inhalt gehört zu einer anderen Seite.
 
 ## Limits
 
-Die Schleife hält bei `limits.maxSteps`, bei `limits.maxMinutes` (vor jedem Schritt geprüft) oder bei einer
-Unterbrechung (Strg+C beendet den aktuellen Schritt und schreibt dann den Trace). Mit `stayOnDomain` wird eine Seite,
-die auf einem anderen Origin oder als leere Seite endet, zurück zu `baseUrl` geschickt, ebenso eine außerhalb des
-`scope`. Eine abgestürzte Seite wird
-geschlossen, und der Lauf geht in einem anderen Tab oder einer frischen Seite weiter; das Orakel `crash` meldet es.
+Die Schleife hält bei `limits.maxSteps`, bei `limits.maxMinutes` oder bei einer Unterbrechung (Strg+C, SIGTERM oder
+SIGHUP beenden den aktuellen Schritt; danach werden Trace und Bericht geschrieben, siehe
+[Grundregeln](grundregeln.md#läufe-enden-immer)). `limits.maxMinutes` und eine Unterbrechung gelten auch mitten in
+einem Schritt, der nicht fertig wird; ein solcher Schritt wird aufgegeben und nicht mehr protokolliert. Dauert die
+Wahl einer Aktion lange (das LLM), prüft die Schleife die Limits vor der Aktion noch einmal. Scheitert das Schließen der Sitzung, etwa weil
+die Platte voll ist, steht das im Log; die Befunde des Laufs bleiben erhalten, nur Trace oder Videos fehlen dann.
+Mit `stayOnDomain` wird eine Seite, die auf einem anderen Origin oder als leere Seite endet, zurück zu `baseUrl`
+geschickt, ebenso eine außerhalb des `scope`. Eine abgestürzte Seite wird geschlossen, und der Lauf geht in einem
+anderen Tab oder einer frischen Seite weiter; das Orakel `crash` meldet es. Ebenso eine eingefrorene Seite: Jeder
+Aufruf an die Seite hat ein Zeitlimit von `monkey.actionTimeoutMs` (der Snapshot das Vierfache), und antwortet sie
+nicht mehr, wird sie geschlossen und ersetzt; das Orakel `hang` meldet sie als `unresponsive`. Ein Link mit einer
+ungültigen Adresse ist für den Monkey ein Link wie jeder andere.
 
 ## Abdeckung auf der Fixture-Seite
 

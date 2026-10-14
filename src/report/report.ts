@@ -55,6 +55,8 @@ export interface RoleSummary {
   pages?: number;
   findings: number;
   blockedNavigations: number;
+  /** Absent when the role could not start. */
+  sessionLosses?: number;
   actionLog?: string;
   trace?: string;
   videos: string[];
@@ -168,7 +170,7 @@ function summarizeRun(outcome: RoleOutcome, secrets: Secrets, path: (file: strin
   const result = outcome.result;
   const error = result?.error ?? outcome.error;
   return {
-    role: secrets.mask(outcome.role),
+    role: outcome.role,
     seed: outcome.seed,
     ...(result === undefined
       ? {}
@@ -183,6 +185,7 @@ function summarizeRun(outcome: RoleOutcome, secrets: Secrets, path: (file: strin
     ...(outcome.coverage === undefined ? {} : { pages: outcome.coverage.pages.length }),
     findings: outcome.findings.length,
     blockedNavigations: outcome.blockedNavigations,
+    ...(outcome.sessionLosses === undefined ? {} : { sessionLosses: outcome.sessionLosses }),
     ...(outcome.actionLog === undefined ? {} : { actionLog: path(outcome.actionLog) }),
     ...(outcome.tracePath === undefined ? {} : { trace: path(outcome.tracePath) }),
     videos: (outcome.videoPaths ?? []).map(path),

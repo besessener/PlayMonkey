@@ -18,11 +18,27 @@ funktioniert, steht unter [Sitzungen und Anmeldung](../explanation/sitzungen.md)
 }
 ```
 
-- `loginUrl` ist relativ zu `baseUrl`.
+- `loginUrl` wird gegen `baseUrl` aufgelöst wie ein Link auf einer Seite unter `baseUrl`. Liegt deine Anwendung unter
+  einem Pfad, z. B. `"baseUrl": "https://test.example.org/app"`, dann gilt:
+  - `/app/login` (mit `/` am Anfang) ist relativ zum Origin: `https://test.example.org/app/login`. Das ist die sicherste
+    Schreibweise.
+  - `/login` landet auf `https://test.example.org/login`, außerhalb der Anwendung.
+  - `login` (ohne `/`) ersetzt den letzten Pfadabschnitt: `https://test.example.org/login`. Endet `baseUrl` auf `/`
+    (`https://test.example.org/app/`), wird daraus `https://test.example.org/app/login`.
+  - Eine absolute URL gilt, wie sie ist.
 - Jeder Schlüssel in `fields` findet genau ein Eingabefeld: als CSS-Selektor, wenn er wie einer aussieht
   (`input[name=user]`, `#pass`), sonst über das Attribut `name`, dann die `id`, dann die sichtbare Beschriftung. Er muss
   genau ein Element treffen.
 - `submit` ist ein Selektor für den Button, der das Formular absendet; er muss genau ein Element treffen.
+
+Nach dem Absenden gilt die Anmeldung als gescheitert, solange alle Felder aus `fields` noch sichtbar sind, auch wenn
+die URL jetzt eine andere ist (ein Formular, das an `/session` geht und bei falschen Zugangsdaten dort wieder
+erscheint). Sonst gilt sie als gelungen, wenn der Browser die Login-URL verlassen hat oder, bei einer Single-Page-App,
+ein Cookie sich geändert hat und der Absende-Button verschwunden ist. Die Einzelheiten stehen unter
+[Sitzungen und Anmeldung](../explanation/sitzungen.md#formular-anmeldung).
+
+Verliert die Rolle ihre Sitzung mitten im Lauf, etwa weil der Monkey „Log out“ klickt, meldet PlayMonkey sie von selbst
+wieder an; siehe [Verlorene Sitzung](../explanation/sitzungen.md#verlorene-sitzung).
 
 ## Gespeicherte Sitzung wiederverwenden
 
@@ -78,6 +94,7 @@ Der Fehler nennt die Rolle und den Grund, nie einen Wert:
 | --- | --- |
 | `login field "x" not found on /login` | Der Schlüssel trifft kein Element (oder mehrere). Nimm einen CSS-Selektor. |
 | `submit selector "…" must match exactly one element` | Mach den Selektor genauer. |
+| `login did not succeed: the login form is still shown at /session after submitting` | Zugangsdaten oder ein Captcha. |
 | `login did not succeed: still on /login after submitting` | Zugangsdaten, Feldschlüssel oder ein Captcha. |
 | `cannot read storageState file … (ENOENT)` | Den Pfad, relativ zur Konfigurationsdatei. |
 | `… is not a Playwright storage state` | Die Datei muss JSON mit einem Array `cookies` sein. |

@@ -56,6 +56,64 @@ describe("dedup keys", () => {
     assert.equal(firstStackFrame("Error: no frames"), "");
     assert.equal(firstStackFrame(undefined), "");
   });
+
+  it("replaces content hashes in asset names but keeps ordinary and versioned names", () => {
+    const cases = {
+      "/assets/index-4f3a2b1c.js": "/assets/index-:hash.js",
+      "/assets/index-BxK3_q9a.css": "/assets/index-:hash.css",
+      "/static/js/main.3f2a1b9c.chunk.js": "/static/js/main.:hash.chunk.js",
+      "/_next/static/chunks/pages/index-a1b2c3d4e5f6a7b8.js": "/_next/static/chunks/pages/index-:hash.js",
+      "/assets/4f3a2b1c.js": "/assets/:hash.js",
+      "/assets/index.js": "/assets/index.js",
+      "/user-settings.html": "/user-settings.html",
+      "/release-notes-2024.html": "/release-notes-2024.html",
+      "/js/jquery-3.7.1.min.js": "/js/jquery-3.7.1.min.js",
+    };
+    for (const [path, key] of Object.entries(cases)) assert.equal(normalizeUrl(`${ORIGIN}${path}`, ORIGIN), key, path);
+  });
+
+  it("normalizes the URL inside a blob URL and keeps the prefix", () => {
+    const uuid = "550e8400-e29b-41d4-a716-446655440000";
+    assert.equal(normalizeUrl(`blob:${ORIGIN}/${uuid}`, ORIGIN), "blob:/:id");
+    assert.equal(normalizeUrl(`blob:https://cdn.example.net/${uuid}`, ORIGIN), "blob:https://cdn.example.net/:id");
+  });
+
+  it("replaces nonces, script hashes and long tokens in messages", () => {
+    const csp = (nonce: string, hash: string) =>
+      `Refused to execute inline script: "script-src 'nonce-${nonce}'". Either a hash ('sha256-${hash}') or a nonce ('nonce-...') is required`;
+    assert.equal(
+      normalizeMessage(csp("rAnd0mN0nceQ1w2E3r4T5y==", "47DEQpj8HBSa+/TImW+5JCeuQeRkm5NMpJWZG3hSuFU=")),
+      `Refused to execute inline script: "script-src 'nonce-:id'". Either a hash (':hash') or a nonce ('nonce-...') is required`,
+    );
+    assert.equal(
+      normalizeMessage(
+        "invalid token eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.dozjgNryP4J3jVmNHl0w5N_XgL0n3I9PlFUP0THsR8U",
+      ),
+      "invalid token :id.:id.:id",
+    );
+    assert.equal(normalizeMessage("session aB3dE5fG7hJ9kL1mN expired"), "session :id expired");
+    assert.equal(normalizeMessage("net::ERR_HTTP2_PROTOCOL_ERROR"), "net::ERR_HTTP#_PROTOCOL_ERROR");
+    assert.equal(normalizeMessage("reading 'user-settings-page'"), "reading 'user-settings-page'");
+  });
+
+  it("does not take the message line as a frame, even when it contains @", () => {
+    const stack = (message: string) => `Error: ${message}\n    at save (${ORIGIN}/a.js:3:9)`;
+    for (const message of ["no account for monkey4711@example.com", "!@#$%^&*()", "x@https://other.example/b.js:1:2"])
+      assert.equal(firstStackFrame(stack(message), ORIGIN, `Error: ${message}`), "at save (/a.js:3:9)", message);
+    const multiline = "first\nsecond@https://other.example/b.js:1:2";
+    assert.equal(firstStackFrame(stack(multiline), ORIGIN, `Error: ${multiline}`), "at save (/a.js:3:9)");
+  });
+
+  it("skips frames without a URL, so the same message from two scripts is two keys", () => {
+    const builtins =
+      "    at JSON.parse (<anonymous>)\n    at async Promise.all (index 0)\n    at new Promise (<anonymous>)";
+    const stack = (script: string) => `SyntaxError: bad\n${builtins}\n    at load (${ORIGIN}/${script}:7:2)`;
+    assert.equal(firstStackFrame(stack("a.js"), ORIGIN, "SyntaxError: bad"), "at load (/a.js:7:2)");
+    assert.equal(firstStackFrame(stack("b.js"), ORIGIN, "SyntaxError: bad"), "at load (/b.js:7:2)");
+    assert.equal(firstStackFrame(`Error: x\n    at async ${ORIGIN}/c.js:4:4`, ORIGIN), "at async /c.js:4:4");
+    const webkit = `forEach@[native code]\nglobal code@${ORIGIN}/assets/index-4f3a2b1c.js:1:5`;
+    assert.equal(firstStackFrame(webkit, ORIGIN), "global code@/assets/index-:hash.js:1:5");
+  });
 });
 
 describe("IgnoreRules", () => {
@@ -256,9 +314,10 @@ describe("oracles in the browser", () => {
         route.fulfill({ contentType: "text/html", body: "<title>Page not found</title><h1>Oops</h1>" }),
       );
       await page.goto("/gone");
-      const [finding] = await check();
-      assert.equal(finding?.oracle, "errorPage");
-      assert.equal(finding?.message, "error page on /gone (status 200): Page not found");
+      assert.deepEqual(
+        (await check()).map((f) => `${f.oracle} ${f.message}`),
+        ["errorPage error page on /gone (status 200): Page not found"],
+      );
     });
     await withWatch("/missing-page", { oracles: { http4xx: false } }, async ({ check }) => {
       const findings = await check();
@@ -275,7 +334,7 @@ describe("oracles in the browser", () => {
         // Never answered.
       });
       const result = await executeAction({ context, current: 0 }, { type: "navigate", url: `${site.url}/never` }, 300);
-      assert.equal(result.hang, true);
+      assert.equal(result.hang, `${site.url}/never`);
       await oracles.check({ ...record(1, page, false), result }, page);
       await page.goto("/clean");
       await page.evaluate("setTimeout(() => { for (;;) {} }, 0)");
@@ -286,6 +345,42 @@ describe("oracles in the browser", () => {
       );
       assert.equal(oracles.findings[1]?.screenshotPath, undefined);
     });
+  });
+
+  it("blacks out secret fields in finding screenshots and masks keys before deduplication", async () => {
+    const context = await browser.newContext({ baseURL: site.url });
+    try {
+      const { config: cfg, secrets } = parseConfig(
+        JSON.stringify({ baseUrl: site.url, testData: { token: "${TOKEN}" }, monkey: { actionTimeoutMs: 1000 } }),
+        { env: { TOKEN: "tok-4711-secret" } },
+      );
+      const oracles = new Oracles(context, {
+        config: cfg,
+        role: "tester",
+        screenshotDir: join(dir, "masked"),
+        secrets,
+      });
+      const page = await context.newPage();
+      await page.setContent(
+        '<input type="password" value="hunter2"><input value="my tok-4711-secret"><input value="plain">',
+      );
+      let masked = -1;
+      const screenshot = page.screenshot.bind(page);
+      page.screenshot = async (options) => {
+        masked = (await options?.mask?.[0]?.count()) ?? 0;
+        return await screenshot(options);
+      };
+      await page.evaluate('console.error("bad token tok-4711-secret")');
+      await oracles.check(record(1, page, false), page);
+      assert.equal(masked, 2);
+      assert.equal(await page.locator("[data-monkey-secret]").count(), 0);
+      assert.deepEqual(
+        oracles.findings.map((f) => [f.key, f.screenshotPath !== undefined]),
+        [["console|bad token ***", true]],
+      );
+    } finally {
+      await context.close();
+    }
   });
 
   it("does not report an element that never becomes clickable as a hang", async () => {
@@ -311,8 +406,10 @@ describe("oracles in the browser", () => {
         onStep: async (rec: StepRecord) => {
           const page = context.pages()[rec.result.tab] ?? context.pages()[0];
           if (rec.step === 2 && page !== undefined) {
-            // The crash event can arrive after goto settles (headless shell), so wait for it explicitly.
-            await Promise.all([page.waitForEvent("crash"), page.goto("chrome://crash").catch(() => undefined)]);
+            // The crash event can arrive after goto settles (headless shell), so wait for it explicitly, longer than
+            // the run's default timeout of actionTimeoutMs.
+            const crashed = page.waitForEvent("crash", { timeout: 15_000 });
+            await Promise.all([crashed, page.goto("chrome://crash").catch(() => undefined)]);
           }
           await oracles.check(rec, page);
         },
