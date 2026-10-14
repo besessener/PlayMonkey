@@ -57,7 +57,7 @@ Element, nicht der Viewport, damit eine Größenänderung ihn nicht in mehrere B
 
 `/clean`, `/login`, `/account` und ein gültiges Absenden von `/form` sind Kontrollen und dürfen **keine** Befunde
 erzeugen. `test/fixture-site.test.ts` geht jeden Klickpfad oben in einem echten Browser ab und prüft, dass die
-Kontrollseiten still bleiben; `test/oracles.test.ts` führt `configs/fixture.json` von Anfang bis Ende aus und
+Kontrollseiten still bleiben; `test/replay.test.ts` führt `configs/fixture.json` von Anfang bis Ende aus und
 erwartet genau diese fünf Befunde.
 
 ## Das Labor
@@ -89,6 +89,37 @@ Eingebaute Fehler im Labor:
 `test/lab.test.ts` geht jede Laborseite mit vorgegebenen Aktionen durch die echte Laufschleife ab;
 `test/chaos.test.ts` lässt 20 Seeds auf das Labor und die Hauptseite los und prüft, dass kein Lauf abstürzt, hängt
 oder sein Zeitlimit überschreitet.
+
+## Der Demo-Shop
+
+`/demo` ist „Monkey Market“, ein gestalteter kleiner Obstladen für Vorführungen: Anmeldung, Produktkatalog,
+Warenkorb und Kasse. Wie das Labor ist er von der Startseite aus **nicht** verlinkt, und er verlinkt auch nicht zurück:
+Ein Lauf ab `/demo` bleibt im Shop und findet nur dessen Fehler, die fünf Fehler oben bleiben genau fünf. Er nutzt
+dieselben Zugangsdaten wie `/login`, aber ein eigenes Sitzungs-Cookie (`shop_sid`). Sein Code liegt mit Konfiguration und
+Startskript im Ordner [`demo/`](../demo/); die Fixture-Seite bindet nur seine Routen ein.
+
+| Pfad | Inhalt |
+| --- | --- |
+| `/demo` | Startseite mit „Start shopping“. |
+| `/demo/login` | Anmeldung. Eine falsche Anmeldung zeigt das Formular erneut mit einer Meldung an (Status 200); angemeldet leitet sie nach `/demo/shop` weiter. |
+| `/demo/shop` | Sechs Produkte mit Mengenfeld (1 bis 9) und „Add … to cart“. Braucht eine Sitzung (sonst 303 nach `/demo/login`), wie alle Seiten unten. |
+| `/demo/cart` | Warenkorb mit „Remove …“ und dem Kassenformular: Name, E-Mail, Gutscheincode, „Place order“. `novalidate`. Ein unbekannter Gutschein zeigt eine Meldung an (Status 200); `MONKEY10` gibt zehn Prozent Rabatt. |
+| `/demo/account` | Der Benutzername oben rechts führt hierher; hat den Button „Sign out“. |
+
+Ein `GET` auf die Formularziele `/demo/checkout`, `/demo/cart/remove` und `/demo/logout` leitet nach `/demo/cart`
+weiter, damit ein Neuladen nicht auf der 404-Seite der Hauptseite landet.
+
+Eingebauter Fehler im Demo-Shop:
+
+| # | Fehler | Klickpfad | Orakel | Schweregrad | Dedup-Schlüssel |
+| - | --- | --- | --- | --- | --- |
+| D1 | HTTP 500 beim Bestellen | Shop → „Add … to cart“ → „Place order“ mit leerer E-Mail-Adresse oder einer ohne Domain | `http5xx` | high | `POST /demo/checkout 500` |
+
+`../demo/demo.json` lässt den Monkey als Rolle `shopper` mit LLM los. Die Zugangsdaten der Demo stehen direkt darin, sie
+sind nur ausgedacht und werden darum nicht als `***` maskiert; nötig sind `FIXTURE_URL` und `MONKEY_LLM_URL`,
+`MONKEY_LLM_DEPLOYMENT` und `MONKEY_LLM_API_KEY`. Mit Seed 11 findet er den Fehler ohne LLM in Schritt 12.
+`test/shop.test.ts` prüft die Seiten über HTTP, den Fehler genau einmal, einen stillen Kontrolldurchlauf und einen Lauf
+mit dieser Konfiguration ohne LLM, der genau diesen einen Befund liefert.
 
 ## Eine Seite hinzufügen
 

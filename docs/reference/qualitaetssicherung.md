@@ -39,8 +39,8 @@ Gruppen:
   | --- | --- | --- |
   | Kognitive Komplexität pro Funktion | 15 | alles |
   | Parameter pro Funktion | 4, sonst ein benanntes Optionsobjekt | alles |
-  | Zeilen pro Funktion (Leerzeilen nicht mitgezählt) | 50 | `src/`, `fixtures/` (keine Test-Suites) |
-  | Zeilen pro Datei (Leerzeilen nicht mitgezählt) | 350 in `src/` und `fixtures/`, 600 in `test/` | alles |
+  | Zeilen pro Funktion (Leerzeilen nicht mitgezählt) | 50 | `src/`, `fixtures/`, `demo/` (keine Test-Suites) |
+  | Zeilen pro Datei (Leerzeilen nicht mitgezählt) | 350 in `src/`, `fixtures/` und `demo/`, 600 in `test/` | alles |
 
 - **Korrektheit:** unbenutzte Imports, Variablen, Parameter, Labels und private Member; Imports nicht deklarierter
   Abhängigkeiten; relative Imports ohne Dateiendung; keine verdeckten Namen; kein `== null`.

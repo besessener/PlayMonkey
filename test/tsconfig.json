@@ -6,5 +6,5 @@
     "allowImportingTsExtensions": true,
     "lib": ["es2023", "dom"]
   },
-  "include": ["../src", "../fixtures", "."]
+  "include": ["../src", "../fixtures", "../demo", "."]
 }
