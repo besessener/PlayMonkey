@@ -306,6 +306,9 @@ function createAdvisor(run: RoleRun, oracles: Oracles): LlmDriver | undefined {
     ...(scope.restricted ? { scope } : {}),
     ...(llm.debugLog === undefined ? {} : { debugLog: llm.debugLog }),
     log,
+    signal: options.signal,
+    // A little before the loop's own deadline, which only makes it stricter.
+    deadline: Date.now() + config.limits.maxMinutes * 60_000,
   });
 }
 
