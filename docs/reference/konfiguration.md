@@ -68,7 +68,7 @@ dort ein Schlüssel steht, der auf dieser Seite fehlt.
 | `llm.deployment` | string | – | Name des Deployments, wird als Modell genutzt. Pflicht in `llm`. |
 | `llm.apiKey` | string | – | API-Key; nutze einen `${VAR}`-Platzhalter. Pflicht in `llm`. |
 | `llm.required` | boolean | `true` | Ein fehlgeschlagener [Preflight](../how-to/llm-einrichten.md#fehlerbehebung) endet mit Code `2`; `false` warnt und läuft als reiner Zufalls-Monkey. |
-| `llm.timeoutMs` | integer ≥ 1000 | `60000` | Zeitlimit einer LLM-Anfrage in Millisekunden. |
+| `llm.timeoutMs` | integer ≥ 1000 | `60000` | Zeitlimit einer LLM-Anfrage in Millisekunden, insgesamt: einschließlich der Wiederholungen nach `llm.maxRetries` und des Lesens der Antwort. Höchstens bis `limits.maxMinutes` des Laufs. Ein Überschreiten öffnet den Circuit Breaker sofort. |
 | `llm.maxRetries` | integer 0 … 10 | `2` | Wiederholungen einer Anfrage nach einem Rate Limit (429), einem Server- oder Verbindungsfehler, mit exponentiellem Backoff. Andere Fehler werden nicht wiederholt. |
 | `llm.maxCalls` | integer ≥ 0 | unbegrenzt | Budget: LLM-Aufrufe pro `monkey run`, über alle Rollen und Seeds, auch wenn sie parallel laufen (laufende Aufrufe zählen mit). Ist es aufgebraucht, laufen die Läufe als reiner Monkey weiter, und der Bericht sagt das. |
 | `llm.maxTokens` | integer ≥ 0 | unbegrenzt | Budget: Tokens pro `monkey run`, über alle Rollen und Seeds (Eingabe, Ausgabe, Cache-Lese- und -Schreibzugriffe). Parallel bereits laufende Aufrufe können es um ihre eigenen Tokens überschreiten. |
@@ -83,7 +83,7 @@ dort ein Schlüssel steht, der auf dieser Seite fehlt.
 | `llm.handoff.loginWall` | boolean | `true` | Übergeben, wenn eine angemeldete Rolle auf einer Anmeldeseite landet (abgelaufene Sitzung). |
 | `llm.handoff.maxDecisions` | integer ≥ 1 | `3` | Aufeinanderfolgende LLM-Entscheidungen pro Übergabe; danach übernimmt wieder der Monkey. |
 | `llm.handoff.cooldownSteps` | integer ≥ 0 | `5` | Monkey-Schritte nach einer Übergabe, bevor die nächste beginnen kann. |
-| `llm.breaker.failures` | integer ≥ 1 | `3` | Fehlgeschlagene LLM-Entscheidungen in Folge, über alle Läufe, die den Circuit Breaker öffnen. |
+| `llm.breaker.failures` | integer ≥ 1 | `3` | Fehlgeschlagene LLM-Entscheidungen in Folge, über alle Läufe, die den Circuit Breaker öffnen. Ein `timeout` oder ein nicht erreichbarer Endpunkt öffnet ihn sofort. |
 | `llm.breaker.pauseSteps` | integer ≥ 1 | `20` | Schritte ohne LLM, solange der Breaker offen ist, gezählt in den eigenen Schritten jedes Laufs; ein Auslösen pausiert jeden Lauf. |
 | `llm.pricing` | Objekt | fehlt | Preise pro Million Tokens für **geschätzte** Kosten im Bericht. Es gibt keine eingebauten Preise. |
 | `llm.pricing.inputPerMTok` | number ≥ 0 | – | Preis pro Million Eingabe-Tokens, die weder aus dem Prompt-Cache gelesen noch in ihn geschrieben werden. Pflicht in `pricing`. |

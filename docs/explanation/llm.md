@@ -53,11 +53,17 @@ Monkey mindestens `cooldownSteps` Schritte bis zur nächsten Übergabe, und die 
 - **Transport- und HTTP-Fehler:** Das SDK wiederholt bei Rate Limits (429), Serverfehlern und Verbindungsproblemen mit
   exponentiellem Backoff (`llm.maxRetries`); andere Fehler wie 400 oder 401 schlagen sofort fehl. Dann wählt der
   Monkey.
+- **Zeitlimit:** Eine Anfrage an das LLM hat insgesamt `llm.timeoutMs`, einschließlich der Wiederholungen des SDK und
+  des Lesens der Antwort; das gilt auch für die Vorabprüfung. Was dann noch läuft, wird abgebrochen und zählt als
+  `timeout`, sodass auch ein Endpunkt, der nie antwortet, den Lauf pro Anfrage höchstens `timeoutMs` aufhält. Das
+  Zeitlimit endet spätestens mit `limits.maxMinutes` des Laufs, und Strg+C bricht eine laufende Anfrage sofort ab;
+  ein solcher Abbruch, weil der Lauf endet, zählt nicht als Fehler des LLM.
 - **Ausfall:** Nach `llm.breaker.failures` fehlgeschlagenen Entscheidungen in Folge wird das LLM für
-  `llm.breaker.pauseSteps` Schritte pausiert und danach wieder versucht. Den Breaker teilen sich alle Läufe eines
-  `monkey run`: Fehlschläge zählen über Läufe hinweg, und ein Auslösen pausiert das LLM in jedem Lauf für
-  `pauseSteps` seiner eigenen Schritte, damit [parallele Läufe](../how-to/parallel-ausfuehren.md) nicht weiter auf
-  einen ausgefallenen Endpunkt einhämmern.
+  `llm.breaker.pauseSteps` Schritte pausiert und danach wieder versucht. Ein `timeout` oder ein nicht erreichbarer
+  Endpunkt (`unreachable`) pausiert es schon beim ersten Mal: Jeder weitere Versuch würde wieder das volle Zeitlimit
+  kosten. Den Breaker teilen sich alle Läufe eines `monkey run`: Fehlschläge zählen über Läufe hinweg, und ein
+  Auslösen pausiert das LLM in jedem Lauf für `pauseSteps` seiner eigenen Schritte, damit
+  [parallele Läufe](../how-to/parallel-ausfuehren.md) nicht weiter auf einen ausgefallenen Endpunkt einhämmern.
 - **Budget:** Sobald `llm.maxCalls` oder `llm.maxTokens` erreicht ist, ist der Rest des Laufs (alle verbleibenden
   Rollen und Seeds, auch die parallel laufenden) reiner Monkey. Ein Aufruf zählt ab seinem Start gegen `maxCalls`,
   sodass parallele Läufe das Budget nicht überziehen können; Tokens sind erst danach bekannt, deshalb können bereits
@@ -96,7 +102,7 @@ Ein Backend implementiert `LlmProvider` aus `src/llm/provider.ts`:
 interface LlmProvider {
   readonly name: string;
   preflight(): Promise<PreflightResult>; // one probe that must come back as a `ping` tool call; never throws
-  decide(input: DecideInput): Promise<DecideResult>; // throws LlmError on any failure
+  decide(input: DecideInput, options?: DecideOptions): Promise<DecideResult>; // throws LlmError on any failure
 }
 ```
 
@@ -105,6 +111,8 @@ interface LlmProvider {
   Teile zuerst.
 - Erzwinge keine Tool-Wahl: Manche Modelle lehnen das ab. Der Prompt verlangt genau einen Tool-Aufruf.
 - Mach aus dem ersten Tool-Aufruf mit `parseToolCall(name, input, input.refs)` eine Entscheidung; das validiert ihn.
+- Gib `options.signal` als Request-Option an das SDK weiter, damit Zeitlimit und Strg+C die Anfrage samt ihren
+  Wiederholungen abbrechen.
 - Bilde Fehler auf einen `LlmError` mit einer Art ab (`auth`, `notFound`, `rateLimited`, `invalid`, …; siehe
   `LlmErrorKind`) und behalte den Verbrauch fehlgeschlagener Aufrufe; die Hinweise der Vorabprüfung und der Bericht
   sind nach Art geordnet.

@@ -3,7 +3,7 @@ import { describe, it } from "node:test";
 import { type LlmConfig, parseConfig } from "../src/config/config.ts";
 import { AnthropicFoundryProvider } from "../src/llm/anthropic-foundry.ts";
 import { OpenAiProvider } from "../src/llm/openai.ts";
-import type { DecideInput, LlmError, LlmProvider } from "../src/llm/provider.ts";
+import { type DecideInput, LlmError, type LlmProvider } from "../src/llm/provider.ts";
 import { LlmStats } from "../src/llm/usage.ts";
 import { connectionError, json, mockFetch } from "./helpers/http.ts";
 
@@ -227,6 +227,35 @@ for (const backend of BACKENDS) {
         assert.match(error.message, /ECONNREFUSED/);
         return true;
       });
+    });
+
+    it("cancels the request and its retries when the signal aborts", async () => {
+      // Like a real fetch on a black-holed endpoint: no answer until the request's signal aborts.
+      const hang = (init?: RequestInit) =>
+        new Promise<Response>((_, reject) => {
+          init?.signal?.addEventListener("abort", () => reject(init.signal?.reason), { once: true });
+        });
+      const { provider: p, requests } = provider(setup({ maxRetries: 2 }), hang, hang, hang);
+      const controller = new AbortController();
+      setTimeout(() => controller.abort(), 20);
+      await assert.rejects(p.decide(input, { signal: controller.signal }), LlmError);
+      assert.equal(requests.length, 1);
+    });
+
+    it("gives the preflight one time limit, retries included", async () => {
+      const hang = (init?: RequestInit) =>
+        new Promise<Response>((_, reject) => {
+          init?.signal?.addEventListener("abort", () => reject(init.signal?.reason), { once: true });
+        });
+      const { provider: p } = provider(
+        { ...setup({ maxRetries: 10 }), timeoutMs: 50 },
+        ...Array.from({ length: 11 }, () => hang),
+      );
+      const started = performance.now();
+      const result = await p.preflight();
+      assert.ok(performance.now() - started < 2000);
+      assert.equal(result.ok, false);
+      if (!result.ok) assert.equal(result.error.kind, "timeout");
     });
 
     it("passes the preflight only with a ping tool call", async () => {

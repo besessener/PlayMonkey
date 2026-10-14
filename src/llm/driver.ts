@@ -13,9 +13,11 @@ import {
   type HistoryEntry,
   LlmError,
   type LlmProvider,
+  OUTAGE_ERRORS,
   RESPONSE_ERRORS,
 } from "./provider.ts";
 import type { StuckDetector } from "./stuck.ts";
+import { decideInTime, RunStopping, type TimeLimit } from "./time-limit.ts";
 import type { LlmStats } from "./usage.ts";
 
 /**
@@ -49,7 +51,14 @@ export interface LlmDriverOptions {
   debugLog?: DebugLog;
   log: (line: string) => void;
   now?: () => number;
+  /** The run's stop signal (Ctrl+C): it cancels a decision in flight, which then is no LLM failure. */
+  signal?: AbortSignal | undefined;
+  /** When the run must end (epoch ms, `limits.maxMinutes`); no decision runs past it. */
+  deadline?: number | undefined;
 }
+
+/** What one provider call came to; `error: undefined` means the run stops and the call was cancelled. */
+type Attempt = { ok: true; action: Action | undefined } | { ok: false; error: LlmError | undefined };
 
 /**
  * Lets the LLM choose when the monkey is stuck, and never lets an LLM problem stop the run. Per step the loop calls
@@ -59,8 +68,9 @@ export interface LlmDriverOptions {
  * A handoff gives the LLM up to `llm.handoff.maxDecisions` decisions in a row, ended early by `done`; then the
  * monkey has at least `cooldownSteps` steps. A bad response (no or an invalid tool call, refusal, truncation) is
  * retried once; any failed decision falls back to a monkey action for that step. After `llm.breaker.failures`
- * failed decisions in a row the LLM pauses for `llm.breaker.pauseSteps` steps. When the budget runs out, the rest
- * of the run is a pure monkey.
+ * failed decisions in a row, or at once on a timeout or an unreachable endpoint, the LLM pauses for
+ * `llm.breaker.pauseSteps` steps. When the budget runs out, the rest of the run is a pure monkey. Each call gets
+ * `llm.timeoutMs`, cut to the run's deadline; the run's signal cancels it.
  */
 export class LlmDriver {
   readonly #o: LlmDriverOptions;
@@ -74,6 +84,7 @@ export class LlmDriver {
   #pausedUntil = 0;
   readonly #breaker: LlmBreaker;
   #tripsSeen = 0;
+  readonly #limit: TimeLimit;
   /** The LLM's own description of its last action, with placeholders instead of filled-in values. */
   #chosen: { step: number; text: string } | undefined;
 
@@ -83,6 +94,8 @@ export class LlmDriver {
     this.#run = options.run ?? options.role;
     this.#breaker = options.breaker ?? new LlmBreaker();
     this.#tripsSeen = this.#breaker.trips;
+    const { signal, deadline } = options;
+    this.#limit = { timeoutMs: options.config.timeoutMs, signal, deadline, now: this.#now };
   }
 
   observe(snapshot: Snapshot, isNewState: boolean): void {
@@ -106,6 +119,10 @@ export class LlmDriver {
       }
       const outcome = await this.#attempt(snapshot, step, attempt, input);
       if (outcome.ok) return outcome.action;
+      if (outcome.error === undefined) {
+        this.#stopped(step);
+        return undefined;
+      }
       failure = outcome.error;
       if (!RESPONSE_ERRORS.has(failure.kind)) break;
     }
@@ -137,18 +154,13 @@ export class LlmDriver {
   }
 
   /** One provider call; any error, including one from recording it, is a failed attempt. */
-  async #attempt(
-    snapshot: Snapshot,
-    step: number,
-    attempt: number,
-    input: DecideInput,
-  ): Promise<{ ok: true; action: Action | undefined } | { ok: false; error: LlmError }> {
+  async #attempt(snapshot: Snapshot, step: number, attempt: number, input: DecideInput): Promise<Attempt> {
     const { stats } = this.#o;
     const role = this.#run;
     stats.begin();
     const started = this.#now();
     try {
-      const result = await this.#o.provider.decide(input);
+      const result = await decideInTime(this.#o.provider, input, this.#limit);
       const action = this.#accepted(result, snapshot);
       stats.call(role, { ok: true, usage: result.usage, latencyMs: this.#now() - started, retries: result.retries });
       await this.#debug({ role, step, attempt, input, result: result.decision, raw: result.raw });
@@ -163,6 +175,10 @@ export class LlmDriver {
       this.#chosen = { step, text: describeAction(action) };
       return { ok: true, action: this.#o.placeholders.fillDecision(action) as Action };
     } catch (error) {
+      if (error instanceof RunStopping) {
+        stats.cancel();
+        return { ok: false, error: undefined };
+      }
       const failure = error instanceof LlmError ? error : new LlmError("other", messageOf(error));
       stats.call(role, {
         ok: false,
@@ -176,7 +192,13 @@ export class LlmDriver {
     }
   }
 
-  /** The monkey acts for `step`; enough failures in a row trip the breaker. */
+  /** The run stops during a decision: the monkey takes this step, and nothing counts against the LLM. */
+  #stopped(step: number): void {
+    this.#o.log(`step ${step}: the run is stopping; LLM decision cancelled`);
+    this.#end(step);
+  }
+
+  /** The monkey acts for `step`; enough failures in a row, or one outage, trip the breaker. */
   #fail(step: number, failure: LlmError): void {
     const { stats, config } = this.#o;
     stats.fallback(this.#run, failure.kind);
@@ -185,18 +207,23 @@ export class LlmDriver {
     );
     this.#decisionsLeft--;
     this.#breaker.failures++;
-    if (this.#breaker.failures >= config.breaker.failures) {
-      this.#breaker.failures = 0;
-      this.#breaker.trips++;
-      this.#tripsSeen = this.#breaker.trips;
-      this.#pausedUntil = step + 1 + config.breaker.pauseSteps;
-      stats.breakerTrip(this.#run);
-      this.#o.log(
-        `step ${step}: ${config.breaker.failures} LLM failures in a row; pausing the LLM for ${config.breaker.pauseSteps} steps`,
-      );
-      this.#decisionsLeft = 0;
+    if (OUTAGE_ERRORS.has(failure.kind)) this.#trip(step, `LLM ${failure.kind}`);
+    else if (this.#breaker.failures >= config.breaker.failures) {
+      this.#trip(step, `${config.breaker.failures} LLM failures in a row`);
     }
     if (this.#decisionsLeft === 0) this.#end(step);
+  }
+
+  /** Opens the shared breaker: this run pauses now, the others at their next step. */
+  #trip(step: number, reason: string): void {
+    const { pauseSteps } = this.#o.config.breaker;
+    this.#breaker.failures = 0;
+    this.#breaker.trips++;
+    this.#tripsSeen = this.#breaker.trips;
+    this.#pausedUntil = step + 1 + pauseSteps;
+    this.#o.stats.breakerTrip(this.#run);
+    this.#o.log(`step ${step}: ${reason}; pausing the LLM for ${pauseSteps} steps`);
+    this.#decisionsLeft = 0;
   }
 
   record(record: StepRecord, snapshot: Snapshot): void {

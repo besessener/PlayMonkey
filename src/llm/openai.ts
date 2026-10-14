@@ -15,6 +15,7 @@ import type { OpenAiApi } from "../config/values.ts";
 import { buildUserMessage, pingMessage, SYSTEM_PROMPT } from "./prompt.ts";
 import {
   type DecideInput,
+  type DecideOptions,
   type DecideResult,
   type Decision,
   LlmError,
@@ -97,8 +98,8 @@ export class OpenAiProvider implements LlmProvider {
     });
   }
 
-  async decide(input: DecideInput): Promise<DecideResult> {
-    const answer = await this.#ask(ACTION_TOOLS, SYSTEM_PROMPT, buildUserMessage(input));
+  async decide(input: DecideInput, options: DecideOptions = {}): Promise<DecideResult> {
+    const answer = await this.#ask(ACTION_TOOLS, SYSTEM_PROMPT, buildUserMessage(input), options);
     const retries = this.#retries();
     const fail = (kind: LlmErrorKind, reason: string): never => {
       throw new LlmError(kind, reason, { usage: answer.usage, retries, raw: answer.raw });
@@ -118,7 +119,9 @@ export class OpenAiProvider implements LlmProvider {
     const started = this.#now();
     const value = `monkey-${started % 100_000}`;
     try {
-      const answer = await this.#ask([PING_TOOL], undefined, pingMessage(value));
+      const answer = await this.#ask([PING_TOOL], undefined, pingMessage(value), {
+        signal: AbortSignal.timeout(this.#config.timeoutMs),
+      });
       const fail = (kind: LlmErrorKind, reason: string): never => {
         throw new LlmError(kind, reason, { usage: answer.usage });
       };
@@ -133,7 +136,12 @@ export class OpenAiProvider implements LlmProvider {
   }
 
   /** One request on the configured API surface; the system prompt and tools come first for prompt caching. */
-  async #ask(tools: readonly ToolDefinition[], system: string | undefined, user: string): Promise<Answer> {
+  async #ask(
+    tools: readonly ToolDefinition[],
+    system: string | undefined,
+    user: string,
+    { signal }: DecideOptions = {},
+  ): Promise<Answer> {
     const { options } = this.#config;
     this.#requests = 0;
     try {
@@ -150,7 +158,7 @@ export class OpenAiProvider implements LlmProvider {
           max_completion_tokens: options.maxOutputTokens,
           ...(options.effort === undefined ? {} : { reasoning_effort: options.effort }),
         };
-        return fromChat(await this.#client.chat.completions.create(params));
+        return fromChat(await this.#client.chat.completions.create(params, { signal }));
       }
       const params: ResponseCreateParamsNonStreaming = {
         model: this.#config.deployment,
@@ -163,7 +171,7 @@ export class OpenAiProvider implements LlmProvider {
         store: false,
         ...(options.effort === undefined ? {} : { reasoning: { effort: options.effort } }),
       };
-      return fromResponses(await this.#client.responses.create(params));
+      return fromResponses(await this.#client.responses.create(params, { signal }));
     } catch (error) {
       throw this.#mapError(error);
     }

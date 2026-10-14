@@ -387,7 +387,7 @@ describe("LLM driver", () => {
   });
 
   it("survives a provider that always throws and opens the circuit breaker", async () => {
-    const down = { error: new LlmError("unreachable", "connection failed (ECONNREFUSED)") };
+    const down = { error: new LlmError("server", "500 Internal Server Error", { status: 500 }) };
     const { config, step, stats, provider, lines } = setup(
       Array.from({ length: 100 }, () => down),
       {
@@ -400,7 +400,7 @@ describe("LLM driver", () => {
     // Transport errors are not retried: one call per failed decision; 3 failures, then 10 paused steps.
     assert.equal(total.failedCalls, provider.inputs.length);
     assert.equal(total.breakerTrips, 3);
-    assert.equal(total.fallbacks.unreachable, 9 + 1);
+    assert.equal(total.fallbacks.server, 9 + 1);
     assert.ok(lines.some((line) => /pausing the LLM for 10 steps/.test(line)));
     assert.equal(config.llm?.breaker.failures, 3);
   });
@@ -441,7 +441,7 @@ describe("LLM driver", () => {
   });
 
   it("shares the circuit breaker: a trip in one run pauses the LLM in the others", async () => {
-    const down = { error: new LlmError("unreachable", "connection failed (ECONNREFUSED)") };
+    const down = { error: new LlmError("server", "500 Internal Server Error", { status: 500 }) };
     const click = { tool: "click", input: { ref: "e1" } };
     const llm = { handoff: { cooldownSteps: 0 }, breaker: { failures: 3, pauseSteps: 5 } };
     const breaker = new LlmBreaker();

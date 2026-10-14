@@ -10,6 +10,7 @@ export interface SdkErrorClasses {
   APIError: ErrorClass;
   APIConnectionError: ErrorClass;
   APIConnectionTimeoutError: ErrorClass;
+  APIUserAbortError: ErrorClass;
   AuthenticationError: ErrorClass;
   PermissionDeniedError: ErrorClass;
   NotFoundError: ErrorClass;
@@ -37,7 +38,8 @@ export function mapSdkError(
     const status = (e as { status?: unknown }).status;
     return new LlmError(kind, scrub(e.message), { ...(typeof status === "number" ? { status } : {}), retries });
   };
-  if (error instanceof C.APIConnectionTimeoutError) {
+  // A request is only aborted by its time limit; the driver tells a stopping run apart itself.
+  if (error instanceof C.APIConnectionTimeoutError || error instanceof C.APIUserAbortError) {
     return new LlmError("timeout", `no response within ${context.timeoutMs} ms`, { retries });
   }
   if (error instanceof C.APIConnectionError) return connectionError(error, retries);
