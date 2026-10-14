@@ -4,6 +4,7 @@ import type { BrowserContext, ConsoleMessage, Page, Response } from "playwright"
 import type { Config } from "../config/config.ts";
 import type { OracleName } from "../config/values.ts";
 import type { StepRecord } from "../monkey/loop.ts";
+import { AccessibilityAudit } from "./accessibility.ts";
 import { type ActionContext, type Finding, IgnoreRules, type Signal } from "./finding.ts";
 import { firstStackFrame, normalizeMessage, normalizeUrl } from "./keys.ts";
 
@@ -61,6 +62,7 @@ export class Oracles {
   readonly #history: ActionContext[] = [];
   readonly #documentStatus = new WeakMap<Page, number>();
   readonly #crashed = new WeakSet<Page>();
+  readonly #accessibility: AccessibilityAudit;
   /** Overflow seen by the previous check, to count a page that stays overflowing once. */
   #overflow: { page: Page; key: string } | undefined;
   #pending: Signal[] = [];
@@ -73,6 +75,7 @@ export class Oracles {
     this.#screenshotDir = options.screenshotDir;
     this.#origin = new URL(options.config.baseUrl).origin;
     this.#ignore = new IgnoreRules(options.config.findings.ignore);
+    this.#accessibility = new AccessibilityAudit(this.#origin);
     for (const page of context.pages()) this.#watch(page);
     context.on("page", (page) => this.#watch(page));
   }
@@ -113,8 +116,16 @@ export class Oracles {
     }
     if (page !== undefined && !this.#crashed.has(page) && /^https?:/.test(page.url())) {
       await this.#inspect(page, record.result.navigated);
+      await this.#audit(page);
     }
     await this.#flush();
+  }
+
+  async #audit(page: Page): Promise<void> {
+    if (!this.#config.oracles.accessibility) return;
+    // axe needs longer than a click on large pages.
+    const signals = await this.#accessibility.audit(page, this.#config.monkey.actionTimeoutMs * 4);
+    for (const signal of signals) this.#add("accessibility", signal);
   }
 
   /** Files signals that arrived after the last step. Call once after the run. */

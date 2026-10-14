@@ -1,4 +1,4 @@
-import type { ActionType, Engine } from "./values.ts";
+import type { ActionType, Engine, OracleName } from "./values.ts";
 
 /** Default values; referenced by the schema (`default`) and by normalization so they cannot drift apart. */
 export const DEFAULTS = {
@@ -8,7 +8,19 @@ export const DEFAULTS = {
   scope: { allow: [] as string[], deny: [] as string[] },
   network: { latencyMs: 0 },
   parallel: 1,
-  oracle: true,
+  oracles: {
+    pageerror: true,
+    console: true,
+    http5xx: true,
+    http4xx: true,
+    crash: true,
+    hang: true,
+    errorPage: true,
+    overflow: true,
+    download: true,
+    // Off by default: it reports what most sites have plenty of, and auditing each page takes time.
+    accessibility: false,
+  } satisfies Record<OracleName, boolean>,
   report: { dir: "./monkey-report", keepDownloads: false },
   findings: { lastActions: 10, ignoreStatus: [] as number[] },
   llm: {

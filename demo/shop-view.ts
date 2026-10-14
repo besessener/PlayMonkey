@@ -144,6 +144,7 @@ export function loginBody(error?: string): string {
 </section>`;
 }
 
+// Seeded bug D2: the visible "Add to cart" is not part of the button's accessible name, so voice control misses it.
 function productCard(product: Product): string {
   return `<article class="card">
   <div class="thumb" style="background: ${product.color};" aria-hidden="true">${product.name.charAt(0)}</div>

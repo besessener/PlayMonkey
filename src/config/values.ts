@@ -13,6 +13,7 @@ export const ORACLES = [
   "errorPage",
   "overflow",
   "download",
+  "accessibility",
 ] as const;
 export type OracleName = (typeof ORACLES)[number];
 
