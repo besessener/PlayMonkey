@@ -109,6 +109,8 @@ interface LlmProvider {
   `LlmErrorKind`) und behalte den Verbrauch fehlgeschlagener Aufrufe; die Hinweise der Vorabprüfung und der Bericht
   sind nach Art geordnet.
 - Melde `usage` (Eingabe-, Ausgabe-, Cache-Lese- und Cache-Schreib-Tokens) und wie viele Anfragen wiederholt wurden.
+  Die vier Zahlen überschneiden sich nicht: Zählt der Anbieter Cache-Zugriffe in den Eingabe-Tokens mit, zieh sie
+  davon ab.
 - Trage den Namen in `LLM_PROVIDERS` in `src/config/values.ts` und in `createProvider` in `src/llm/factory.ts` ein.
 
 `test/helpers/fake-provider.ts` ist ein geskripteter Anbieter für Tests; `test/foundry.test.ts` und

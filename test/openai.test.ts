@@ -137,7 +137,7 @@ describe("openai provider", () => {
     const result = await new OpenAiProvider(llm, { fetch }).decide(input);
 
     assert.deepEqual(result.decision, { type: "click", ref: "e3" });
-    assert.deepEqual(result.usage, { inputTokens: 1500, outputTokens: 40, cachedTokens: 1024 });
+    assert.deepEqual(result.usage, { inputTokens: 476, outputTokens: 40, cachedTokens: 1024 });
     assert.equal(result.retries, 0);
 
     const [request] = requests as [CapturedRequest];
@@ -177,7 +177,7 @@ describe("openai provider", () => {
     );
     const result = await new OpenAiProvider(llm, { fetch }).decide(input);
     assert.deepEqual(result.decision, { type: "fill", ref: "e3", value: "x" });
-    assert.deepEqual(result.usage, { inputTokens: 900, outputTokens: 25, cachedTokens: 512 });
+    assert.deepEqual(result.usage, { inputTokens: 388, outputTokens: 25, cachedTokens: 512 });
 
     const [request] = requests as [CapturedRequest];
     assert.equal(request.url, "https://res.openai.azure.com/openai/v1/chat/completions");

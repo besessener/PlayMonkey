@@ -86,7 +86,7 @@ dort ein Schlüssel steht, der auf dieser Seite fehlt.
 | `llm.breaker.failures` | integer ≥ 1 | `3` | Fehlgeschlagene LLM-Entscheidungen in Folge, über alle Läufe, die den Circuit Breaker öffnen. |
 | `llm.breaker.pauseSteps` | integer ≥ 1 | `20` | Schritte ohne LLM, solange der Breaker offen ist, gezählt in den eigenen Schritten jedes Laufs; ein Auslösen pausiert jeden Lauf. |
 | `llm.pricing` | Objekt | fehlt | Preise pro Million Tokens für **geschätzte** Kosten im Bericht. Es gibt keine eingebauten Preise. |
-| `llm.pricing.inputPerMTok` | number ≥ 0 | – | Preis pro Million Eingabe-Tokens. Pflicht in `pricing`. |
+| `llm.pricing.inputPerMTok` | number ≥ 0 | – | Preis pro Million Eingabe-Tokens, die weder aus dem Prompt-Cache gelesen noch in ihn geschrieben werden. Pflicht in `pricing`. |
 | `llm.pricing.outputPerMTok` | number ≥ 0 | – | Preis pro Million Ausgabe-Tokens (Thinking eingeschlossen). Pflicht in `pricing`. |
 | `llm.pricing.cacheReadPerMTok` | number ≥ 0 | `inputPerMTok` | Preis pro Million Tokens, die aus dem Prompt-Cache gelesen werden. |
 | `llm.pricing.cacheWritePerMTok` | number ≥ 0 | `inputPerMTok` | Preis pro Million Tokens, die in den Prompt-Cache geschrieben werden. |

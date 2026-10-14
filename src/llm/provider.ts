@@ -59,6 +59,7 @@ export interface DecideResult {
 }
 
 export interface LlmUsage {
+  /** Input tokens neither read from nor written to the prompt cache; the four counts never overlap. */
   inputTokens: number;
   outputTokens: number;
   /** Input tokens read from the prompt cache, when the provider reports them. */

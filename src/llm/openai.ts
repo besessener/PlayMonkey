@@ -222,25 +222,31 @@ function toChatTool(definition: ToolDefinition): ChatCompletionFunctionTool {
   };
 }
 
-/** The cache token counts the API reported; a missing or null count is left out. */
-function cacheUsage(
+/**
+ * The usage the API reported. OpenAI counts cache reads and writes inside the input tokens, so `inputTokens` keeps
+ * only the uncached rest, as with every provider; a missing or null cache count is left out.
+ */
+function openAiUsage(
+  input: number | undefined,
+  output: number | undefined,
   details: { cached_tokens?: number | null; cache_write_tokens?: number | null } | undefined,
-): Pick<LlmUsage, "cachedTokens" | "cacheWriteTokens"> {
-  const cached = details?.cached_tokens;
-  const written = details?.cache_write_tokens;
+): LlmUsage {
+  const cached = details?.cached_tokens ?? undefined;
+  const written = details?.cache_write_tokens ?? undefined;
   return {
-    ...(cached === null || cached === undefined ? {} : { cachedTokens: cached }),
-    ...(written === null || written === undefined ? {} : { cacheWriteTokens: written }),
+    inputTokens: Math.max(0, (input ?? 0) - (cached ?? 0) - (written ?? 0)),
+    outputTokens: output ?? 0,
+    ...(cached === undefined ? {} : { cachedTokens: cached }),
+    ...(written === undefined ? {} : { cacheWriteTokens: written }),
   };
 }
 
 function fromResponses(response: OpenAiResponse): Answer {
-  const details = response.usage?.input_tokens_details;
-  const usage: LlmUsage = {
-    inputTokens: response.usage?.input_tokens ?? 0,
-    outputTokens: response.usage?.output_tokens ?? 0,
-    ...cacheUsage(details),
-  };
+  const usage = openAiUsage(
+    response.usage?.input_tokens,
+    response.usage?.output_tokens,
+    response.usage?.input_tokens_details,
+  );
   const answer: Answer = { usage, raw: response };
   const call = response.output.find((item): item is ResponseFunctionToolCall => item.type === "function_call");
   if (call !== undefined) answer.call = { name: call.name, arguments: call.arguments };
@@ -267,12 +273,11 @@ function fromResponses(response: OpenAiResponse): Answer {
 }
 
 function fromChat(completion: ChatCompletion): Answer {
-  const details = completion.usage?.prompt_tokens_details;
-  const usage: LlmUsage = {
-    inputTokens: completion.usage?.prompt_tokens ?? 0,
-    outputTokens: completion.usage?.completion_tokens ?? 0,
-    ...cacheUsage(details),
-  };
+  const usage = openAiUsage(
+    completion.usage?.prompt_tokens,
+    completion.usage?.completion_tokens,
+    completion.usage?.prompt_tokens_details,
+  );
   const answer: Answer = { usage, raw: completion };
   const choice = completion.choices[0];
   const call = choice?.message.tool_calls?.find((item) => item.type === "function");
