@@ -14,6 +14,7 @@ import { describeUsage, type LlmStats } from "./llm/usage.ts";
 import { type Action, describeAction } from "./monkey/actions.ts";
 import { describeEvent, removeDownloads } from "./monkey/events.ts";
 import { type ReplayPlan, type RunResult, runMonkey, type StepRecord } from "./monkey/loop.ts";
+import { UrlScope } from "./monkey/scope.ts";
 import type { Spectator } from "./monkey/spectator.ts";
 import type { Finding } from "./oracles/finding.ts";
 import { Oracles } from "./oracles/oracles.ts";
@@ -262,6 +263,7 @@ function createAdvisor(run: RoleRun, oracles: Oracles): LlmDriver | undefined {
   const { config, secrets } = run.loaded;
   const llm = options.llm;
   if (options.replay !== undefined || llm === undefined || config.llm === undefined) return undefined;
+  const scope = new UrlScope(config.scope);
   return new LlmDriver({
     provider: llm.provider,
     config: config.llm,
@@ -276,6 +278,7 @@ function createAdvisor(run: RoleRun, oracles: Oracles): LlmDriver | undefined {
     ...(llm.breaker === undefined ? {} : { breaker: llm.breaker }),
     findings: () => oracles.findings.map((f) => `${f.severity} ${f.oracle}: ${f.message}`),
     ...(config.stayOnDomain ? { origin: new URL(config.baseUrl).origin } : {}),
+    ...(scope.restricted ? { scope } : {}),
     ...(llm.debugLog === undefined ? {} : { debugLog: llm.debugLog }),
     log,
   });

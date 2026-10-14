@@ -7,7 +7,8 @@ Entwurf.
 
 Es gibt keinen Nur-Lesen-Modus, keinen Filter für zerstörerische Aktionen und keine Bestätigung. Der Monkey klickt,
 löscht und sendet alles ab, was er findet; so findet er Fehler. Richte ihn nur auf Testumgebungen, die du wegwerfen
-kannst.
+kannst. Mit [`scope`](sitzungen.md#scope) kannst du ihn von Seiten fernhalten, um einen Lauf zu lenken; Anfragen per
+`fetch` oder XHR hält der Scope nicht auf, er ist also kein Schutz.
 
 ## Läufe enden immer
 

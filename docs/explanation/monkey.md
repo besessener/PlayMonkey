@@ -33,7 +33,7 @@ dieselbe Seite ergeben denselben Lauf.
 2. **Element** innerhalb dieses Typs, bevorzugt Neues: Das Gewicht eines Elements sinkt mit jeder Verwendung im
    selben Zustand (URL und Snapshot-Hash), und Links zu einer URL, die der Lauf noch nicht besucht hat, zählen
    dreifach. Deaktivierte Elemente werden übersprungen; mit `stayOnDomain` sind Links zu anderen Origins keine
-   Kandidaten.
+   Kandidaten, ebenso Links außerhalb des [Scopes](sitzungen.md#scope).
 3. **Blockierende Oberfläche zuerst:** Solange ein Dialog offen ist, zählen die Elemente darin zehnfach; solange ein
    Cookie- oder Consent-Banner zu sehen ist, gilt das auch für seine Antwort-Buttons („Accept“, „Reject“, …). Solche
    Overlays verdecken meist die Seite, Klicks anderswo liefen also nur in einen Timeout. Der Lauf bleibt nie an einem
@@ -94,7 +94,8 @@ aber ihr Inhalt gehört zu einer anderen Seite.
 
 Die Schleife hält bei `limits.maxSteps`, bei `limits.maxMinutes` (vor jedem Schritt geprüft) oder bei einer
 Unterbrechung (Strg+C beendet den aktuellen Schritt und schreibt dann den Trace). Mit `stayOnDomain` wird eine Seite,
-die auf einem anderen Origin oder als leere Seite endet, zurück zu `baseUrl` geschickt. Eine abgestürzte Seite wird
+die auf einem anderen Origin oder als leere Seite endet, zurück zu `baseUrl` geschickt, ebenso eine außerhalb des
+`scope`. Eine abgestürzte Seite wird
 geschlossen, und der Lauf geht in einem anderen Tab oder einer frischen Seite weiter; das Orakel `crash` meldet es.
 
 ## Abdeckung auf der Fixture-Seite

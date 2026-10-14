@@ -3,6 +3,7 @@ import { unblockingElements } from "../snapshot/blocking.ts";
 import type { Snapshot, SnapshotElement } from "../snapshot/snapshot.ts";
 import type { Action } from "./actions.ts";
 import type { Random } from "./random.ts";
+import type { UrlScope } from "./scope.ts";
 import { chooseFillValue } from "./values.ts";
 
 const FILL_ROLES = new Set(["textbox", "searchbox", "spinbutton"]);
@@ -59,6 +60,8 @@ export interface ChooseOptions {
   testData: Record<string, string>;
   /** Origin the monkey must stay on, or undefined when `stayOnDomain` is off. */
   origin?: string;
+  /** URLs the monkey may open; links elsewhere are never clicked. */
+  scope?: UrlScope;
   tabCount: number;
   currentTab: number;
   viewport: { width: number; height: number };
@@ -115,7 +118,7 @@ function elementCandidates(element: SnapshotElement, pageUrl: string, options: C
   if (FILL_ROLES.has(element.role)) return [{ type: "fill", element }];
   if (SELECT_ROLES.has(element.role)) return (element.options?.length ?? 0) > 0 ? [{ type: "select", element }] : [];
   // Buttons, links and anything the page marks clickable.
-  if (element.role === "link" && !staysOnOrigin(element, pageUrl, options.origin)) return [];
+  if (element.role === "link" && !linkAllowed(element, pageUrl, options)) return [];
   const candidates: Candidate[] = [{ type: "click", element }];
   for (const type of POINTER_TYPES) candidates.push({ type, element });
   if (options.viewport.width < TOUCH_WIDTH) candidates.push({ type: "longPress", element });
@@ -227,6 +230,11 @@ function elementKeys(elements: SnapshotElement[]): Map<SnapshotElement, string> 
     keys.set(element, `${base}\u0000${index}`);
   }
   return keys;
+}
+
+function linkAllowed(element: SnapshotElement, pageUrl: string, options: ChooseOptions): boolean {
+  if (!staysOnOrigin(element, pageUrl, options.origin)) return false;
+  return element.url === undefined || options.scope === undefined || options.scope.allowsLink(element.url, pageUrl);
 }
 
 function staysOnOrigin(element: SnapshotElement, pageUrl: string, origin: string | undefined): boolean {

@@ -3,6 +3,7 @@ import { join } from "node:path";
 import type { Browser, BrowserContext, BrowserContextOptions, Cookie, Locator, Page, Request } from "playwright";
 import type { AuthRole, Config, FieldsLoginRole, StorageStateRole } from "../config/config.ts";
 import type { Secrets } from "../config/secrets.ts";
+import { UrlScope } from "../monkey/scope.ts";
 
 /** Role name used when the config has no `auth` entries. */
 export const ANONYMOUS_ROLE = "anonymous";
@@ -76,6 +77,8 @@ export async function openRoleSession(
   }
 
   const [width, height] = config.browser.viewport;
+  const scope = new UrlScope(config.scope);
+  const guarded = config.stayOnDomain || scope.restricted;
   const context = await browser.newContext({
     baseURL: config.baseUrl,
     viewport: { width, height },
@@ -83,12 +86,16 @@ export async function openRoleSession(
     ...(options.video === false
       ? {}
       : { recordVideo: { dir: join(options.outputDir, "video"), size: { width, height } } }),
-    // Service workers bypass request routing, so they would undermine stayOnDomain.
-    ...(config.stayOnDomain ? { serviceWorkers: "block" as const } : {}),
+    // Service workers bypass request routing, so they would undermine stayOnDomain and scope.
+    ...(guarded ? { serviceWorkers: "block" as const } : {}),
   });
 
   const events: SessionEvent[] = [];
-  if (config.stayOnDomain) await guardOrigin(context, new URL(config.baseUrl).origin, events, secrets);
+  if (guarded) {
+    const origin = config.stayOnDomain ? new URL(config.baseUrl).origin : undefined;
+    const allowed = (url: string) => (origin === undefined || new URL(url).origin === origin) && scope.allows(url);
+    await guardNavigations(context, allowed, events, secrets);
+  }
 
   const tracing = options.trace !== false;
   if (tracing) await context.tracing.start({ screenshots: true, snapshots: true });
@@ -222,14 +229,20 @@ async function readStorageState(
 }
 
 /**
- * Blocks top-level navigations to other origins and records them; subresources (CDNs, fonts) are allowed. The
- * request is aborted as `aborted` (net::ERR_ABORTED), which keeps the current page; other error codes would show
- * the browser's error page, and answering 204 leaves Playwright's click waiting for the navigation.
+ * Blocks top-level navigations to URLs that are not `allowed` (other origins, out of scope) and records them;
+ * subresources (CDNs, fonts) and fetches are allowed. The request is aborted as `aborted` (net::ERR_ABORTED), which
+ * keeps the current page; other error codes would show the browser's error page, and answering 204 leaves
+ * Playwright's click waiting for the navigation.
  */
-async function guardOrigin(context: BrowserContext, origin: string, events: SessionEvent[], secrets: Secrets) {
+async function guardNavigations(
+  context: BrowserContext,
+  allowed: (url: string) => boolean,
+  events: SessionEvent[],
+  secrets: Secrets,
+) {
   await context.route("**/*", async (route, request) => {
     const isTopLevel = request.isNavigationRequest() && isMainFrame(request);
-    if (isTopLevel && new URL(request.url()).origin !== origin) {
+    if (isTopLevel && !allowed(request.url())) {
       events.push({ kind: "blocked-navigation", url: secrets.mask(request.url()), time: new Date().toISOString() });
       await route.abort("aborted");
       return;

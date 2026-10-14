@@ -26,7 +26,7 @@ beantwortet, auch während der Schritte des LLM; der Prompt sagt das.
 
 Nichts, was es zurückgibt, gilt als vertrauenswürdig. Die Tool-Eingabe wird gegen das JSON-Schema des Tools
 validiert, Element-Tools müssen eine Ref des aktuellen Snapshots nennen, und `navigate` muss auf der Seite bleiben,
-wenn `stayOnDomain` an ist. Ein Verstoß zählt als ungültige Antwort.
+wenn `stayOnDomain` an ist, und im `scope` liegen. Ein Verstoß zählt als ungültige Antwort.
 
 ## Wann der Monkey übergibt
 
