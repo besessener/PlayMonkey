@@ -30,6 +30,8 @@ const ERROR_PAGE_PATTERNS = [
 
 /** Chromium's console echo of a failed HTTP response: the response itself is the HTTP oracles' business. */
 const FAILED_RESOURCE = /^Failed to load resource: the server responded with a status of (\d{3})\b/;
+/** Chromium's echo of a request the `offline` action made fail: caused by the monkey, not the page. */
+const OFFLINE_RESOURCE = /^Failed to load resource: net::ERR_INTERNET_DISCONNECTED\b/;
 
 interface PageFacts {
   scrollWidth: number;
@@ -149,7 +151,7 @@ export class Oracles {
   #onConsole(page: Page, message: ConsoleMessage): void {
     if (message.type() !== "error") return;
     const text = message.text();
-    if (FAILED_RESOURCE.test(text)) return;
+    if (FAILED_RESOURCE.test(text) || OFFLINE_RESOURCE.test(text)) return;
     const location = message.location();
     this.#add("console", {
       severity: "medium",

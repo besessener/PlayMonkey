@@ -54,6 +54,7 @@ dort ein Schlüssel steht, der auf dieser Seite fehlt.
 | `stayOnDomain` | boolean | `true` | Navigationen zu anderen Origins als dem von `baseUrl` nicht folgen. |
 | `scope.allow` | Array regulärer Ausdrücke | `[]` | Ist es nicht leer, öffnet der Monkey nur Seiten, deren vollständige URL zu einem der Muster passt; siehe [scope](../explanation/sitzungen.md#scope). |
 | `scope.deny` | Array regulärer Ausdrücke | `[]` | Seiten, deren vollständige URL zu einem der Muster passt, öffnet der Monkey nie, z. B. `["/logout", "/admin/"]`. |
+| `network.latencyMs` | integer 0 … 60000 | `0` | Verzögerung jeder Anfrage des Laufs in Millisekunden; siehe [Netzwerk](../explanation/monkey.md#netzwerk). |
 | `auth` | Array | `[]` (eine anonyme Rolle) | Rollen, unter denen gelaufen wird; siehe unten. |
 | `auth[].name` | string, Pflicht | – | Eindeutiger Rollenname. |
 | `auth[].loginUrl` | string | – | Pfad der Anmeldeseite, relativ zu `baseUrl`. Pflicht mit `fields`. |
@@ -127,6 +128,7 @@ dort ein Schlüssel steht, der auf dieser Seite fehlt.
 | `monkey.weights.navigate` | number ≥ 0 | `1` | Relatives Gewicht dafür, eine URL zu öffnen, die früher im Lauf vorkam. |
 | `monkey.weights.setViewport` | number ≥ 0 | `0.2` | Relatives Gewicht für eine Änderung der Viewport-Größe. |
 | `monkey.weights.switchTab` | number ≥ 0 | `1` | Relatives Gewicht für den Wechsel in einen anderen offenen Tab. |
+| `monkey.weights.offline` | number ≥ 0 | `0` | Relatives Gewicht dafür, den Browser für den nächsten Schritt offline zu nehmen; siehe [Netzwerk](../explanation/monkey.md#netzwerk). |
 
 Wie das LLM eingesetzt wird, erklärt [Das LLM](../explanation/llm.md); wie du ein Backend einrichtest, [LLM
 einrichten](../how-to/llm-einrichten.md). Was jedes Orakel meldet, erklärt [Orakel und

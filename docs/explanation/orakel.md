@@ -33,7 +33,10 @@ Skriptauswertung pro Schritt.
   Navigation oder das Laden einer Seite zählen als `hang`.
 - **Das Echo von Chromium auf eine fehlgeschlagene Antwort**
   (`Failed to load resource: the server responded with a status of 404`) in der Konsole. Die Antwort selbst ist der
-  Befund der HTTP-Orakel; das Echo würde sie doppelt melden.
+  Befund der HTTP-Orakel; das Echo würde sie doppelt melden. Ebenso das Echo einer Anfrage, die nur deshalb
+  scheitert, weil die Aktion [`offline`](monkey.md#netzwerk) das Netz gekappt hat
+  (`net::ERR_INTERNET_DISCONNECTED`). Was die Seite selbst dann tut, etwa eine nicht abgefangene Ablehnung von
+  `fetch`, ist sehr wohl ein Befund.
 - **Eine Fehlerseite, deren Status die HTTP-Orakel melden.** Eine 404-Seite ist ein Befund `http4xx`, nicht auch noch
   `errorPage`. `errorPage` deckt ab, was die HTTP-Orakel nicht sehen können: weiche Fehlerseiten, die mit Status 200
   ausgeliefert werden und deren Titel oder Hauptüberschrift „Not found“, „Something went wrong“, „Internal Server

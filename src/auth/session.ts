@@ -79,6 +79,7 @@ export async function openRoleSession(
   const [width, height] = config.browser.viewport;
   const scope = new UrlScope(config.scope);
   const guarded = config.stayOnDomain || scope.restricted;
+  const { latencyMs } = config.network;
   const context = await browser.newContext({
     baseURL: config.baseUrl,
     viewport: { width, height },
@@ -86,10 +87,18 @@ export async function openRoleSession(
     ...(options.video === false
       ? {}
       : { recordVideo: { dir: join(options.outputDir, "video"), size: { width, height } } }),
-    // Service workers bypass request routing, so they would undermine stayOnDomain and scope.
-    ...(guarded ? { serviceWorkers: "block" as const } : {}),
+    // Service workers bypass request routing, so they would undermine stayOnDomain, scope and the latency.
+    ...(guarded || latencyMs > 0 ? { serviceWorkers: "block" as const } : {}),
   });
 
+  // Routes run newest first: the guard below aborts blocked navigations before they are delayed.
+  if (latencyMs > 0) {
+    await context.route("**/*", async (route) => {
+      await new Promise((resolve) => setTimeout(resolve, latencyMs));
+      // The context may have closed during the delay; then nobody waits for the request any more.
+      await route.fallback().catch(() => undefined);
+    });
+  }
   const events: SessionEvent[] = [];
   if (guarded) {
     const origin = config.stayOnDomain ? new URL(config.baseUrl).origin : undefined;

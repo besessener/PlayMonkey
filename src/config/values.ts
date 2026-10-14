@@ -32,6 +32,7 @@ export const ACTION_TYPES = [
   "navigate",
   "setViewport",
   "switchTab",
+  "offline",
 ] as const;
 export type ActionType = (typeof ACTION_TYPES)[number];
 

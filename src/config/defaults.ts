@@ -6,6 +6,7 @@ export const DEFAULTS = {
   browser: { engine: "chromium" as Engine, viewport: [1280, 800] as [number, number], headless: true },
   stayOnDomain: true,
   scope: { allow: [] as string[], deny: [] as string[] },
+  network: { latencyMs: 0 },
   parallel: 1,
   oracle: true,
   report: { dir: "./monkey-report", keepDownloads: false },
@@ -49,6 +50,8 @@ export const DEFAULTS = {
       navigate: 1,
       setViewport: 0.2,
       switchTab: 1,
+      // Off by default: a new action type with weight > 0 would change the run of every existing seed.
+      offline: 0,
     } satisfies Record<ActionType, number>,
   },
 } as const;

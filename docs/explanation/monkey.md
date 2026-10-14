@@ -28,8 +28,9 @@ dieselbe Seite ergeben denselben Lauf.
    `drag` (ein Element auf ein anderes, nach bestem Bemühen), `fill` (Textfelder), `select` (Dropdowns), `check`
    (Checkboxen, Radiobuttons, Schalter; ein angehakter wird abgehakt), `press` (Tab, Shift+Tab, Enter, Escape,
    Pfeiltasten, Leertaste: Navigation nur per Tastatur), `scroll`, `back`, `navigate` (zu einer URL, die früher im
-   Lauf gesehen wurde), `setViewport` (Größen für Smartphone, Tablet, Laptop, Desktop) und `switchTab` (nur bei
-   mehreren Tabs). Ein Gewicht von 0 schaltet einen Typ ab.
+   Lauf gesehen wurde), `setViewport` (Größen für Smartphone, Tablet, Laptop, Desktop), `switchTab` (nur bei
+   mehreren Tabs) und `offline` (siehe [Netzwerk](#netzwerk); standardmäßig mit Gewicht 0 aus). Ein Gewicht von 0
+   schaltet einen Typ ab.
 2. **Element** innerhalb dieses Typs, bevorzugt Neues: Das Gewicht eines Elements sinkt mit jeder Verwendung im
    selben Zustand (URL und Snapshot-Hash), und Links zu einer URL, die der Lauf noch nicht besucht hat, zählen
    dreifach. Deaktivierte Elemente werden übersprungen; mit `stayOnDomain` sind Links zu anderen Origins keine
@@ -83,6 +84,21 @@ einmal.
 blockiert und geschlossen, und der Monkey macht im ersten Tab weiter. Mehr als `monkey.maxTabs` offene Tabs
 (Standard 5) werden nicht behalten: Die ältesten, die der Monkey zurückgelassen hat, werden geschlossen, nie der
 erste Tab oder der aktuelle.
+
+## Netzwerk
+
+Zwei Einstellungen bringen schlechte Verbindungen in einen Lauf, beide standardmäßig aus:
+
+- **`network.latencyMs`** verzögert jede Anfrage des Laufs um so viele Millisekunden, über eine Route auf dem
+  Kontext, die mit jeder Engine funktioniert. Das macht Ladezustände, doppelt abgeschickte Formulare und
+  Wettläufe sichtbar. Halte den Wert deutlich unter `monkey.actionTimeoutMs`, sonst wird jede Navigation zum `hang`.
+  Service Worker sind dann blockiert, weil sie die Route umgehen; die Anmeldung läuft ohne Verzögerung.
+- **Die Aktion `offline`** (`monkey.weights.offline`) nimmt dem Browser das Netz für genau den nächsten Schritt;
+  danach ist er wieder online. So zeigt sich, ob eine Seite fehlgeschlagene Anfragen abfängt. Weil das Gewicht
+  standardmäßig 0 ist, ändert die Aktion keinen bestehenden Lauf; setzt du es, verschiebt sich die Folge des Seeds.
+
+Ein Schritt ohne Netz, der eine Seite lädt, landet auf der Fehlerseite des Browsers; der nächste Schritt bringt die
+Seite wie bei einem verlassenen Origin zurück zu `baseUrl` (mit `stayOnDomain`).
 
 ## Frames
 

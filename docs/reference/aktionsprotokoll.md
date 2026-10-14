@@ -9,7 +9,7 @@ immer vollständiges JSON, auch wenn ein Lauf abgebrochen wird.
 
 ```json
 {
-  "version": 2,
+  "version": 3,
   "seed": 42,
   "baseUrl": "${FIXTURE_URL}",
   "role": "user",
@@ -59,12 +59,12 @@ immer vollständiges JSON, auch wenn ein Lauf abgebrochen wird.
 
 | Feld | Bedeutung |
 | --- | --- |
-| `version` | Formatversion, derzeit `2`. Protokolle der Version 1 (vor den Aktionen `dblclick`, `rightclick`, `hover`, `longPress`, `drag` und `events`) werden weiterhin gelesen; andere Versionen lehnt `monkey replay` mit einer klaren Meldung ab. |
+| `version` | Formatversion, derzeit `3`. Protokolle der Version 2 (vor der Aktion `offline`) und 1 (vor den Aktionen `dblclick`, `rightclick`, `hover`, `longPress`, `drag` und `events`) werden weiterhin gelesen; andere Versionen lehnt `monkey replay` mit einer klaren Meldung ab. |
 | `seed`, `baseUrl`, `role`, `viewport` | Die Einstellungen des Laufs; Replay nutzt sie statt der aus der Konfiguration. |
 | `placeholders` | Variablen, deren Werte das Protokoll als `${VAR}` speichert; siehe unten. |
 | `actions[].step` | 1, 2, … in Ausführungsreihenfolge. |
 | `actions[].source` | `monkey`, oder `llm` für eine Aktion, die das LLM gewählt hat. Replay führt beide gleich aus. |
-| `actions[].type` und seine Felder | Die Aktion: `click`, `dblclick`, `rightclick`, `hover`, `longPress`, `check`, `uncheck` (`ref`); `drag` (`ref`, `toRef`); `fill`, `select` (`ref`, `value`); `press` (`key`); `scroll` (`deltaY`); `back`; `navigate` (`url`); `setViewport` (`width`, `height`); `switchTab` (`index`). |
+| `actions[].type` und seine Felder | Die Aktion: `click`, `dblclick`, `rightclick`, `hover`, `longPress`, `check`, `uncheck` (`ref`); `drag` (`ref`, `toRef`); `fill`, `select` (`ref`, `value`); `press` (`key`); `scroll` (`deltaY`); `back`; `navigate` (`url`); `setViewport` (`width`, `height`); `switchTab` (`index`); `offline`. |
 | `actions[].ref` | Die Ref des Elements im Snapshot dieses Schritts. Nur zur Information: Refs überleben keinen Seitenwechsel. |
 | `actions[].locator` | **Dauerhafter Locator** des Elements, so wie Playwrights `codegen` ihn schreibt. Replay findet das Element darüber. |
 | `actions[].toLocator` | Nur bei `drag`: dauerhafter Locator des Ablageziels. |

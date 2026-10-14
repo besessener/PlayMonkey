@@ -17,6 +17,7 @@ export interface RawConfig {
   browser?: { engine?: Engine; viewport?: [number, number]; headless?: boolean };
   stayOnDomain?: boolean;
   scope?: { allow?: string[]; deny?: string[] };
+  network?: { latencyMs?: number };
   auth?: RawAuth[];
   testData?: Record<string, string>;
   llm?: RawLlm;
@@ -161,6 +162,23 @@ export const configSchema: JSONSchemaType<RawConfig> = {
           nullable: true,
           default: DEFAULTS.scope.deny,
           description: "URLs matching one of these patterns are never opened.",
+        },
+      },
+    },
+    network: {
+      type: "object",
+      nullable: true,
+      additionalProperties: false,
+      required: [],
+      description: "Network conditions of the run. Going offline is the monkey action offline (monkey.weights).",
+      properties: {
+        latencyMs: {
+          type: "integer",
+          minimum: 0,
+          maximum: 60_000,
+          nullable: true,
+          default: DEFAULTS.network.latencyMs,
+          description: "Delay added to every request of the run in milliseconds; 0 for none.",
         },
       },
     },
