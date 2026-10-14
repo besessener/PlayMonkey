@@ -75,8 +75,9 @@ immer vollständiges JSON, auch wenn ein Lauf abgebrochen wird.
 
 ## Secrets und Platzhalter
 
-Jeder Wert, der aus einem `${VAR}`-Platzhalter in der Konfiguration stammt (Passwörter, die Basis-URL der
-Testumgebung, Testdaten), wird in den Freitextfeldern des Protokolls wieder als Platzhalter geschrieben (`baseUrl`,
+Jedes [Secret](konfiguration.md#secrets-var) (Anmeldefelder, Testdaten, API-Key) und jeder Wert, der aus einem
+`${VAR}`-Platzhalter in `baseUrl` stammt (Host und Port der Testumgebung), wird in den Freitextfeldern des
+Protokolls wieder als Platzhalter geschrieben (`baseUrl`,
 `role`, `value`, `url`, `key`, `locator`, `toLocator`, `pageUrl`, `error`, Dialogmeldungen und Prompt-Text, Namen
 und URLs von Downloads, Meldungen und Schlüssel von Befunden). `monkey replay` löst sie wieder aus der Umgebung auf,
 aber nur Variablen, die auch die Konfiguration von `--config` verwendet; braucht das Protokoll eine andere, bricht es

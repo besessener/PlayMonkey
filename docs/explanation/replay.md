@@ -31,7 +31,8 @@ LLM-Entscheidungen stehen als gewöhnliche Aktionen im Protokoll.
 Ein Aktionsprotokoll ist eine Eingabe von außen: Das Artefakt `monkey-report` eines CI-Laufs für einen Pull Request
 aus einem Fork bestimmt der Fork. Replay und Shrink behandeln jedes Protokoll deshalb als nicht vertrauenswürdig:
 
-- **Platzhalter:** Aufgelöst werden nur Variablen, die deine Konfiguration (`--config`) selbst verwendet. Ein
+- **Platzhalter:** Aufgelöst werden nur Variablen, die deine Konfiguration (`--config`) als Secret oder in `baseUrl`
+  verwendet. Ein
   Protokoll, das eine andere Variable braucht, wird mit ihrem Namen abgelehnt, auch wenn sie in deiner Umgebung
   gesetzt ist; so kann es sich keine Umgebungsvariable aussuchen. Ohne `--config` wird gar nichts aufgelöst, und ein
   Protokoll mit Platzhaltern braucht `--config`.

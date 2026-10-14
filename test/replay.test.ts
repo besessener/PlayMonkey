@@ -205,9 +205,9 @@ describe("action log and replay against the fixture site", () => {
     });
     for (const finding of findings) {
       assert.equal(finding.role, "user");
-      // baseUrl comes from ${FIXTURE_URL}, so it is masked like every substituted value.
-      assert.match(finding.url, /^\*\*\*\//);
-      assert.doesNotMatch(finding.url, /^\*\*\*\/(clean|login|account)$/);
+      // baseUrl comes from ${FIXTURE_URL}, which is no credential, so it is not masked.
+      assert.ok(finding.url.startsWith(`${site.url}/`), finding.url);
+      assert.doesNotMatch(finding.url, /\/(clean|login|account)$/);
       assert.ok((await stat(finding.screenshotPath ?? "")).size > 0, `${finding.id} has a screenshot`);
       assert.equal(finding.lastActions.length, Math.min(10, finding.step));
       assert.equal(finding.lastActions.at(-1)?.step, finding.step);

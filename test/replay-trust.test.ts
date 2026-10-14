@@ -96,7 +96,11 @@ describe("replaying an untrusted action log", () => {
       const file = await write("origin.actions.json", log({ baseUrl, placeholders: ["SITE_URL"], actions: [] }));
       const { code, stderr } = await cli(["replay", "--config", siteConfig, file]);
       assert.equal(code, ExitCode.Error, baseUrl);
-      assert.match(stderr, /baseUrl .* is not on the origin of the config's baseUrl \*\*\*; replay only logs/, baseUrl);
+      assert.match(
+        stderr,
+        /baseUrl .* is not on the origin of the config's baseUrl http:\/\/site\.invalid; replay only logs/,
+        baseUrl,
+      );
     }
   });
 
@@ -122,7 +126,7 @@ describe("replaying an untrusted action log", () => {
       ["javascript:alert(1)", siteConfig, /step 2: navigate javascript:alert\(1\) is not an http\(s\) URL/],
       ["file:///etc/passwd", offSite, /step 2: navigate file:\/\/\/etc\/passwd is not an http\(s\) URL/],
       ["http://attacker.invalid/x", siteConfig, /step 2: navigate .* leaves the site under test \(stayOnDomain\)/],
-      ["${SITE_URL}/admin", scoped, /step 2: navigate \*\*\*\/admin is outside the configured scope/],
+      ["${SITE_URL}/admin", scoped, /step 2: navigate http:\/\/site\.invalid\/admin is outside the configured scope/],
     ];
     for (const [url, config, expected] of cases) {
       const actions = [action(1, { type: "back" }), action(2, { type: "navigate", url })];

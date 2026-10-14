@@ -171,7 +171,7 @@ describe("monkey shrink against the fixture site", () => {
   it("keeps the shortest result so far and exits 2 when interrupted", async () => {
     let stdout = "";
     let stderr = "";
-    const code = await runCli(["shrink", logFile], {
+    const code = await runCli(["shrink", "--config", config, logFile], {
       stdout: (text) => {
         stdout += text;
         // In-process stand-in for Ctrl+C after the first replay.

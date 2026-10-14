@@ -98,7 +98,7 @@ export async function runAllRoles(loaded: LoadedConfig, options: RunAllOptions):
         outcomes[index] = await runRole(
           browser,
           plan.role,
-          { config: { ...config, seed: plan.seed }, secrets },
+          { ...loaded, config: { ...config, seed: plan.seed } },
           plannedRoleOptions(plan, options, llm),
         );
       } catch (error) {
@@ -141,6 +141,9 @@ function plannedRoleOptions(plan: PlannedRun, options: RunAllOptions, llm: RunLl
   };
 }
 
+/** What a run needs of the loaded config; without `variables`, the action log stores only the secrets as placeholders. */
+type RunConfig = Pick<LoadedConfig, "config" | "secrets"> & Partial<Pick<LoadedConfig, "variables">>;
+
 export interface RoleOptions {
   log: (line: string) => void;
   /** Log prefix and LLM usage key; default: the role name. */
@@ -165,7 +168,7 @@ export interface RoleOptions {
 export async function runRole(
   browser: Browser,
   role: AuthRole | undefined,
-  loaded: Pick<LoadedConfig, "config" | "secrets">,
+  loaded: RunConfig,
   options: RoleOptions,
 ): Promise<RoleOutcome> {
   const { config, secrets } = loaded;
@@ -195,7 +198,7 @@ interface RoleRun {
   name: string;
   label: string;
   log: (line: string) => void;
-  loaded: Pick<LoadedConfig, "config" | "secrets">;
+  loaded: RunConfig;
   options: RoleOptions;
 }
 
@@ -274,12 +277,12 @@ async function closeSession(run: RoleRun, session: RoleSession): Promise<Session
 
 /** Writes `actions.json` of one run into its output directory. */
 async function createActionLog(run: RoleRun): Promise<ActionLogWriter> {
-  const { config, secrets } = run.loaded;
+  const { config, secrets, variables } = run.loaded;
   await mkdir(run.options.outputDir, { recursive: true });
   return new ActionLogWriter(
     join(run.options.outputDir, "actions.json"),
     { seed: config.seed, baseUrl: config.baseUrl, role: run.name, viewport: config.browser.viewport },
-    secrets,
+    variables ?? secrets,
   );
 }
 

@@ -104,6 +104,11 @@ export interface LoadedConfig {
    * the config with them.
    */
   secrets: Secrets;
+  /**
+   * The secrets and the values of `${VAR}` in `baseUrl`: the action log stores them as placeholders, so a replay fills
+   * in its own environment's values and runs on another host or port too.
+   */
+  variables: Secrets;
   /** True when no seed was configured and a random one was generated. */
   seedGenerated: boolean;
 }
@@ -162,6 +167,7 @@ export function parseConfig(text: string, options: ParseOptions = {}): LoadedCon
 
   const { value: raw, secrets: substituted, missing } = resolvePlaceholders(json, env);
   const secrets = new Secrets(substituted.filter(({ path }) => isCredential(path)));
+  const variables = new Secrets(substituted.filter(({ path }) => isCredential(path) || path[0] === "baseUrl"));
   const issues = findIssues(raw, missing);
   if (issues.length > 0) {
     throw new ConfigError(source, dedupe(issues, secrets));
@@ -173,6 +179,7 @@ export function parseConfig(text: string, options: ParseOptions = {}): LoadedCon
   return {
     config: normalize(config, seed, baseDir),
     secrets,
+    variables,
     seedGenerated,
   };
 }

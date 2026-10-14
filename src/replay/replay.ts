@@ -48,7 +48,7 @@ export class ReplayError extends Error {
 export interface PreparedReplay {
   /** With placeholders resolved. */
   log: ActionLog;
-  loaded: Pick<LoadedConfig, "config" | "secrets">;
+  loaded: Pick<LoadedConfig, "config" | "secrets" | "variables">;
   /** Undefined for the anonymous role. */
   role: AuthRole | undefined;
 }
@@ -63,7 +63,7 @@ export async function prepareReplay(
   options: Pick<ReplayOptions, "config" | "env">,
 ): Promise<PreparedReplay> {
   const given = options.config === undefined ? undefined : await loadConfig(options.config, { env: options.env });
-  const { log, secrets: logSecrets } = await readActionLog(file, replayVariables(options.env, given?.secrets));
+  const { log, secrets: logSecrets } = await readActionLog(file, replayVariables(options.env, given?.variables));
   const loaded = given ?? configFromLog(file, log);
   const config: Config = {
     ...loaded.config,
@@ -71,7 +71,10 @@ export async function prepareReplay(
     seed: log.seed,
     browser: { ...loaded.config.browser, viewport: log.viewport },
   };
-  const secrets = new Secrets([...loaded.secrets.entries, ...logSecrets]);
+  // The log's values of the config's secrets are secrets; those of its baseUrl variables are not.
+  const secretNames = new Set(loaded.secrets.names);
+  const secrets = new Secrets([...loaded.secrets.entries, ...logSecrets.filter(({ name }) => secretNames.has(name))]);
+  const variables = new Secrets([...loaded.variables.entries, ...logSecrets]);
   const problem = untrustedLogProblem(log, loaded.config, secrets);
   if (problem !== undefined) throw new ActionLogError(file, problem);
   const role = config.auth.find((r) => r.name === log.role);
@@ -82,7 +85,7 @@ export async function prepareReplay(
         : `role "${secrets.mask(log.role)}" is not in the config's auth`,
     );
   }
-  return { log, loaded: { config, secrets }, role };
+  return { log, loaded: { config, secrets, variables }, role };
 }
 
 /** Default settings on the log's own site, for a replay without `--config`. */
