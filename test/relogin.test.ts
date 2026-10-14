@@ -35,9 +35,8 @@ const signIn = snap(`/signin?token=${SECRET}`, [element("textbox", "Password"), 
 
 /** A keeper with a fake re-login that fails while `failing` is true. */
 function keeper(failing = false) {
-  const { secrets } = parseConfig(JSON.stringify({ baseUrl: BASE, auth: [{ name: "u", storageState: "${STATE}" }] }), {
-    env: { STATE: SECRET },
-  });
+  const role = { name: "u", loginUrl: "/login", fields: { password: "${PASS}" }, submit: "button" };
+  const { secrets } = parseConfig(JSON.stringify({ baseUrl: BASE, auth: [role] }), { env: { PASS: SECRET } });
   const events: SessionEvent[] = [];
   const lines: string[] = [];
   const state = { failing, relogins: 0 };
