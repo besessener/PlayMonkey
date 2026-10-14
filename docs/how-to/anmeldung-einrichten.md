@@ -18,7 +18,14 @@ funktioniert, steht unter [Sitzungen und Anmeldung](../explanation/sitzungen.md)
 }
 ```
 
-- `loginUrl` ist relativ zu `baseUrl`.
+- `loginUrl` wird gegen `baseUrl` aufgelöst wie ein Link auf einer Seite unter `baseUrl`. Liegt deine Anwendung unter
+  einem Pfad, z. B. `"baseUrl": "https://test.example.org/app"`, dann gilt:
+  - `/app/login` (mit `/` am Anfang) ist relativ zum Origin: `https://test.example.org/app/login`. Das ist die sicherste
+    Schreibweise.
+  - `/login` landet auf `https://test.example.org/login`, außerhalb der Anwendung.
+  - `login` (ohne `/`) ersetzt den letzten Pfadabschnitt: `https://test.example.org/login`. Endet `baseUrl` auf `/`
+    (`https://test.example.org/app/`), wird daraus `https://test.example.org/app/login`.
+  - Eine absolute URL gilt, wie sie ist.
 - Jeder Schlüssel in `fields` findet genau ein Eingabefeld: als CSS-Selektor, wenn er wie einer aussieht
   (`input[name=user]`, `#pass`), sonst über das Attribut `name`, dann die `id`, dann die sichtbare Beschriftung. Er muss
   genau ein Element treffen.

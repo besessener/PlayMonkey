@@ -57,7 +57,7 @@ dort ein Schlüssel steht, der auf dieser Seite fehlt.
 | `network.latencyMs` | integer 0 … 60000 | `0` | Verzögerung jeder Anfrage des Laufs in Millisekunden; siehe [Netzwerk](../explanation/monkey.md#netzwerk). |
 | `auth` | Array | `[]` (eine anonyme Rolle) | Rollen, unter denen gelaufen wird; siehe unten. |
 | `auth[].name` | string, Pflicht | – | Eindeutiger Rollenname. |
-| `auth[].loginUrl` | string | – | Pfad der Anmeldeseite, relativ zu `baseUrl`. Pflicht mit `fields`. |
+| `auth[].loginUrl` | string | – | Adresse der Anmeldeseite, aufgelöst gegen `baseUrl` wie ein Link: `/login` hängt am Origin, `login` ersetzt den letzten Pfadabschnitt von `baseUrl` (außer `baseUrl` endet auf `/`); siehe [Anmeldung einrichten](../how-to/anmeldung-einrichten.md). Pflicht mit `fields`. |
 | `auth[].fields` | Objekt aus Strings | – | Felder des Anmeldeformulars, die ausgefüllt werden: Schlüssel → Wert. |
 | `auth[].submit` | string | – | Selektor des Absende-Buttons der Anmeldung. Pflicht mit `fields`. |
 | `auth[].storageState` | string | – | Storage-State-Datei von Playwright, relativ zur Konfigurationsdatei. |
