@@ -6,6 +6,7 @@ import { serializeSnapshot } from "../snapshot/serialize.ts";
 import type { Snapshot } from "../snapshot/snapshot.ts";
 import type { DebugEntry, DebugLog } from "./debug-log.ts";
 import type { PromptPlaceholders } from "./placeholders.ts";
+import { firstLine, recentFindings } from "./prompt.ts";
 import {
   type DecideInput,
   type DecideResult,
@@ -247,11 +248,9 @@ export class LlmDriver {
       snapshot: placeholders.hide(serializeSnapshot(snapshot, { maxChars: config.snapshotChars })),
       refs: new Set(snapshot.elements.map((element) => element.ref)),
       history: [...this.#history],
-      findingsSoFar: this.#o
-        .findings()
-        .slice(0, 20)
-        .map((line) => placeholders.hide(line)),
-      goal: placeholders.hide(this.#goal),
+      // Hidden before cut, so no cut can leave part of a secret that `hide` no longer recognizes.
+      findingsSoFar: recentFindings(this.#o.findings().map((line) => placeholders.hide(line))),
+      goal: firstLine(placeholders.hide(this.#goal)),
       testDataKeys: placeholders.testDataKeys,
       placeholders: placeholders.offered,
       role: placeholders.hide(this.#o.role),

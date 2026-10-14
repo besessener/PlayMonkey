@@ -12,7 +12,7 @@ import type {
 } from "openai/resources/responses/responses";
 import type { LlmConfig } from "../config/config.ts";
 import type { OpenAiApi } from "../config/values.ts";
-import { buildUserMessage, pingMessage, SYSTEM_PROMPT } from "./prompt.ts";
+import { buildUserMessage, firstLine, pingMessage, SYSTEM_PROMPT } from "./prompt.ts";
 import {
   type DecideInput,
   type DecideOptions,
@@ -323,9 +323,4 @@ function parseArguments(call: RawToolCall, fail: (kind: LlmErrorKind, reason: st
   } catch {
     return fail("invalid", `tool ${JSON.stringify(call.name)}: arguments are not valid JSON`);
   }
-}
-
-function firstLine(text: string): string {
-  const line = text.split("\n")[0] ?? "";
-  return line.length > 200 ? `${line.slice(0, 199)}…` : line;
 }

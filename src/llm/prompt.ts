@@ -23,6 +23,34 @@ Guidelines:
 
 Respond with exactly one tool call and no other text.`;
 
+/** Longest finding or goal line in the prompt. */
+const LINE_CHARS = 200;
+/** Characters and lines of the findings block. */
+const FINDINGS_CHARS = 2000;
+const MAX_FINDINGS = 20;
+
+/**
+ * The first line of `text`, cut to `max` characters with an ellipsis. Page text such as a console message can be
+ * long and span lines; one line cannot fake a section of the prompt.
+ */
+export function firstLine(text: string, max = LINE_CHARS): string {
+  const line = text.trimStart().split(/[\r\n\u2028\u2029]/)[0] ?? "";
+  return line.length > max ? `${line.slice(0, max - 1)}…` : line;
+}
+
+/** The most recent findings that fit the prompt, oldest first, each cut to its first line. */
+export function recentFindings(lines: readonly string[]): string[] {
+  const kept: string[] = [];
+  let chars = 0;
+  for (let i = lines.length - 1; i >= 0 && kept.length < MAX_FINDINGS; i--) {
+    const line = firstLine(lines[i] ?? "");
+    chars += line.length;
+    if (chars > FINDINGS_CHARS) break;
+    kept.push(line);
+  }
+  return kept.reverse();
+}
+
 /** The per-step user message: role, goal, placeholders, history, findings and the snapshot last. */
 export function buildUserMessage(input: DecideInput): string {
   const lines = [`Role: ${input.role}`, `Why you were called: ${input.goal}`, ""];

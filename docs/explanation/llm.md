@@ -19,7 +19,10 @@ execute -> oracles -> action log (source "monkey" or "llm")
 
 Das LLM sieht einen [serialisierten Snapshot](snapshot.md#serialisieren-für-das-llm) innerhalb von
 `llm.snapshotChars`, die letzten `llm.historyActions` Aktionen mit ihren Ergebnissen, die bisherigen Befunde, warum es
-gerufen wurde, die Rolle und die Platzhalter, die es verwenden darf. Es antwortet mit genau einem Tool-Aufruf; jede
+gerufen wurde, die Rolle und die Platzhalter, die es verwenden darf. Befunde und der Grund stammen aus Seitentext wie
+Konsolenmeldungen oder Dialognamen: Jeder wird auf seine erste Zeile mit höchstens 200 Zeichen gekürzt, damit er
+keinen eigenen Abschnitt in den Prompt schreiben kann, und von den Befunden kommen nur die neuesten mit, höchstens 20
+mit zusammen 2000 Zeichen. Es antwortet mit genau einem Tool-Aufruf; jede
 Aktion ist ein Tool (`click`, `dblclick`, `hover`, `fill`, `select`, `check`, `uncheck`, `press`, `scroll`, `back`,
 `navigate`), dazu `done`, um die Kontrolle früher zurückzugeben. Native Dialoge und Dateiauswahlen werden automatisch
 beantwortet, auch während der Schritte des LLM; der Prompt sagt das.
