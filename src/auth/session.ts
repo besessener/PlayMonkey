@@ -40,7 +40,7 @@ export interface RoleSession {
   page: Page;
   /** Info events such as blocked off-domain navigations, in order. */
   events: SessionEvent[];
-  /** Stops tracing and closes the context, which writes the video. */
+  /** Stops tracing and closes the context, which writes the video; the context is closed even when this throws. */
   close(): Promise<SessionArtifacts>;
 }
 
@@ -79,7 +79,6 @@ export async function openRoleSession(
   const [width, height] = config.browser.viewport;
   const scope = new UrlScope(config.scope);
   const guarded = config.stayOnDomain || scope.restricted;
-  const { latencyMs } = config.network;
   const context = await browser.newContext({
     baseURL: config.baseUrl,
     viewport: { width, height },
@@ -88,9 +87,34 @@ export async function openRoleSession(
       ? {}
       : { recordVideo: { dir: join(options.outputDir, "video"), size: { width, height } } }),
     // Service workers bypass request routing, so they would undermine stayOnDomain, scope and the latency.
-    ...(guarded || latencyMs > 0 ? { serviceWorkers: "block" as const } : {}),
+    ...(guarded || config.network.latencyMs > 0 ? { serviceWorkers: "block" as const } : {}),
   });
+  const events: SessionEvent[] = [];
+  let page: Page;
+  try {
+    page = await prepareContext(context, { options, scope, guarded, events });
+  } catch (error) {
+    // The setup error is the one worth reporting; a failed close must not replace it.
+    await context.close().catch(() => undefined);
+    throw error;
+  }
+  const tracePath = options.trace === false ? undefined : join(options.outputDir, "trace.zip");
+  return { role: name, context, page, events, close: () => closeContext(context, tracePath) };
+}
 
+/** What `prepareContext` needs besides the context. */
+interface ContextSetup {
+  options: SessionOptions;
+  scope: UrlScope;
+  /** stayOnDomain or a restricted scope: navigations are checked. */
+  guarded: boolean;
+  events: SessionEvent[];
+}
+
+/** Adds the latency, the navigation guard and tracing to a new context and opens its first page. */
+async function prepareContext(context: BrowserContext, { options, scope, guarded, events }: ContextSetup) {
+  const { config, secrets } = options;
+  const { latencyMs } = config.network;
   // Routes run newest first: the guard below aborts blocked navigations before they are delayed.
   if (latencyMs > 0) {
     await context.route("**/*", async (route) => {
@@ -99,34 +123,25 @@ export async function openRoleSession(
       await route.fallback().catch(() => undefined);
     });
   }
-  const events: SessionEvent[] = [];
   if (guarded) {
     const origin = config.stayOnDomain ? new URL(config.baseUrl).origin : undefined;
     const allowed = (url: string) => (origin === undefined || new URL(url).origin === origin) && scope.allows(url);
     await guardNavigations(context, allowed, events, secrets);
   }
+  if (options.trace !== false) await context.tracing.start({ screenshots: true, snapshots: true });
+  return await context.newPage();
+}
 
-  const tracing = options.trace !== false;
-  if (tracing) await context.tracing.start({ screenshots: true, snapshots: true });
-
-  const page = await context.newPage();
-  return {
-    role: name,
-    context,
-    page,
-    events,
-    close: async () => {
-      const artifacts: SessionArtifacts = { videoPaths: [] };
-      if (tracing) {
-        artifacts.tracePath = join(options.outputDir, "trace.zip");
-        await context.tracing.stop({ path: artifacts.tracePath });
-      }
-      const videos = context.pages().flatMap((p) => p.video() ?? []);
-      await context.close();
-      for (const video of videos) artifacts.videoPaths.push(await video.path());
-      return artifacts;
-    },
-  };
+/** Stops tracing into `tracePath`, if given, and closes the context, which writes the videos, even if tracing fails. */
+async function closeContext(context: BrowserContext, tracePath: string | undefined): Promise<SessionArtifacts> {
+  const videos = context.pages().flatMap((page) => page.video() ?? []);
+  try {
+    if (tracePath !== undefined) await context.tracing.stop({ path: tracePath });
+  } finally {
+    await context.close();
+  }
+  const videoPaths = await Promise.all(videos.map((video) => video.path()));
+  return { ...(tracePath === undefined ? {} : { tracePath }), videoPaths };
 }
 
 /**

@@ -168,6 +168,29 @@ describe("monkey shrink against the fixture site", () => {
     assert.match(stdout, /\nshrunk {2}F1 http5xx: 8 -> \d actions \(stopped early, may shrink further\), 2 replays\n$/);
   });
 
+  it("keeps the shortest result so far and exits 2 when interrupted", async () => {
+    let stdout = "";
+    let stderr = "";
+    const code = await runCli(["shrink", logFile], {
+      stdout: (text) => {
+        stdout += text;
+        // In-process stand-in for Ctrl+C after the first replay.
+        if (text.includes("replay 1:")) process.emit("SIGINT", "SIGINT");
+      },
+      stderr: (text) => {
+        stderr += text;
+      },
+      env: { FIXTURE_URL: site.url },
+    });
+    assert.equal(code, 2, stdout);
+    assert.match(
+      stdout,
+      /\nshrunk {2}F1 http5xx: 8 -> \d actions \(stopped early, may shrink further\), \d+ replays\n$/,
+    );
+    assert.match(stderr, /^monkey shrink: SIGINT: stopping after the current step/);
+    assert.match(stderr, /\nmonkey shrink: interrupted; the shrink did not complete\n$/);
+  });
+
   it("rejects an unknown finding, a bad budget and options of other commands", async () => {
     const unknown = await cli(["shrink", "--finding", "F9", "--config", config, logFile]);
     assert.equal(unknown.code, 2);

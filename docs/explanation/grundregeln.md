@@ -18,6 +18,13 @@ pünktlich. Jeder Aufruf an die Seite hat ein Zeitlimit; eine Seite, die nicht m
 ersetzt wie eine abgestürzte. Mit `stayOnDomain` (standardmäßig an) folgt
 der Monkey keinen Navigationen zu anderen Origins und kann so nicht zu externen Seiten abwandern.
 
+Auch ein unterbrochener Lauf endet geordnet: Strg+C (SIGINT), SIGTERM (etwa ein Timeout in der CI) oder SIGHUP halten
+jeden Lauf nach dem aktuellen Schritt an. Danach schließt PlayMonkey selbst die Sitzungen und den Browser und schreibt
+den Bericht mit den Befunden bis dahin. Playwrights eigene Signal-Handler sind deshalb abgeschaltet; sie würden den
+Browser schließen und den Prozess beenden, bevor der Bericht geschrieben ist. Ein unterbrochener oder deswegen nicht
+gestarteter Lauf gilt als nicht abgeschlossen und führt zu Exit-Code `2`, damit eine abgebrochene CI nie als „keine
+Befunde“ durchgeht. Ein zweites Signal beendet den Prozess sofort, ohne Bericht.
+
 ## Secrets kommen aus der Umgebung und erscheinen nur maskiert
 
 Zugangsdaten und Schlüssel stehen als Platzhalter `${VAR}` in der Konfiguration und werden beim Start aus

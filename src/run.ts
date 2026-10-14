@@ -2,7 +2,13 @@ import { mkdir, rm } from "node:fs/promises";
 import { join } from "node:path";
 import type { Browser } from "playwright";
 import { launchBrowser } from "./auth/browser.ts";
-import { ANONYMOUS_ROLE, LoginError, openRoleSession, type RoleSession } from "./auth/session.ts";
+import {
+  ANONYMOUS_ROLE,
+  LoginError,
+  openRoleSession,
+  type RoleSession,
+  type SessionArtifacts,
+} from "./auth/session.ts";
 import type { AuthRole, LoadedConfig } from "./config/config.ts";
 import { DebugLog } from "./llm/debug-log.ts";
 import { LlmBreaker, LlmDriver } from "./llm/driver.ts";
@@ -18,6 +24,7 @@ import type { Spectator } from "./monkey/spectator.ts";
 import type { Finding } from "./oracles/finding.ts";
 import { Oracles } from "./oracles/oracles.ts";
 import { ActionLogWriter } from "./replay/log.ts";
+import { type PlannedRun, planRuns } from "./run-plan.ts";
 import { describeFinding, describeStep, maskFinding, plural, summarize } from "./run-text.ts";
 import type { Snapshot } from "./snapshot/snapshot.ts";
 
@@ -60,36 +67,11 @@ export interface RunLlm {
   breaker?: LlmBreaker;
 }
 
-/** One run of an invocation: a role (undefined: anonymous) with a seed. */
-export interface PlannedRun {
-  role: AuthRole | undefined;
-  seed: number;
-  /** `role`, or `role/seed` with `seeds`; prefixes log lines and keys LLM usage. */
-  label: string;
-  /** `<report.dir>/<role>`, or `<report.dir>/<role>/<seed>` with `seeds`. */
-  outputDir: string;
-}
-
-/** Every run of the config, roles first, then seeds: the order of the report, whatever order they finish in. */
-export function planRuns(config: LoadedConfig["config"]): PlannedRun[] {
-  const roles = config.auth.length > 0 ? config.auth : [undefined];
-  return roles.flatMap((role) => {
-    const name = role?.name ?? ANONYMOUS_ROLE;
-    const roleDir = join(config.report.dir, roleDirectory(name));
-    if (config.seeds === undefined) return [{ role, seed: config.seed, label: name, outputDir: roleDir }];
-    return config.seeds.map((seed) => ({
-      role,
-      seed,
-      label: `${name}/${seed}`,
-      outputDir: join(roleDir, String(seed)),
-    }));
-  });
-}
-
 /**
  * Runs the monkey for every role (one anonymous role without `auth`) and seed, up to `config.parallel` at a time,
  * each in its own browser context of one shared browser. A run that cannot log in or crashes is recorded and the
- * others still run. Outcomes are in `planRuns` order; runs not started because of the signal are left out.
+ * others still run. Outcomes are in `planRuns` order; a run not started because of the signal has the error
+ * `not started: interrupted`.
  */
 export async function runAllRoles(loaded: LoadedConfig, options: RunAllOptions): Promise<RoleOutcome[]> {
   const { config, secrets } = loaded;
@@ -134,7 +116,14 @@ export async function runAllRoles(loaded: LoadedConfig, options: RunAllOptions):
   } finally {
     await browser.close();
   }
-  return outcomes.filter((outcome) => outcome !== undefined);
+  return outcomes.map((outcome, index) => outcome ?? notStarted(plans[index] as PlannedRun, options.log, secrets));
+}
+
+/** The outcome of a run the signal stopped before it started. */
+function notStarted(plan: PlannedRun, log: (line: string) => void, secrets: LoadedConfig["secrets"]): RoleOutcome {
+  const error = "not started: interrupted";
+  log(`[${secrets.mask(plan.label)}] ${error}`);
+  return { role: plan.role?.name ?? ANONYMOUS_ROLE, seed: plan.seed, error, findings: [], blockedNavigations: 0 };
 }
 
 /** The options `runAllRoles` gives `runRole` for one planned run. */
@@ -210,8 +199,28 @@ interface RoleRun {
   options: RoleOptions;
 }
 
-/** The part of `runRole` after the login: runs the monkey or the replay, then closes the session. */
+/**
+ * The part of `runRole` after the login: runs the monkey or the replay, then closes the session. An error while
+ * closing is logged and keeps the run's outcome.
+ */
 async function runSession(run: RoleRun, session: RoleSession): Promise<RoleOutcome> {
+  const downloadDir = join(run.options.outputDir, "downloads");
+  let outcome: RoleOutcome | undefined;
+  try {
+    outcome = await exploreSession(run, session, downloadDir);
+  } finally {
+    const artifacts = await closeSession(run, session);
+    if (!run.loaded.config.report.keepDownloads) await removeDownloads(downloadDir);
+    if (outcome !== undefined && artifacts !== undefined) {
+      if (artifacts.tracePath !== undefined) outcome.tracePath = artifacts.tracePath;
+      outcome.videoPaths = artifacts.videoPaths;
+    }
+  }
+  return outcome;
+}
+
+/** Runs the monkey or the replay in an open session, with the oracles, the coverage and the action log. */
+async function exploreSession(run: RoleRun, session: RoleSession, downloadDir: string): Promise<RoleOutcome> {
   const { name, label, log, options } = run;
   const { config } = run.loaded;
   const oracles = new Oracles(session.context, {
@@ -226,40 +235,40 @@ async function runSession(run: RoleRun, session: RoleSession): Promise<RoleOutco
     stayOnDomain: config.stayOnDomain,
     scope: new UrlScope(config.scope),
   });
-  const downloadDir = join(options.outputDir, "downloads");
-  let outcome: RoleOutcome | undefined;
+  const result = await runMonkey(session.context, {
+    config,
+    downloadDir,
+    ...(options.signal === undefined ? {} : { signal: options.signal }),
+    ...(options.replay === undefined ? {} : { replay: options.replay }),
+    ...(advisor === undefined ? {} : { advisor }),
+    ...(options.spectator === undefined ? {} : { spectator: options.spectator }),
+    onStep: stepHandler(run, session, { oracles, coverage, writer }),
+  });
+  const findings = await collectFindings(run, result, oracles, writer);
+  if (advisor !== undefined && options.llm !== undefined) log(describeUsage(options.llm.stats.role(label)));
+  if (writer !== undefined) log(`actions: ${writer.file}`);
+  return {
+    role: name,
+    seed: config.seed,
+    result,
+    findings,
+    blockedNavigations: session.events.length,
+    ...(writer === undefined ? {} : { actionLog: writer.file }),
+    coverage: coverage.summary(),
+  };
+}
+
+/** Closes the session and logs the trace path; logs instead of throwing when closing fails. */
+async function closeSession(run: RoleRun, session: RoleSession): Promise<SessionArtifacts | undefined> {
   try {
-    const result = await runMonkey(session.context, {
-      config,
-      downloadDir,
-      ...(options.signal === undefined ? {} : { signal: options.signal }),
-      ...(options.replay === undefined ? {} : { replay: options.replay }),
-      ...(advisor === undefined ? {} : { advisor }),
-      ...(options.spectator === undefined ? {} : { spectator: options.spectator }),
-      onStep: stepHandler(run, session, { oracles, coverage, writer }),
-    });
-    const findings = await collectFindings(run, result, oracles, writer);
-    if (advisor !== undefined && options.llm !== undefined) log(describeUsage(options.llm.stats.role(label)));
-    if (writer !== undefined) log(`actions: ${writer.file}`);
-    outcome = {
-      role: name,
-      seed: config.seed,
-      result,
-      findings,
-      blockedNavigations: session.events.length,
-      ...(writer === undefined ? {} : { actionLog: writer.file }),
-      coverage: coverage.summary(),
-    };
-  } finally {
     const artifacts = await session.close();
-    if (!config.report.keepDownloads) await removeDownloads(downloadDir);
-    if (artifacts.tracePath !== undefined) log(`trace: ${artifacts.tracePath}`);
-    if (outcome !== undefined) {
-      if (artifacts.tracePath !== undefined) outcome.tracePath = artifacts.tracePath;
-      outcome.videoPaths = artifacts.videoPaths;
-    }
+    if (artifacts.tracePath !== undefined) run.log(`trace: ${artifacts.tracePath}`);
+    return artifacts;
+  } catch (error) {
+    const reason = error instanceof Error ? error.message.split("\n")[0] : String(error);
+    run.log(run.loaded.secrets.mask(`closing the session failed, trace and videos may be missing: ${reason}`));
+    return undefined;
   }
-  return outcome;
 }
 
 /** Writes `actions.json` of one run into its output directory. */
@@ -340,9 +349,4 @@ async function collectFindings(
   run.log(`${secrets.mask(summarize(result))}, ${plural(findings.length, "finding")}`);
   for (const finding of findings) run.log(`  ${describeFinding(finding)}`);
   return findings;
-}
-
-/** A directory name for a role: safe characters only. */
-export function roleDirectory(role: string): string {
-  return role.replace(/[^A-Za-z0-9._-]/g, "_") || "_";
 }

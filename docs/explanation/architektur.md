@@ -20,7 +20,7 @@ Problem in einem deduplizierten Befund, und am Ende des Laufs steht ein Bericht.
 | `src/auth/` | Browserstart, ein Kontext pro Rolle, Anmeldung, `stayOnDomain` und `scope`, Trace und Video | umgesetzt |
 | `src/snapshot/` | Seiten-Snapshot mit Element-Refs, Snapshot-Hash, Serialisierer für das LLM | umgesetzt |
 | `src/monkey/` | Zufallsgenerator für Aktionen mit Seed, Ausführung und Schleife des Laufs | umgesetzt |
-| `src/run.ts` | Plant die Läufe (Rollen × Seeds) und führt jeweils `parallel` davon gleichzeitig aus: Sitzung, Monkey oder Replay, Orakel, Aktionsprotokoll, Artefakte | umgesetzt |
+| `src/run.ts`, `src/run-plan.ts` | Plant die Läufe (Rollen × Seeds) und führt jeweils `parallel` davon gleichzeitig aus: Sitzung, Monkey oder Replay, Orakel, Aktionsprotokoll, Artefakte | umgesetzt |
 | `src/oracles/` | Befunde erkennen und deduplizieren, Screenshots | umgesetzt |
 | `src/replay/` | Schreiben und Lesen des Aktionsprotokolls, Parser für dauerhafte Locators, Prüfung fremder Protokolle, `monkey replay`, `monkey shrink` (Delta Debugging) | umgesetzt |
 | `src/report/` | `report.json` und der in sich geschlossene `report.html`, Coverage über alle Läufe | umgesetzt |

@@ -3,7 +3,7 @@ import { mkdtemp, readFile, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { after, before, describe, it } from "node:test";
-import type { Browser } from "playwright";
+import type { Browser, BrowserContext, BrowserContextOptions } from "playwright";
 import { FIXTURE_CREDENTIALS, type Fixture, startFixture } from "../fixtures/site/server.ts";
 import { ANONYMOUS_ROLE, LoginError, openRoleSession, type RoleSession } from "../src/auth/session.ts";
 import { type LoadedConfig, parseConfig } from "../src/config/config.ts";
@@ -194,5 +194,30 @@ describe("role sessions against the fixture site", () => {
     for (const [name, data] of entries) {
       assert.equal(data.includes(FIXTURE_CREDENTIALS.password), false, `password found in trace entry ${name}`);
     }
+  });
+
+  it("closes the context even when stopping the trace fails", async () => {
+    const session = await openSession(load([]), undefined, { video: false });
+    open.splice(open.indexOf(session), 1);
+    session.context.tracing.stop = () => Promise.reject(new Error("ENOSPC: no space left on device"));
+    await assert.rejects(session.close(), /ENOSPC/);
+    assert.equal(browser.contexts().includes(session.context), false);
+  });
+
+  it("closes the context when the session cannot be set up", async () => {
+    const created: BrowserContext[] = [];
+    const failing = {
+      newContext: async (contextOptions: BrowserContextOptions) => {
+        const context = await browser.newContext(contextOptions);
+        context.newPage = () => Promise.reject(new Error("cannot open a page"));
+        created.push(context);
+        return context;
+      },
+    } as Browser;
+    const loaded = load([]);
+    const options = { config: loaded.config, secrets: loaded.secrets, outputDir: outputRoot, video: false };
+    await assert.rejects(openRoleSession(failing, undefined, options), /cannot open a page/);
+    assert.equal(created.length, 1);
+    assert.equal(browser.contexts().includes(created[0] as BrowserContext), false);
   });
 });

@@ -34,6 +34,10 @@ export async function shrink(command: ShrinkCommand): Promise<ExitCode> {
         signal,
       });
       for (const result of results) io.stdout(`${describeResult(result)}\n`);
+      if (signal.aborted) {
+        io.stderr("monkey shrink: interrupted; the shrink did not complete\n");
+        return ExitCode.Error;
+      }
       return results.some((result) => result.after !== undefined) ? ExitCode.Findings : ExitCode.NoFindings;
     } catch (error) {
       return replayFailure("shrink", error, undefined, io);

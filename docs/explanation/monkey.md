@@ -109,10 +109,12 @@ aber ihr Inhalt gehört zu einer anderen Seite.
 ## Limits
 
 Die Schleife hält bei `limits.maxSteps`, bei `limits.maxMinutes` (vor jedem Schritt geprüft) oder bei einer
-Unterbrechung (Strg+C beendet den aktuellen Schritt und schreibt dann den Trace). Mit `stayOnDomain` wird eine Seite,
-die auf einem anderen Origin oder als leere Seite endet, zurück zu `baseUrl` geschickt, ebenso eine außerhalb des
-`scope`. Eine abgestürzte Seite wird
-geschlossen, und der Lauf geht in einem anderen Tab oder einer frischen Seite weiter; das Orakel `crash` meldet es.
+Unterbrechung (Strg+C, SIGTERM oder SIGHUP beenden den aktuellen Schritt; danach werden Trace und Bericht
+geschrieben, siehe [Grundregeln](grundregeln.md#läufe-enden-immer)). Scheitert das Schließen der Sitzung, etwa weil
+die Platte voll ist, steht das im Log; die Befunde des Laufs bleiben erhalten, nur Trace oder Videos fehlen dann.
+Mit `stayOnDomain` wird eine Seite, die auf einem anderen Origin oder als leere Seite endet, zurück zu `baseUrl`
+geschickt, ebenso eine außerhalb des `scope`. Eine abgestürzte Seite wird geschlossen, und der Lauf geht in einem
+anderen Tab oder einer frischen Seite weiter; das Orakel `crash` meldet es.
 
 ## Abdeckung auf der Fixture-Seite
 

@@ -33,11 +33,14 @@ Browseroperation und schließt `--watch` ein.
 | --- | --- |
 | `0` | Keine Befunde (auch `--help`, `--version`); mit `findings.baseline` keine neuen. Replay: Keiner der aufgezeichneten Befunde trat wieder auf. Shrink: Keiner ließ sich reproduzieren. |
 | `1` | Befunde vorhanden; mit `findings.baseline` neue, die die Baseline nicht kennt. Replay: Mindestens ein aufgezeichneter Befund trat wieder auf. Shrink: Mindestens einer wurde reproduziert und gekürzt. |
-| `2` | Werkzeug- oder Konfigurationsfehler: falsche Verwendung, unbekannter Befehl oder unbekannte Option, ungültige Konfiguration, eine unlesbare `findings.baseline`, ein Lauf, dessen Anmeldung scheiterte oder der abstürzte (die anderen Läufe laufen trotzdem, und der Bericht wird geschrieben), ein Lauf, der seinen Browser verloren hat, ein fehlgeschlagener LLM-Preflight (außer `llm.required` ist `false`), ein nicht verfügbarer `llm.provider`, `--watch` ohne Display. Replay: außerdem ein unlesbares Aktionsprotokoll, eine nicht unterstützte Protokollversion, eine Variable, die das Protokoll braucht und die Konfiguration nicht verwendet, ein Protokoll, dessen `baseUrl` oder `navigate`-Aktionen die Website der Konfiguration verlassen, eine Rolle, die in `--config` fehlt, oder ein `--strict`-Replay, das ein Element nicht finden konnte. Shrink: dieselben Fehler wie Replay, ein Protokoll ohne Befunde oder ein unbekanntes `--finding`. |
+| `2` | Werkzeug- oder Konfigurationsfehler: falsche Verwendung, unbekannter Befehl oder unbekannte Option, ungültige Konfiguration, eine unlesbare `findings.baseline`, ein Lauf, dessen Anmeldung scheiterte oder der abstürzte (die anderen Läufe laufen trotzdem, und der Bericht wird geschrieben), ein Lauf, der seinen Browser verloren hat, ein Lauf, der durch Strg+C, SIGTERM oder SIGHUP unterbrochen wurde oder deshalb nicht mehr startete (der Bericht mit den Befunden bis dahin wird trotzdem geschrieben), ein fehlgeschlagener LLM-Preflight (außer `llm.required` ist `false`), ein nicht verfügbarer `llm.provider`, `--watch` ohne Display. Replay: außerdem ein unlesbares Aktionsprotokoll, eine nicht unterstützte Protokollversion, eine Variable, die das Protokoll braucht und die Konfiguration nicht verwendet, ein Protokoll, dessen `baseUrl` oder `navigate`-Aktionen die Website der Konfiguration verlassen, eine Rolle, die in `--config` fehlt, oder ein `--strict`-Replay, das ein Element nicht finden konnte. Shrink: dieselben Fehler wie Replay, ein Protokoll ohne Befunde oder ein unbekanntes `--finding`. Replay und Shrink: auch eine Unterbrechung. |
 
 Vorrang bei `run`: `2`, wenn irgendein Lauf nicht abgeschlossen wurde, auch wenn andere etwas gefunden haben; sonst
 `1`, wenn es (neue) Befunde gibt; sonst `0`. Die letzte Zeile der Ausgabe nennt den Grund, z. B.
 `exit 2: run broken/4 did not complete`.
+
+Ein zweites Strg+C, SIGTERM oder SIGHUP beendet sofort, ohne Bericht, mit `130`, `143` bzw. `129` (128 plus
+Signalnummer).
 
 ## npm-Skripte
 

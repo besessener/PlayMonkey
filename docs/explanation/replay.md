@@ -97,7 +97,8 @@ mehr fehlen darf. Die Reihenfolge bleibt erhalten, und keine Teilfolge wird zwei
 Zuerst prüft ein Replay mit allen Aktionen bis zum Befund, ob er sich überhaupt reproduzieren lässt; wenn nicht, gibt
 es nichts zu kürzen. `--max-replays` (Standard 60, inklusive dieser Prüfung) begrenzt die Replays pro Befund; ist das
 Budget aufgebraucht oder drückst du Strg+C, bleibt das kürzeste Ergebnis bis dahin, mit dem Hinweis
-`stopped early, may shrink further`.
+`stopped early, may shrink further`. Nach Strg+C endet `monkey shrink` mit `2`, weil es nicht fertig wurde; ebenso
+ein unterbrochenes `monkey replay`.
 
 ```text
 F1 http5xx: POST /form responded 500 Internal Server Error

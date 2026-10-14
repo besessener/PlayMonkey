@@ -257,6 +257,22 @@ describe("action log and replay against the fixture site", () => {
     assert.deepEqual(result.added, []);
   });
 
+  it("exits 2 when the replay is interrupted", async () => {
+    let stderr = "";
+    const log = await recordSmallRun();
+    const code = await runCli(["replay", "--config", join(dir, "small.json"), log], {
+      // In-process stand-in for Ctrl+C as the replay starts.
+      stdout: (text) => text.includes("replaying") && process.emit("SIGINT", "SIGINT"),
+      stderr: (text) => {
+        stderr += text;
+      },
+      env: env(site.url),
+    });
+    assert.equal(code, 2);
+    assert.match(stderr, /SIGINT: stopping after the current step/);
+    assert.match(stderr, /interrupted; the replay did not complete\n$/);
+  });
+
   it("names the variables the log needs that the config does not use, even when they are set", async () => {
     const config = await writeConfig("url-only", { baseUrl: "${FIXTURE_URL}/form" });
     await assert.rejects(

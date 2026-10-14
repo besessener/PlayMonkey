@@ -13,7 +13,8 @@ export interface LaunchOptions {
 
 /**
  * Launches the configured engine. One browser serves all roles; each role gets its own context. For Chromium,
- * `CHROMIUM_EXECUTABLE_PATH` selects another binary when the one installed for Playwright is not available.
+ * `CHROMIUM_EXECUTABLE_PATH` selects another binary when the one installed for Playwright is not available. The
+ * caller closes the browser, also after a stop signal (see `withStopSignal`).
  */
 export function launchBrowser(browser: Config["browser"], options: LaunchOptions = {}): Promise<Browser> {
   const executablePath =
@@ -21,6 +22,10 @@ export function launchBrowser(browser: Config["browser"], options: LaunchOptions
   const { spectator } = options;
   return ENGINES[browser.engine].launch({
     headless: spectator === undefined ? browser.headless : false,
+    // Playwright's handlers would close the browser and exit before the run stops and writes its report.
+    handleSIGINT: false,
+    handleSIGTERM: false,
+    handleSIGHUP: false,
     ...(spectator === undefined || spectator.slowMoMs === 0 ? {} : { slowMo: spectator.slowMoMs }),
     ...(executablePath === undefined || executablePath === "" ? {} : { executablePath }),
   });
