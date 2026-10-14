@@ -191,7 +191,7 @@ function normalize(raw: RawConfig, seed: number, baseDir: string): Config {
     network: { latencyMs: raw.network?.latencyMs ?? DEFAULTS.network.latencyMs },
     auth: (raw.auth ?? []).map((role) => normalizeRole(role, baseDir)),
     testData: { ...raw.testData },
-    oracles: Object.fromEntries(ORACLES.map((name) => [name, raw.oracles?.[name] ?? DEFAULTS.oracle])) as Record<
+    oracles: Object.fromEntries(ORACLES.map((name) => [name, raw.oracles?.[name] ?? DEFAULTS.oracles[name]])) as Record<
       OracleName,
       boolean
     >,

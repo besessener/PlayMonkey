@@ -23,5 +23,7 @@
 - **Konfigurationsschema:** gegen das TypeScript-Interface typisiert mit `JSONSchemaType` von Ajv, sodass der
   Compiler fehlschlägt, wenn Schema und Typ nicht übereinstimmen. Standardwerte stehen in einem Objekt, das sowohl das
   Schema als auch die Normalisierung verwenden.
-- **Laufzeitabhängigkeiten:** nur `playwright` und `ajv`. Das Parsen der Argumente nutzt `node:util` `parseArgs`;
-  die Fixture-Seite nutzt `node:http`.
+- **Laufzeitabhängigkeiten:** `playwright`, `ajv`, `axe-core` und die SDKs der LLM-Backends. Das Parsen der
+  Argumente nutzt `node:util` `parseArgs`; die Fixture-Seite nutzt `node:http`.
+- **Barrierefreiheit: axe-core.** Der verbreitete Regelsatz für WCAG, gepflegt, ohne eigene Abhängigkeiten
+  (MPL-2.0). Eigene Regeln wären wenige und müssten hier gepflegt werden.

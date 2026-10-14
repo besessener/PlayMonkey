@@ -150,7 +150,9 @@ describe("demo shop in a run with demo/demo.json", () => {
     return outcome;
   }
 
-  it("reports the checkout crash exactly once, however often it happens", async () => {
+  const D2 = "accessibility|label-content-name-mismatch|/demo/shop";
+
+  it("reports the checkout crash and the mislabelled buttons exactly once, however often they happen", async () => {
     const outcome = await run("bug", [
       link("Start shopping"),
       button("Add Bananas to cart"),
@@ -158,15 +160,19 @@ describe("demo shop in a run with demo/demo.json", () => {
       link("Back to the cart"),
       fill("Email", "monkey"),
       button("Place order"),
+      click("getByRole('link', { name: 'Shop', exact: true })"),
     ]);
     assert.equal(outcome.result?.stopReason, "end", outcome.result?.error ?? "no error");
     assert.deepEqual(
       outcome.findings.map((f) => [f.oracle, f.severity, f.key, f.step, f.occurrences]),
-      [["http5xx", "high", "http5xx|POST /demo/checkout 500", 3, 2]],
+      [
+        ["accessibility", "medium", D2, 1, 1],
+        ["http5xx", "high", "http5xx|POST /demo/checkout 500", 3, 2],
+      ],
     );
   });
 
-  it("stays silent on every other page and on a valid order", async () => {
+  it("stays silent on every other page and on a valid order, apart from the shop page's labels", async () => {
     const outcome = await run("control", [
       link("Start shopping"),
       button("Add Mangoes to cart"),
@@ -189,15 +195,15 @@ describe("demo shop in a run with demo/demo.json", () => {
       link("Sign in"),
     ]);
     assert.equal(outcome.result?.stopReason, "end", outcome.result?.error ?? "no error");
-    assert.deepEqual(outcome.findings, []);
-  });
-
-  it("finds the seeded bug and nothing else with the config's seed", async () => {
-    const outcome = await run("random");
-    assert.equal(outcome.result?.stopReason, "maxSteps");
     assert.deepEqual(
       outcome.findings.map((f) => f.key),
-      ["http5xx|POST /demo/checkout 500"],
+      [D2],
     );
+  });
+
+  it("finds the seeded bugs and nothing else with the config's seed", async () => {
+    const outcome = await run("random");
+    assert.equal(outcome.result?.stopReason, "maxSteps");
+    assert.deepEqual(outcome.findings.map((f) => f.key).sort(), [D2, "http5xx|POST /demo/checkout 500"]);
   });
 });

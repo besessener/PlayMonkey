@@ -78,6 +78,7 @@ einzubeziehen (`/lab` verlinkt auf `/`).
 | `/lab/download` | Ein funktionierender Download (`report.csv`, 29 Bytes) und ein kaputter. |
 | `/lab/widgets` | Ein Hover-Menü, Doppelklick zum Bearbeiten, ein Kontextmenü, Drag-and-drop, langes Drücken. |
 | `/lab/news` | Ein Button „Load news“, der per `fetch` `/lab/news.json` lädt und die Schlagzeile anzeigt. |
+| `/lab/gallery` | Zwei Bilder, eines davon ohne Alternativtext, und ein Link „Next page“ auf dieselbe Seite mit Query. |
 
 Eingebaute Fehler im Labor:
 
@@ -88,8 +89,12 @@ Eingebaute Fehler im Labor:
 | L3 | Download bricht mitten in der Datei ab | Labor → „Download“ → „Download the export“ | `download` | medium | `/lab/files/export.zip` |
 | L4 | Fehlgeschlagene Anfrage wird nicht abgefangen | Labor → „News“ → Aktion `offline` → „Load news“ | `pageerror` | high | `TypeError: Failed to fetch` + erster Stack-Frame |
 
+| L5 | Bild ohne Alternativtext | Labor → „Gallery“ | `accessibility` | medium | `image-alt` + `/lab/gallery` |
+
 L4 tritt nur ohne Netz auf, also nur mit der Aktion `offline`, die standardmäßig aus ist; online ist „Load news“ eine
-Kontrolle. `test/network.test.ts` prüft beides.
+Kontrolle. `test/network.test.ts` prüft beides. L5 meldet nur das Orakel `accessibility`, das standardmäßig aus ist;
+`test/accessibility.test.ts` prüft, dass es genau einmal kommt, auch über „Next page“ und einen zweiten Besuch hinweg.
+Alle anderen Seiten der Fixture-Seite bestehen die Prüfung ohne Verstoß.
 
 `test/lab.test.ts` geht jede Laborseite mit vorgegebenen Aktionen durch die echte Laufschleife ab;
 `test/chaos.test.ts` lässt 20 Seeds auf das Labor und die Hauptseite los und prüft, dass kein Lauf abstürzt, hängt
@@ -114,17 +119,19 @@ Startskript im Ordner [`demo/`](../demo/); die Fixture-Seite bindet nur seine Ro
 Ein `GET` auf die Formularziele `/demo/checkout`, `/demo/cart/remove` und `/demo/logout` leitet nach `/demo/cart`
 weiter, damit ein Neuladen nicht auf der 404-Seite der Hauptseite landet.
 
-Eingebauter Fehler im Demo-Shop:
+Eingebaute Fehler im Demo-Shop:
 
 | # | Fehler | Klickpfad | Orakel | Schweregrad | Dedup-Schlüssel |
 | - | --- | --- | --- | --- | --- |
 | D1 | HTTP 500 beim Bestellen | Shop → „Add … to cart“ → „Place order“ mit leerer E-Mail-Adresse oder einer ohne Domain | `http5xx` | high | `POST /demo/checkout 500` |
+| D2 | Der sichtbare Text „Add to cart“ ist nicht Teil des zugänglichen Namens „Add Bananas to cart“ | Shop | `accessibility` | medium | `label-content-name-mismatch` + `/demo/shop` |
 
-`../demo/demo.json` lässt den Monkey als Rolle `shopper` mit LLM los. Die Zugangsdaten der Demo stehen direkt darin, sie
-sind nur ausgedacht und werden darum nicht als `***` maskiert; nötig sind `FIXTURE_URL` und `MONKEY_LLM_URL`,
-`MONKEY_LLM_DEPLOYMENT` und `MONKEY_LLM_API_KEY`. Mit Seed 11 findet er den Fehler ohne LLM in Schritt 12.
-`test/shop.test.ts` prüft die Seiten über HTTP, den Fehler genau einmal, einen stillen Kontrolldurchlauf und einen Lauf
-mit dieser Konfiguration ohne LLM, der genau diesen einen Befund liefert.
+`../demo/demo.json` lässt den Monkey als Rolle `shopper` mit LLM und eingeschaltetem Orakel `accessibility` los. Die
+Zugangsdaten der Demo stehen direkt darin, sie sind nur ausgedacht und werden darum nicht als `***` maskiert; nötig
+sind `FIXTURE_URL` und `MONKEY_LLM_URL`, `MONKEY_LLM_DEPLOYMENT` und `MONKEY_LLM_API_KEY`. Mit Seed 11 findet er ohne
+LLM D2 in Schritt 1 und D1 in Schritt 12. `test/shop.test.ts` prüft die Seiten über HTTP, beide Fehler genau einmal,
+einen Kontrolldurchlauf, der nur D2 meldet, und einen Lauf mit dieser Konfiguration ohne LLM, der genau diese zwei
+Befunde liefert.
 
 ## Eine Seite hinzufügen
 

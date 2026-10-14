@@ -11,6 +11,7 @@
     }
   ],
   "testData": { "name": "Monkey", "email": "monkey@test.local", "coupon": "MONKEY10" },
+  "oracles": { "accessibility": true },
   "llm": {
     "provider": "anthropic-foundry",
     "baseUrl": "${MONKEY_LLM_URL}",

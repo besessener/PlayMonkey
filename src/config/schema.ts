@@ -210,9 +210,9 @@ export const configSchema: JSONSchemaType<RawConfig> = {
       nullable: true,
       additionalProperties: false,
       required: [],
-      description: "Switch individual oracles on or off. All are on by default.",
+      description: "Switch individual oracles on or off. All but accessibility are on by default.",
       properties: Object.fromEntries(
-        ORACLES.map((name) => [name, { type: "boolean", nullable: true, default: DEFAULTS.oracle }]),
+        ORACLES.map((name) => [name, { type: "boolean", nullable: true, default: DEFAULTS.oracles[name] }]),
       ) as JSONSchemaType<RawConfig>["properties"]["oracles"]["properties"],
     },
     findings: {

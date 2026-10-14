@@ -16,6 +16,7 @@ export const LAB_PAGES: { path: string; link: string }[] = [
   { path: "/lab/download", link: "Download" },
   { path: "/lab/widgets", link: "Widgets" },
   { path: "/lab/news", link: "News" },
+  { path: "/lab/gallery", link: "Gallery" },
 ];
 
 /** Bytes of the broken download that arrive before the connection drops (seeded bug). */
@@ -177,6 +178,10 @@ const NEWS_BODY = `<button type="button" id="load">Load news</button>
   });
 </script>`;
 
+const BANANA_SVG = `data:image/svg+xml,${encodeURIComponent(
+  '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10"><path d="M1 7q4 3 8-6q-1 7-8 6" fill="#f5c400"/></svg>',
+)}`;
+
 function labPage(path: string, title: string, body: string): Route {
   return { method: "GET", path, handle: () => page(title, body) };
 }
@@ -299,6 +304,12 @@ function popupFileAndWidgetRoutes(): Route[] {
       }),
     },
     labPage("/lab/widgets", "Widgets", WIDGETS_BODY),
+  ];
+}
+
+/** Pages for the network conditions and the accessibility oracle. */
+function newsAndGalleryRoutes(): Route[] {
+  return [
     labPage("/lab/news", "News", NEWS_BODY),
     {
       method: "GET",
@@ -309,9 +320,18 @@ function popupFileAndWidgetRoutes(): Route[] {
         body: JSON.stringify({ headline: "Bananas are back in stock" }),
       }),
     },
+    labPage(
+      "/lab/gallery",
+      "Gallery",
+      // Seeded bug: the second picture has no alt text, so screen readers announce nothing useful.
+      `<p>Two pictures of the same banana.</p>
+<img src="${BANANA_SVG}" width="80" height="80" alt="A ripe banana">
+<img src="${BANANA_SVG}" width="80" height="80">
+<p><a href="/lab/gallery?page=2">Next page</a></p>`,
+    ),
   ];
 }
 
 export function labRoutes(): Route[] {
-  return [...dialogAndFrameRoutes(), ...popupFileAndWidgetRoutes()];
+  return [...dialogAndFrameRoutes(), ...popupFileAndWidgetRoutes(), ...newsAndGalleryRoutes()];
 }

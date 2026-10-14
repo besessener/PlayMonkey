@@ -103,6 +103,7 @@ dort ein Schlüssel steht, der auf dieser Seite fehlt.
 | `oracles.errorPage` | boolean | `true` | Navigationen melden, die auf einer Fehlerseite landen. |
 | `oracles.overflow` | boolean | `true` | Horizontalen Überlauf melden. |
 | `oracles.download` | boolean | `true` | Downloads melden, die fehlschlagen (z. B. weil die Verbindung abbricht). |
+| `oracles.accessibility` | boolean | `false` | Jede Seite einmal mit axe-core auf Verstöße gegen WCAG 2.1 A und AA prüfen; siehe [Barrierefreiheit](../explanation/orakel.md#barrierefreiheit). |
 | `findings.lastActions` | integer ≥ 0 | `10` | Anzahl der Aktionen vor einem Befund, die er zur Reproduktion festhält. |
 | `findings.ignoreStatus` | Array von Integern 400 … 599 | `[]` | HTTP-Status, die nie Befunde sind, z. B. `[401, 403]`. |
 | `findings.ignore` | Array | `[]` | Regeln, die bekanntes Rauschen verwerfen; siehe [Ignorierregeln](../explanation/orakel.md#ignorierregeln). |

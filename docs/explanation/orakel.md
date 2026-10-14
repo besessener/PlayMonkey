@@ -17,8 +17,10 @@ Kontext, um ihn zu reproduzieren. Der Code liegt in `src/oracles/`.
 | `errorPage` | Eine Navigation ist auf einer Fehlerseite gelandet (siehe unten). | medium |
 | `overflow` | Horizontaler Overflow: Die `scrollWidth` des Dokuments ist größer als seine `clientWidth`. | low |
 | `download` | Ein Download, den die Seite gestartet hat, ist fehlgeschlagen, z. B. weil die Verbindung mitten in der Datei abgebrochen ist (`download.failure()`). | medium |
+| `accessibility` | Ein Verstoß gegen eine Regel von WCAG 2.0 oder 2.1, Stufe A oder AA, laut axe-core; siehe [Barrierefreiheit](#barrierefreiheit). Standardmäßig aus. | medium bei Auswirkung `serious` und `critical`, sonst low |
 
-Jedes lässt sich mit `oracles.<name>: false` in der [Konfiguration](../reference/konfiguration.md) abschalten.
+Jedes lässt sich mit `oracles.<name>: false` in der [Konfiguration](../reference/konfiguration.md) abschalten;
+`accessibility` schaltest du mit `oracles.accessibility: true` ein.
 
 Die Event-Orakel (`pageerror`, `console`, `http*`, `crash`) lauschen auf jeder Seite des Browserkontexts der Rolle,
 auch auf Tabs und Popups, die die Seite öffnet, und den Iframes darin. `download` sieht sich die Downloads jedes
@@ -79,6 +81,7 @@ Weg dorthin ist.
 | `hang` | Art (`navigation` oder `unresponsive`) + normalisierte URL. |
 | `crash` | Normalisierte Seiten-URL. |
 | `download` | Normalisierte Download-URL. |
+| `accessibility` | Regel (z. B. `image-alt`) + normalisierte Seiten-URL. |
 
 Die **Normalisierung** entfernt, was sich zwischen Auftreten desselben Fehlers ändert:
 
@@ -114,6 +117,21 @@ von JavaScript (Groß- und Kleinschreibung beachtet) gegen die Request-URL (HTTP
 anderen) und die Meldung des Befunds. `findings.ignoreStatus` listet HTTP-Status, die nie Befunde sind; ein 401 von
 einer API, von der die Seite erwartet, dass sie fehlschlägt, ist ein typischer.
 
+## Barrierefreiheit
+
+Mit `oracles.accessibility: true` prüft [axe-core](https://github.com/dequelabs/axe-core) jede Seite eines Laufs
+**einmal**, nach ihrer normalisierten URL (`/orders/17` und `/orders/18` sind eine Seite), gleich nach dem ersten
+Schritt, der auf ihr endet. Geprüft werden die Regeln mit den Tags `wcag2a`, `wcag2aa`, `wcag21a` und `wcag21aa`; die
+„Best Practices“ von axe bleiben draußen. Jede verletzte Regel ergibt pro Seite einen Befund, mit bis zu fünf
+betroffenen Elementen (CSS-Selektoren), der Auswirkung und dem Link zur Erklärung in `details`.
+
+Das Orakel ist standardmäßig aus: Die meisten Seiten haben viele solche Verstöße, und eine Prüfung kostet pro Seite
+einige hundert Millisekunden. Geprüft wird das Hauptdokument, nicht der Inhalt von Iframes. axe wird über das
+DevTools-Protokoll in die Seite gebracht, eine strenge Content-Security-Policy hält es also nicht auf. Scheitert eine
+Prüfung oder dauert sie länger als das Vierfache von `monkey.actionTimeoutMs`, versucht der nächste Besuch der Seite
+es noch einmal; eine gescheiterte Prüfung ist kein Befund. Einzelne Regeln verwirfst du mit einer Ignorierregel, etwa
+`{ "oracle": "accessibility", "message": "^color-contrast " }`.
+
 ## Abstürze
 
 Eine abgestürzte Seite wirft bei jedem Aufruf. Der Monkey schließt sie und macht in einem anderen Tab weiter oder in
@@ -124,9 +142,9 @@ einer frischen Seite auf `baseUrl`, sodass ein Absturz den Lauf nicht beendet.
 Orakel liegen in `src/oracles/oracles.ts`; jedes erzeugt Signale über `#add(oracle, signal)`, das die Ignorierregeln
 anwendet und nach Schlüssel dedupliziert.
 
-1. Trage den Namen in `ORACLES` in `src/config/values.ts` ein. Das macht `oracles.<name>` zu einem
-   Konfigurationsschlüssel (standardmäßig an); dokumentiere ihn in der [Konfiguration](../reference/konfiguration.md),
-   was `test/docs.test.ts` erzwingt.
+1. Trage den Namen in `ORACLES` in `src/config/values.ts` und seinen Standardwert in `DEFAULTS.oracles` in
+   `src/config/defaults.ts` ein. Das macht `oracles.<name>` zu einem Konfigurationsschlüssel; dokumentiere ihn in der
+   [Konfiguration](../reference/konfiguration.md), was `test/docs.test.ts` erzwingt.
 2. Erkenne das Problem in der Klasse `Oracles`: Ein **Event-Orakel** registriert einen Listener in `#watch(page)`, das
    für jede Seite des Kontexts läuft, Popups eingeschlossen; ein **Zustands-Orakel** prüft die Seite nach jedem
    Schritt in `#inspect(page, navigated)`; was in den Events des Schritts festgehalten ist, gehört in `check`. Kehre
