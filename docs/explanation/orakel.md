@@ -13,8 +13,8 @@ Kontext, um ihn zu reproduzieren. Der Code liegt in `src/oracles/`.
 | `http5xx` | Antwort mit Status 500 … 599 (`page.on('response')`), jeder Ressourcentyp. | high |
 | `http4xx` | Antwort mit Status 400 … 499, außer `findings.ignoreStatus`. | medium für die Seite selbst, low für Subressourcen und API-Aufrufe |
 | `crash` | Der Renderer der Seite ist abgestürzt (`page.on('crash')`). | critical |
-| `hang` | Eine Navigation oder das Laden einer Seite hat `monkey.actionTimeoutMs` überschritten, oder die Seite hat auf ein triviales Skript nicht mehr geantwortet. | high |
-| `errorPage` | Eine Navigation ist auf einer Fehlerseite gelandet (siehe unten). | medium |
+| `hang` | Eine Navigation oder das Laden einer Seite hat `monkey.actionTimeoutMs` überschritten, auch wenn ein Klick oder ein Absenden sie gestartet hat und sie nie angekommen ist, oder die Seite hat auf ein triviales Skript nicht mehr geantwortet. | high |
+| `errorPage` | Eine Navigation ist auf einer Fehlerseite gelandet (siehe unten), oder sie ist im Netz gescheitert, z. B. weil der Server die Verbindung abgebrochen oder abgelehnt hat (`net::ERR_EMPTY_RESPONSE`, `net::ERR_CONNECTION_RESET`). | medium; high für eine Navigation, die im Netz gescheitert ist |
 | `overflow` | Horizontaler Overflow: Die `scrollWidth` des Dokuments ist größer als seine `clientWidth`. | low |
 | `download` | Ein Download, den die Seite gestartet hat, ist fehlgeschlagen, z. B. weil die Verbindung mitten in der Datei abgebrochen ist (`download.failure()`). | medium |
 | `accessibility` | Ein Verstoß gegen eine Regel von WCAG 2.0 oder 2.1, Stufe A oder AA, laut axe-core; siehe [Barrierefreiheit](#barrierefreiheit). Standardmäßig aus. | medium bei Auswirkung `serious` und `critical`, sonst low |
@@ -32,7 +32,15 @@ Skriptauswertung pro Schritt.
 
 - **Eine fehlgeschlagene Aktion.** Ein Element, das verdeckt ist, verschwunden ist oder nie klickbar wird, läuft in
   einen Timeout, aber das ist das Problem des Monkeys, nicht das der Seite. Nur Timeouts beim Warten auf eine
-  Navigation oder das Laden einer Seite zählen als `hang`.
+  Navigation oder das Laden einer Seite zählen als `hang`: Eine Navigation lädt von ihrer Anfrage bis zum
+  Load-Event der Seite oder bis die Anfrage scheitert.
+- **Eine Navigation, die die Seite abgebrochen hat.** Lehnt der Monkey eine `beforeunload`-Warnung („Ungespeicherte
+  Änderungen“) ab, startet die Navigation nie; ein `back`, das darauf wartet, ist kein `hang`. Solange eine
+  Navigation noch lädt, sehen sich die Zustands-Orakel die Seite nicht an: Eine Seite im Wechsel antwortet nicht, und
+  das sagt nichts über sie.
+- **Eine abgebrochene Navigation** (`net::ERR_ABORTED`: die Sperre von `stayOnDomain` oder `scope`, eine neuere
+  Navigation, ein Download) und eine, die nur ohne Netz scheitert (`net::ERR_INTERNET_DISCONNECTED` nach der Aktion
+  `offline`).
 - **Das Echo von Chromium auf eine fehlgeschlagene Antwort**
   (`Failed to load resource: the server responded with a status of 404`) in der Konsole. Die Antwort selbst ist der
   Befund der HTTP-Orakel; das Echo würde sie doppelt melden. Ebenso das Echo einer Anfrage, die nur deshalb
@@ -77,8 +85,8 @@ Weg dorthin ist.
 | `console` | Normalisierte Meldung. |
 | `http4xx`, `http5xx` | Methode + normalisierte URL + Status. |
 | `overflow` | Normalisierte Seiten-URL + das verursachende Element (das äußerste Element, das rechts herausragt, z. B. `div.banner`). |
-| `errorPage` | Normalisierte Seiten-URL + Status. |
-| `hang` | Art (`navigation` oder `unresponsive`) + normalisierte URL. |
+| `errorPage` | Normalisierte Seiten-URL + Status, bei einer im Netz gescheiterten Navigation + Fehlercode (z. B. `net::ERR_EMPTY_RESPONSE`). |
+| `hang` | Art (`navigation` oder `unresponsive`) + normalisierte URL: bei `navigation` die der Seite, die nicht geladen hat, nicht die der Seite, von der der Monkey kam. |
 | `crash` | Normalisierte Seiten-URL. |
 | `download` | Normalisierte Download-URL. |
 | `accessibility` | Regel (z. B. `image-alt`) + normalisierte Seiten-URL. |

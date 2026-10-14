@@ -12,7 +12,10 @@ kannst. Mit [`scope`](sitzungen.md#scope) kannst du ihn von Seiten fernhalten, u
 
 ## Läufe enden immer
 
-`limits.maxSteps` und `limits.maxMinutes` beenden den Lauf jeder Rolle. Mit `stayOnDomain` (standardmäßig an) folgt
+`limits.maxSteps` und `limits.maxMinutes` beenden den Lauf jeder Rolle. `limits.maxMinutes` gilt auch mitten in einem
+Schritt: Hängt ein Schritt (eine eingefrorene Seite, ein LLM, das nicht antwortet), endet der Lauf trotzdem
+pünktlich. Jeder Aufruf an die Seite hat ein Zeitlimit; eine Seite, die nicht mehr antwortet, wird geschlossen und
+ersetzt wie eine abgestürzte. Mit `stayOnDomain` (standardmäßig an) folgt
 der Monkey keinen Navigationen zu anderen Origins und kann so nicht zu externen Seiten abwandern.
 
 ## Secrets kommen aus der Umgebung und erscheinen nur maskiert
