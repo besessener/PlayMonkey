@@ -12,6 +12,7 @@ import { ExitCode } from "../src/exit-codes.ts";
 import { runAllRoles } from "../src/run.ts";
 
 const MAIN = fileURLToPath(new URL("../src/cli/main.ts", import.meta.url));
+const IPC_SIGNAL = new URL("helpers/ipc-signal.ts", import.meta.url).href;
 
 describe("withStopSignal", () => {
   it("aborts on the first stop signal and exits with 128 + signal number on the second", async () => {
@@ -73,14 +74,19 @@ describe("interrupting a run", () => {
   it("stops on SIGINT, writes the findings so far into the report and exits 2", async () => {
     // Seed 4 follows the broken link within 8 steps; the limits are far away.
     const file = await writeConfig("sigint", { seed: 4, limits: { maxSteps: 10_000, maxMinutes: 5 } });
-    const child = spawn(process.execPath, [MAIN, "run", file], { stdio: ["ignore", "pipe", "pipe"] });
+    const child = spawn(process.execPath, ["--import", IPC_SIGNAL, MAIN, "run", file], {
+      stdio: ["ignore", "pipe", "pipe", "ipc"],
+    });
+    assert.ok(child.stdout && child.stderr);
     let stdout = "";
     let stderr = "";
     child.stdout.on("data", (chunk: Buffer) => (stdout += chunk.toString()));
     child.stderr.on("data", (chunk: Buffer) => (stderr += chunk.toString()));
     const exited = new Promise<number | null>((resolve) => child.on("exit", (status) => resolve(status)));
     await waitForActions(join(dir, "sigint", "anonymous", "actions.json"), 10);
-    child.kill("SIGINT");
+    // On Windows child.kill("SIGINT") terminates the child instead of signalling it.
+    if (process.platform === "win32") child.send("SIGINT");
+    else child.kill("SIGINT");
     const code = await exited;
 
     assert.equal(code, ExitCode.Error, `${stdout}\n${stderr}`);
