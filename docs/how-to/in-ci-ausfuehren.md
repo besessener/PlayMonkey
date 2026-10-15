@@ -12,7 +12,7 @@ npm install --save-dev github:besessener/PlayMonkey
 npx monkey --help
 ```
 
-Leg dich für reproduzierbare Builds auf ein Release-Tag (`github:besessener/PlayMonkey#v0.7.0`, siehe die
+Leg dich für reproduzierbare Builds auf ein Release-Tag (`github:besessener/PlayMonkey#v0.7.1`, siehe die
 [Releases](https://github.com/besessener/PlayMonkey/releases)) oder einen Commit fest. Check deine Konfiguration
 daneben ein, z. B. `monkey.json`, mit jedem Secret als Platzhalter `${VAR}` (siehe
 [Anmeldung einrichten](anmeldung-einrichten.md#secrets-aus-der-datei-heraushalten)).
