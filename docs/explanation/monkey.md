@@ -25,12 +25,12 @@ dieselbe Seite ergeben denselben Lauf.
 1. **Aktionstyp** nach Gewicht (`monkey.weights`), unter den Typen, die auf der aktuellen Seite möglich sind: `click`
    (Links, Buttons, alles Klickbare), `dblclick`, `rightclick` und `hover` (auf denselben Elementen: Bearbeiten an Ort
    und Stelle, Kontextmenüs, Hover-Menüs), `longPress` (drücken und halten; nur in Viewports schmaler als 1024 px),
-   `drag` (ein Element auf ein anderes, nach bestem Bemühen), `fill` (Textfelder), `select` (Dropdowns), `check`
-   (Checkboxen, Radiobuttons, Schalter; ein angehakter wird abgehakt), `press` (Tab, Shift+Tab, Enter, Escape,
-   Pfeiltasten, Leertaste: Navigation nur per Tastatur), `scroll`, `back`, `navigate` (zu einer URL, die früher im
-   Lauf gesehen wurde), `setViewport` (Größen für Smartphone, Tablet, Laptop, Desktop), `switchTab` (nur bei
-   mehreren Tabs) und `offline` (siehe [Netzwerk](#netzwerk); standardmäßig mit Gewicht 0 aus). Ein Gewicht von 0
-   schaltet einen Typ ab.
+   `drag` (ein Element auf ein anderes, nach bestem Bemühen), `fill` (Text-, Such- und Zahlenfelder), `select`
+   (Dropdowns), `check` (Checkboxen, Radiobuttons, Schalter; ein angehakter wird abgehakt), `press` (Tab, Shift+Tab,
+   Enter, Escape, Pfeiltasten, Leertaste: Navigation nur per Tastatur), `scroll`, `back`, `navigate` (zu einer URL,
+   die früher im Lauf gesehen wurde), `setViewport` (Größen für Smartphone, Tablet, Laptop, Desktop), `switchTab`
+   (nur bei mehreren Tabs) und `offline` (siehe [Netzwerk](#netzwerk); standardmäßig mit Gewicht 0 aus). Ein Gewicht
+   von 0 schaltet einen Typ ab.
 2. **Element** innerhalb dieses Typs, bevorzugt Neues: Das Gewicht eines Elements sinkt mit jeder Verwendung im
    selben Zustand (URL und Snapshot-Hash), und Links zu einer URL, die der Lauf noch nicht besucht hat, zählen
    dreifach. Deaktivierte Elemente werden übersprungen; mit `stayOnDomain` sind Links zu anderen Origins keine
@@ -41,13 +41,18 @@ dieselbe Seite ergeben denselben Lauf.
    hängen: Ein verdecktes Element scheitert nach `monkey.actionTimeoutMs`, und mit LLM ist der offene Dialog auch ein
    Auslöser für eine [Übergabe](llm.md#wann-der-monkey-übergibt).
 
-## Werte für Textfelder
+## Werte für Eingabefelder
 
-Etwa die Hälfte der Zeit tippt der Monkey einen gültigen Wert: Testdaten, deren Schlüssel im Namen oder Platzhalter
-des Felds vorkommt (`email` passt zu „E-Mail address“), sonst einen schlichten Wert wie `Monkey`. In der anderen
-Hälfte tippt er etwas Gemeines: leer, Leerraum, 10 000 Zeichen, Unicode mit Emoji und Rechts-nach-links-Text,
-Sonderzeichen, HTML und skriptartige Zeichenketten, SQL-artige Zeichenketten, Zahlen außerhalb des Bereichs, ein
-unmögliches Datum.
+Text-, Such- und Zahlenfelder bekommen Werte aus denselben Listen. Etwa die Hälfte der Zeit tippt der Monkey einen
+gültigen Wert: Testdaten, deren Schlüssel im Namen oder Platzhalter des Felds vorkommt (`email` passt zu „E-Mail
+address“), sonst einen schlichten Wert wie `Monkey` oder `42`. In der anderen Hälfte tippt er etwas Gemeines: leer,
+Leerraum, 10 000 Zeichen, Unicode mit Emoji und Rechts-nach-links-Text, Sonderzeichen, HTML und skriptartige
+Zeichenketten, SQL-artige Zeichenketten, Grenzfälle für Zahlen (`0`, `-1`, eine Zahl mit 20 Neunen, eine Zahl über dem
+größten Gleitkommawert, `NaN`), `null` und ein unmögliches Datum. Welcher Wert es wird, entscheidet der Seed.
+
+In ein Zahlenfeld (`<input type="number">`) lässt Playwright keinen Text tippen; solche Eingaben scheitern als
+[fehlgeschlagene Aktion](#ausführen-und-abwarten). Dort kommen also nur die Zahlen und leere Eingaben an, und der
+Browser leert eine Zahl, die er nicht darstellen kann, selbst.
 
 ## Ausführen und Abwarten
 

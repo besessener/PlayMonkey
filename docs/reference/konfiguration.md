@@ -121,7 +121,7 @@ dort ein Schlüssel steht, der auf dieser Seite fehlt.
 | `monkey.weights.hover` | number ≥ 0 | `1` | Relatives Gewicht dafür, die Maus über ein klickbares Element zu bewegen (Hover-Menüs, Tooltips). |
 | `monkey.weights.longPress` | number ≥ 0 | `0.3` | Relatives Gewicht für langes Drücken eines klickbaren Elements; nur in Viewports schmaler als 1024 px. |
 | `monkey.weights.drag` | number ≥ 0 | `0.3` | Relatives Gewicht dafür, ein klickbares Element auf ein anderes Element zu ziehen (nach bestem Bemühen). |
-| `monkey.weights.fill` | number ≥ 0 | `6` | Relatives Gewicht für Eingaben in Textfelder. |
+| `monkey.weights.fill` | number ≥ 0 | `6` | Relatives Gewicht für Eingaben in Text-, Such- und Zahlenfelder. |
 | `monkey.weights.select` | number ≥ 0 | `3` | Relatives Gewicht für die Auswahl einer Option in einem Dropdown. |
 | `monkey.weights.check` | number ≥ 0 | `3` | Relatives Gewicht für das Umschalten von Checkboxen, Radio-Buttons und Schaltern. |
 | `monkey.weights.press` | number ≥ 0 | `1` | Relatives Gewicht für einen Tastendruck (Tab, Enter, Escape, Pfeiltasten). |
