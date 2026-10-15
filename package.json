@@ -1,6 +1,6 @@
 {
   "name": "playmonkey",
-  "version": "0.6.0",
+  "version": "0.7.0",
   "description": "Seeded, LLM-assisted monkey testing for websites in test environments, built on Playwright.",
   "type": "module",
   "license": "MIT",
