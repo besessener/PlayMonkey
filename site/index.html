@@ -41,7 +41,7 @@
           Schritte zum Nachstellen.
         </p>
         <p class="status">
-          Stand: Version 0.7.1. Der Zufalls-Monkey mit Seed, mit Orakeln, Berichten und Replay; Claude auf Microsoft Foundry oder jeder OpenAI-kompatible
+          Stand: Version 0.7.1. Der Zufalls-Monkey mit Seed, mit Orakeln, Berichten, Baseline, Replay und Shrink; Claude auf Microsoft Foundry oder jeder OpenAI-kompatible
           Endpunkt für festgefahrene Situationen; Cookie-Banner, native Dialoge, iframes, Popups, Uploads und Downloads werden behandelt; parallele Läufe je
           Rolle und Seed und ein CI-Beispiel.
         </p>
@@ -78,11 +78,17 @@ exit 1: findings present</code></pre>
           </article>
           <article>
             <h3>Befunde statt Rauschen</h3>
-            <p>Orakel achten auf nicht abgefangene Exceptions, Konsolenfehler, HTTP 4xx und 5xx, Abstürze, Hänger, Fehlerseiten und Layout-Überlauf, ohne Duplikate.</p>
+            <p>
+              Orakel achten auf nicht abgefangene Exceptions, Konsolenfehler, HTTP 4xx und 5xx, Abstürze, Hänger, Fehlerseiten, Layout-Überlauf und auf Wunsch
+              Barrierefreiheit, ohne Duplikate. Mit einer Baseline lassen nur neue Befunde die CI scheitern.
+            </p>
           </article>
           <article>
             <h3>Reproduzierbar von Grund auf</h3>
-            <p>Jede Aktion wird mit einem dauerhaften Locator protokolliert. <code>monkey replay</code> spielt das Protokoll ohne LLM erneut ab; Traces und Videos zeigen, was passiert ist.</p>
+            <p>
+              Jede Aktion wird mit einem dauerhaften Locator protokolliert. <code>monkey replay</code> spielt das Protokoll ohne LLM erneut ab,
+              <code>monkey shrink</code> kürzt den Weg zu jedem Befund auf die wenigsten Aktionen; Traces und Videos zeigen, was passiert ist.
+            </p>
           </article>
         </div>
         <picture>
