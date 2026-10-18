@@ -101,9 +101,11 @@ OpenAI-kompatibler Endpunkt, der nur Chat Completions dokumentiert:
 }
 ```
 
-- `deployment` ist der Modellname, wie ihn STACKIT unter den verfügbaren Shared Models listet. Wähl ein Modell mit
-  „Tool calling enabled“: PlayMonkey entscheidet nur über Werkzeugaufrufe, ohne sie scheitert der Preflight mit
-  `badRequest` oder `invalid`.
+- `deployment` ist der Modellname, wie ihn STACKIT unter den
+  [verfügbaren Shared Models](https://docs.stackit.cloud/products/data-and-ai/ai-model-serving/basics/available-shared-models/)
+  listet. Wähl ein Modell mit „Tool calling enabled“, im Oktober 2026 unter anderem Qwen3-VL 235B, Qwen3.8 27B und
+  Llama 3.3 70B; die Liste ändert sich, maßgeblich ist die Seite von STACKIT. PlayMonkey entscheidet nur über
+  Werkzeugaufrufe, ohne sie scheitert der Preflight mit `badRequest` oder `invalid`.
 - `apiKey` ist ein Auth-Token für AI Model Serving, das du im STACKIT Portal erzeugst; es wird als
   `Authorization: Bearer` gesendet.
 - Prüf es: `STACKIT_AI_TOKEN=… monkey preflight config.json`.

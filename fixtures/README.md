@@ -159,7 +159,8 @@ Eingebaute Fehler im Demo-Shop:
 
 `../demo/demo.json` lässt den Monkey als Rolle `shopper` mit LLM und eingeschaltetem Orakel `accessibility` los. Die
 Zugangsdaten der Demo stehen direkt darin, sie sind nur ausgedacht und werden darum nicht als `***` maskiert; nötig
-sind `FIXTURE_URL` und `MONKEY_LLM_URL`, `MONKEY_LLM_DEPLOYMENT` und `MONKEY_LLM_API_KEY`. Mit Seed 11 findet er ohne
+sind `FIXTURE_URL` und `MONKEY_LLM_URL`, `MONKEY_LLM_DEPLOYMENT` und `MONKEY_LLM_API_KEY`. `../demo/demo-openai.json`
+ist dieselbe Demo für einen OpenAI-kompatiblen Endpunkt (`provider: "openai"`, Chat Completions). Mit Seed 11 findet er ohne
 LLM D2 in Schritt 1 und D1 in Schritt 12. `test/shop.test.ts` prüft die Seiten über HTTP, beide Fehler genau einmal,
 einen Kontrolldurchlauf, der nur D2 meldet, und einen Lauf mit dieser Konfiguration ohne LLM, der genau diese zwei
 Befunde liefert.

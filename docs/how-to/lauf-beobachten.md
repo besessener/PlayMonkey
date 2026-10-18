@@ -50,14 +50,25 @@ ausgegebene Adresse und für das LLM `MONKEY_LLM_URL`, `MONKEY_LLM_DEPLOYMENT` u
 npx monkey run demo/demo.json --slow-mo 600
 ```
 
+`demo/demo.json` spricht Claude auf Microsoft Foundry an (`anthropic-foundry`). Für einen OpenAI-kompatiblen Endpunkt
+wie [STACKIT AI Model Serving](llm-einrichten.md#stackit-ai-model-serving) nimm `demo/demo-openai.json`: dieselbe
+Demo mit `provider: "openai"` und Chat Completions. Dann ist `MONKEY_LLM_URL` die `/v1`-Basis des Endpunkts und
+`MONKEY_LLM_DEPLOYMENT` ein Modell mit Tool Calling:
+
+```sh
+npx monkey run demo/demo-openai.json --slow-mo 600
+```
+
 Unter Windows erledigt `demo/demo.ps1` alles in einem Schritt. Es prüft zuerst, ob `MONKEY_LLM_URL`,
 `MONKEY_LLM_API_KEY` und `MONKEY_LLM_DEPLOYMENT` gesetzt sind (in der Sitzung oder in deinem Benutzerprofil), und bricht
 sonst mit einer Liste der fehlenden Variablen ab. Dann startet es die Fixture-Seite (falls auf dem Port noch keine
-läuft), startet den Lauf mit `demo/demo.json` und beendet die Seite danach wieder:
+läuft), startet den Lauf mit `demo/demo.json` (mit `-Provider openai` mit `demo/demo-openai.json`) und beendet die
+Seite danach wieder:
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File demo/demo.ps1            # Port 8080, --slow-mo 600
-powershell -ExecutionPolicy Bypass -File demo/demo.ps1 -SlowMo 0  # volle Geschwindigkeit
+powershell -ExecutionPolicy Bypass -File demo/demo.ps1                   # Port 8080, --slow-mo 600
+powershell -ExecutionPolicy Bypass -File demo/demo.ps1 -SlowMo 0         # volle Geschwindigkeit
+powershell -ExecutionPolicy Bypass -File demo/demo.ps1 -Provider openai  # OpenAI-kompatibel, z. B. STACKIT
 ```
 
 Eine gute Demo ist ein [Replay](../explanation/replay.md) eines Laufs, der etwas gefunden hat: Es zeigt genau die

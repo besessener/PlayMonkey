@@ -1,0 +1,23 @@
+{
+  "baseUrl": "${FIXTURE_URL}/demo",
+  "seed": 11,
+  "limits": { "maxSteps": 80, "maxMinutes": 5 },
+  "auth": [
+    {
+      "name": "shopper",
+      "loginUrl": "/demo/login",
+      "fields": { "username": "monkey", "password": "banana-split" },
+      "submit": "button[type=submit]"
+    }
+  ],
+  "testData": { "name": "Monkey", "email": "monkey@test.local", "coupon": "MONKEY10" },
+  "oracles": { "accessibility": true },
+  "llm": {
+    "provider": "openai",
+    "baseUrl": "${MONKEY_LLM_URL}",
+    "deployment": "${MONKEY_LLM_DEPLOYMENT}",
+    "apiKey": "${MONKEY_LLM_API_KEY}",
+    "maxCalls": 20,
+    "options": { "api": "chat" }
+  }
+}

@@ -118,6 +118,21 @@ const fill = (name: string, value: string) =>
 const button = (name: string) => click(`getByRole('button', { name: '${name}' })`);
 const link = (name: string) => click(`getByRole('link', { name: '${name}' })`);
 
+describe("demo configs", () => {
+  const read = async (name: string) => JSON.parse(await readFile(new URL(`../demo/${name}`, import.meta.url), "utf8"));
+
+  it("ship the same demo for an OpenAI-compatible endpoint, apart from the LLM", async () => {
+    const [foundry, openai] = await Promise.all([read("demo.json"), read("demo-openai.json")]);
+    assert.deepEqual({ ...openai, llm: undefined }, { ...foundry, llm: undefined });
+    assert.deepEqual(
+      { ...openai.llm, provider: foundry.llm.provider, options: undefined },
+      { ...foundry.llm, options: undefined },
+    );
+    assert.equal(openai.llm.provider, "openai");
+    assert.deepEqual(openai.llm.options, { api: "chat" });
+  });
+});
+
 describe("demo shop in a run with demo/demo.json", () => {
   let site: Fixture;
   let browser: Browser;

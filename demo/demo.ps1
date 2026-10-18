@@ -1,8 +1,11 @@
 # Runs the local demo: starts the fixture site (unless one is already running on the port) and lets the monkey loose
-# on the demo shop with demo.json next to this script. Usage, from anywhere: .\demo\demo.ps1 [-Port 8080] [-SlowMo 600]
+# on the demo shop with demo.json (or demo-openai.json for -Provider openai) next to this script.
+# Usage, from anywhere: .\demo\demo.ps1 [-Port 8080] [-SlowMo 600] [-Provider anthropic-foundry|openai]
 param(
   [int]$Port = 8080,
-  [int]$SlowMo = 600
+  [int]$SlowMo = 600,
+  [ValidateSet("anthropic-foundry", "openai")]
+  [string]$Provider = "anthropic-foundry"
 )
 $ErrorActionPreference = "Stop"
 
@@ -27,7 +30,7 @@ if ($missing.Count -gt 0) {
 }
 
 $root = Split-Path -Parent $PSScriptRoot
-$config = Join-Path $PSScriptRoot "demo.json"
+$config = Join-Path $PSScriptRoot $(if ($Provider -eq "openai") { "demo-openai.json" } else { "demo.json" })
 Set-Location $root
 
 $env:FIXTURE_URL = "http://127.0.0.1:$Port"
