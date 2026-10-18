@@ -210,6 +210,60 @@ describe("openai provider", () => {
     );
   });
 
+  it("works with STACKIT AI Model Serving on Chat Completions, answered the way vLLM does", async () => {
+    const { llm } = llmConfig({
+      baseUrl: "https://api.openai-compat.model-serving.eu01.onstackit.cloud/v1",
+      deployment: "my-stackit-model",
+      options: { api: "chat" },
+    });
+    const { fetch, requests } = mockFetch(
+      json(200, {
+        id: "chatcmpl-5f0c2a9e1b7d4c3a8e6f",
+        object: "chat.completion",
+        created: 0,
+        model: "my-stackit-model",
+        choices: [
+          {
+            index: 0,
+            message: {
+              role: "assistant",
+              content: null,
+              refusal: null,
+              annotations: null,
+              audio: null,
+              function_call: null,
+              reasoning_content: null,
+              tool_calls: [
+                {
+                  id: "chatcmpl-tool-9a1e4c7b2d8f4e06",
+                  type: "function",
+                  function: { name: "click", arguments: '{"ref": "e3"}' },
+                },
+              ],
+            },
+            logprobs: null,
+            finish_reason: "tool_calls",
+            stop_reason: null,
+          },
+        ],
+        service_tier: null,
+        system_fingerprint: null,
+        usage: { prompt_tokens: 1200, completion_tokens: 30, total_tokens: 1230, prompt_tokens_details: null },
+        prompt_logprobs: null,
+        kv_transfer_params: null,
+      }),
+    );
+    const result = await new OpenAiProvider(llm, { fetch }).decide(input);
+
+    assert.deepEqual(result.decision, { type: "click", ref: "e3" });
+    assert.deepEqual(result.usage, { inputTokens: 1200, outputTokens: 30 });
+    const [request] = requests as [CapturedRequest];
+    assert.equal(request.url, "https://api.openai-compat.model-serving.eu01.onstackit.cloud/v1/chat/completions");
+    assert.equal(request.headers.get("authorization"), `Bearer ${KEY}`);
+    assert.equal(request.body.model, "my-stackit-model");
+    assert.ok((request.body.tools as unknown[]).length > 0, "an empty tools list is rejected by the service");
+  });
+
   it("sends the effort as reasoning effort on the Responses API", async () => {
     const { llm } = llmConfig({ options: { effort: "medium" } });
     const { fetch, requests } = mockFetch(response([functionCall("back", {})]));
