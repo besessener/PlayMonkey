@@ -45,6 +45,7 @@ bestehende Konfigurationen zu ändern.
    | --- | --- |
    | Azure OpenAI v1 auf der Ressource | `https://<resource>.openai.azure.com/openai/v1` |
    | Dasselbe auf einer Foundry-Ressource | `https://<resource>.services.ai.azure.com/openai/v1` |
+   | [STACKIT AI Model Serving](#stackit-ai-model-serving) | `https://api.openai-compat.model-serving.eu01.onstackit.cloud/v1` |
    | Jeder andere OpenAI-kompatible Server | Was er dokumentiert, z. B. `https://api.openai.com/v1` |
 
 3. Konfiguriere:
@@ -84,6 +85,30 @@ Preflight auf der einen Schnittstelle mit `notFound` oder `badRequest`, versuch 
 `llm.options.effort` wird als Reasoning Effort gesendet (`reasoning.effort`, `reasoning_effort`); `thinking` gilt nur
 für Claude und wird mit `openai` abgelehnt. OpenAI cacht lange Prompt-Präfixe automatisch; Cache-Lesezugriffe
 erscheinen als `cachedTokens`.
+
+### STACKIT AI Model Serving
+
+[STACKIT AI Model Serving](https://docs.stackit.cloud/products/data-and-ai/ai-model-serving/) ist ein
+OpenAI-kompatibler Endpunkt, der nur Chat Completions dokumentiert:
+
+```json
+"llm": {
+  "provider": "openai",
+  "baseUrl": "https://api.openai-compat.model-serving.eu01.onstackit.cloud/v1",
+  "deployment": "<model-name>",
+  "apiKey": "${STACKIT_AI_TOKEN}",
+  "options": { "api": "chat" }
+}
+```
+
+- `deployment` ist der Modellname, wie ihn STACKIT unter den
+  [verfügbaren Shared Models](https://docs.stackit.cloud/products/data-and-ai/ai-model-serving/basics/available-shared-models/)
+  listet. Wähl ein Modell mit „Tool calling enabled“, im Oktober 2026 unter anderem Qwen3-VL 235B, Qwen3.8 27B und
+  Llama 3.3 70B; die Liste ändert sich, maßgeblich ist die Seite von STACKIT. PlayMonkey entscheidet nur über
+  Werkzeugaufrufe, ohne sie scheitert der Preflight mit `badRequest` oder `invalid`.
+- `apiKey` ist ein Auth-Token für AI Model Serving, das du im STACKIT Portal erzeugst; es wird als
+  `Authorization: Bearer` gesendet.
+- Prüf es: `STACKIT_AI_TOKEN=… monkey preflight config.json`.
 
 ## Budget und Kosten
 
