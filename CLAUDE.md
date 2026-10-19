@@ -15,8 +15,9 @@ to reproduce it. An LLM steps in only when the random monkey is stuck. Full docs
 - **Runtime:** Node.js 26, TypeScript run through Node's type stripping, few dependencies
   ([werkzeuge.md](docs/explanation/werkzeuge.md)).
 - **Ground truth:** the [fixture site](fixtures/README.md) with seeded bugs.
-- **Siblings:** [flakipype](https://github.com/besessener/flakipype) and [Archivist](https://github.com/besessener/Archivist)
-  share these rules, the docs layout and the `site/` layout; a change to a shared rule or layout is mirrored there.
+- **Siblings:** [flakipype](https://github.com/besessener/flakipype), [Archivist](https://github.com/besessener/Archivist)
+  and [WOMBOT](https://github.com/besessener/WOMBOT) share these rules, the docs layout and the `site/` layout; a change
+  to a shared rule or layout is mirrored there.
 
 ## Read before you touch
 
