@@ -35,7 +35,7 @@ export async function nextAction(
   snap: Snapshot,
   advisor: StepAdvisor | undefined,
 ): Promise<Choice> {
-  const advised = await advisor?.choose(snap, run.step + 1);
+  const advised = await advisor?.choose(snap, run.step + 1, page);
   const { replay } = run.options;
   if (advised === undefined && replay !== undefined) return await replayedAction(run, page, replay);
   const choice: { action: Action; elementKey?: string } =

@@ -1,25 +1,29 @@
 import { AnthropicFoundry } from "@anthropic-ai/foundry-sdk";
 import type {
+  ContentBlockParam,
   Message,
   MessageCreateParamsNonStreaming,
   Tool,
   ToolUseBlock,
 } from "@anthropic-ai/sdk/resources/messages/messages";
 import type { LlmConfig } from "../config/config.ts";
-import { buildUserMessage, pingMessage, SYSTEM_PROMPT } from "./prompt.ts";
+import { buildUserMessage, pingMessage, systemPrompt } from "./prompt.ts";
 import {
   type DecideInput,
   type DecideOptions,
   type DecideResult,
-  type Decision,
+  type InspectInput,
+  type InspectResult,
   LlmError,
   type LlmErrorKind,
   type LlmProvider,
   type LlmUsage,
   type PreflightResult,
+  type Screenshot,
 } from "./provider.ts";
 import { mapSdkError } from "./sdk-errors.ts";
 import { ACTION_TOOLS, isValidPing, PING_TOOL, parseToolCall, type ToolDefinition } from "./tools.ts";
+import { parseVisualReport, VISUAL_SYSTEM_PROMPT, VISUAL_TOOL, visualMessage } from "./visual.ts";
 
 export interface FoundryOptions {
   /** Replaces the HTTP layer; tests use it to mock responses. */
@@ -73,29 +77,48 @@ export class AnthropicFoundryProvider implements LlmProvider {
   }
 
   async decide(input: DecideInput, options: DecideOptions = {}): Promise<DecideResult> {
-    const message = await this.#send(
-      {
-        ...this.#base(),
-        system: [{ type: "text", text: SYSTEM_PROMPT, cache_control: { type: "ephemeral" } }],
-        tools: this.#tools,
-        messages: [{ role: "user", content: buildUserMessage(input) }],
-      },
-      options,
+    const params = this.#request(this.#tools, systemPrompt(this.#config), userContent(buildUserMessage(input), input));
+    const { value, ...rest } = await this.#call(params, options, (call) =>
+      parseToolCall(call.name, call.input, input.refs),
     );
+    return { decision: value, ...rest };
+  }
+
+  async inspect(input: InspectInput, options: DecideOptions = {}): Promise<InspectResult> {
+    const content = userContent(visualMessage(input), input);
+    const params = this.#request([toAnthropicTool(VISUAL_TOOL)], VISUAL_SYSTEM_PROMPT, content);
+    const { value, ...rest } = await this.#call(params, options, (call) => parseVisualReport(call.name, call.input));
+    return { bugs: value, ...rest };
+  }
+
+  #request(tools: Tool[], system: string, content: string | ContentBlockParam[]): MessageCreateParamsNonStreaming {
+    return {
+      ...this.#base(),
+      system: [{ type: "text", text: system, cache_control: { type: "ephemeral" } }],
+      tools,
+      messages: [{ role: "user", content }],
+    };
+  }
+
+  /** One request whose first tool call `parse` turns into a value; any problem throws `LlmError` with the usage. */
+  async #call<T>(
+    params: MessageCreateParamsNonStreaming,
+    options: DecideOptions,
+    parse: (call: ToolUseBlock) => T,
+  ): Promise<{ value: T; usage: LlmUsage; retries: number; raw: Message }> {
+    const message = await this.#send(params, options);
     const usage = mapUsage(message);
     const retries = this.#retries();
     const fail = (kind: LlmErrorKind, reason: string): never => {
       throw new LlmError(kind, reason, { usage, retries, raw: message });
     };
     const call = this.#toolCall(message, fail);
-    let decision: Decision;
     try {
-      decision = parseToolCall(call.name, call.input, input.refs);
+      return { value: parse(call), usage, retries, raw: message };
     } catch (error) {
       if (error instanceof LlmError) fail(error.kind, error.message);
       throw error;
     }
-    return { decision, usage, retries, raw: message };
   }
 
   async preflight(): Promise<PreflightResult> {
@@ -187,6 +210,18 @@ export function normalizeFoundryBaseUrl(baseUrl: string): { url: string; strippe
   if (match === null) return { url: url.href.replace(/\/+$/, "") };
   url.pathname = url.pathname.slice(0, match.index);
   return { url: url.href.replace(/\/+$/, ""), stripped: match[0].replace(/\/+$/, "") };
+}
+
+/** The text, and the screenshot after it when there is one. */
+function userContent(
+  text: string,
+  { screenshot }: { screenshot?: Screenshot | undefined },
+): string | ContentBlockParam[] {
+  if (screenshot === undefined) return text;
+  return [
+    { type: "text", text },
+    { type: "image", source: { type: "base64", media_type: screenshot.mediaType, data: screenshot.data } },
+  ];
 }
 
 function toAnthropicTool(definition: ToolDefinition): Tool {

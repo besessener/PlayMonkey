@@ -1,6 +1,7 @@
 import OpenAI from "openai";
 import type {
   ChatCompletion,
+  ChatCompletionContentPart,
   ChatCompletionCreateParamsNonStreaming,
   ChatCompletionFunctionTool,
 } from "openai/resources/chat/completions";
@@ -9,23 +10,27 @@ import type {
   Response as OpenAiResponse,
   ResponseCreateParamsNonStreaming,
   ResponseFunctionToolCall,
+  ResponseInputMessageContentList,
 } from "openai/resources/responses/responses";
 import type { LlmConfig } from "../config/config.ts";
 import type { OpenAiApi } from "../config/values.ts";
-import { buildUserMessage, firstLine, pingMessage, SYSTEM_PROMPT } from "./prompt.ts";
+import { buildUserMessage, firstLine, pingMessage, systemPrompt } from "./prompt.ts";
 import {
   type DecideInput,
   type DecideOptions,
   type DecideResult,
-  type Decision,
+  type InspectInput,
+  type InspectResult,
   LlmError,
   type LlmErrorKind,
   type LlmProvider,
   type LlmUsage,
   type PreflightResult,
+  type Screenshot,
 } from "./provider.ts";
 import { mapSdkError } from "./sdk-errors.ts";
 import { ACTION_TOOLS, isValidPing, PING_TOOL, parseToolCall, type ToolDefinition } from "./tools.ts";
+import { parseVisualReport, VISUAL_SYSTEM_PROMPT, VISUAL_TOOL, visualMessage } from "./visual.ts";
 
 export interface OpenAiOptions {
   /** Replaces the HTTP layer; tests use it to mock responses. */
@@ -99,29 +104,57 @@ export class OpenAiProvider implements LlmProvider {
   }
 
   async decide(input: DecideInput, options: DecideOptions = {}): Promise<DecideResult> {
-    const answer = await this.#ask(ACTION_TOOLS, SYSTEM_PROMPT, buildUserMessage(input), options);
+    const user = { text: buildUserMessage(input), image: input.screenshot };
+    const { value, ...rest } = await this.#call(ACTION_TOOLS, systemPrompt(this.#config), user, {
+      options,
+      parse: (call) => parseToolCall(call.name, call.input, input.refs),
+    });
+    return { decision: value, ...rest };
+  }
+
+  async inspect(input: InspectInput, options: DecideOptions = {}): Promise<InspectResult> {
+    const user = { text: visualMessage(input), image: input.screenshot };
+    const { value, ...rest } = await this.#call([VISUAL_TOOL], VISUAL_SYSTEM_PROMPT, user, {
+      options,
+      parse: (call) => parseVisualReport(call.name, call.input),
+    });
+    return { bugs: value, ...rest };
+  }
+
+  /** One request whose first tool call `parse` turns into a value; any problem throws `LlmError` with the usage. */
+  async #call<T>(
+    tools: readonly ToolDefinition[],
+    system: string,
+    user: UserContent,
+    { options, parse }: { options: DecideOptions; parse: (call: { name: string; input: unknown }) => T },
+  ): Promise<{ value: T; usage: LlmUsage; retries: number; raw: unknown }> {
+    const answer = await this.#ask(tools, system, user, options);
     const retries = this.#retries();
     const fail = (kind: LlmErrorKind, reason: string): never => {
       throw new LlmError(kind, reason, { usage: answer.usage, retries, raw: answer.raw });
     };
     const call = toolCall(answer, fail);
-    let decision: Decision;
     try {
-      decision = parseToolCall(call.name, parseArguments(call, fail), input.refs);
+      const value = parse({ name: call.name, input: parseArguments(call, fail) });
+      return { value, usage: answer.usage, retries, raw: answer.raw };
     } catch (error) {
       if (error instanceof LlmError) fail(error.kind, error.message);
       throw error;
     }
-    return { decision, usage: answer.usage, retries, raw: answer.raw };
   }
 
   async preflight(): Promise<PreflightResult> {
     const started = this.#now();
     const value = `monkey-${started % 100_000}`;
     try {
-      const answer = await this.#ask([PING_TOOL], undefined, pingMessage(value), {
-        signal: AbortSignal.timeout(this.#config.timeoutMs),
-      });
+      const answer = await this.#ask(
+        [PING_TOOL],
+        undefined,
+        { text: pingMessage(value) },
+        {
+          signal: AbortSignal.timeout(this.#config.timeoutMs),
+        },
+      );
       const fail = (kind: LlmErrorKind, reason: string): never => {
         throw new LlmError(kind, reason, { usage: answer.usage });
       };
@@ -139,7 +172,7 @@ export class OpenAiProvider implements LlmProvider {
   async #ask(
     tools: readonly ToolDefinition[],
     system: string | undefined,
-    user: string,
+    user: UserContent,
     { signal }: DecideOptions = {},
   ): Promise<Answer> {
     const { options } = this.#config;
@@ -150,7 +183,7 @@ export class OpenAiProvider implements LlmProvider {
           model: this.#config.deployment,
           messages: [
             ...(system === undefined ? [] : [{ role: "system" as const, content: system }]),
-            { role: "user", content: user },
+            { role: "user", content: chatContent(user) },
           ],
           tools: tools.map(toChatTool),
           // A forced tool choice is rejected by some models; the prompt asks for exactly one tool call instead.
@@ -163,7 +196,7 @@ export class OpenAiProvider implements LlmProvider {
       const params: ResponseCreateParamsNonStreaming = {
         model: this.#config.deployment,
         ...(system === undefined ? {} : { instructions: system }),
-        input: [{ role: "user", content: user }],
+        input: [{ role: "user", content: responsesContent(user) }],
         tools: tools.map(toResponsesTool),
         tool_choice: "auto",
         max_output_tokens: options.maxOutputTokens,
@@ -202,6 +235,32 @@ export function normalizeOpenAiBaseUrl(baseUrl: string): { url: string; stripped
   if (match === null) return { url: url.href.replace(/\/+$/, "") };
   url.pathname = url.pathname.slice(0, match.index);
   return { url: url.href.replace(/\/+$/, ""), stripped: match[0].replace(/\/+$/, "") };
+}
+
+/** A user message: text, and a screenshot after it when there is one. */
+interface UserContent {
+  text: string;
+  image?: Screenshot | undefined;
+}
+
+function dataUrl(image: Screenshot): string {
+  return `data:${image.mediaType};base64,${image.data}`;
+}
+
+function chatContent(user: UserContent): string | ChatCompletionContentPart[] {
+  if (user.image === undefined) return user.text;
+  return [
+    { type: "text", text: user.text },
+    { type: "image_url", image_url: { url: dataUrl(user.image) } },
+  ];
+}
+
+function responsesContent(user: UserContent): string | ResponseInputMessageContentList {
+  if (user.image === undefined) return user.text;
+  return [
+    { type: "input_text", text: user.text },
+    { type: "input_image", image_url: dataUrl(user.image), detail: "auto" },
+  ];
 }
 
 /**

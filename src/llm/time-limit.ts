@@ -1,4 +1,4 @@
-import { type DecideInput, type DecideResult, LlmError, type LlmProvider } from "./provider.ts";
+import { type DecideInput, type DecideOptions, type DecideResult, LlmError, type LlmProvider } from "./provider.ts";
 
 /** A call was cancelled because its run stops (its signal, or its deadline); this is no LLM failure. */
 export class RunStopping extends Error {
@@ -22,7 +22,12 @@ export interface TimeLimit {
  * The provider's decision within `timeoutMs`, cut to the run's deadline. A call still running then is cut off,
  * even when the provider ignores the signal: it fails as `timeout`, or with `RunStopping` when the run stops.
  */
-export async function decideInTime(provider: LlmProvider, input: DecideInput, limit: TimeLimit): Promise<DecideResult> {
+export function decideInTime(provider: LlmProvider, input: DecideInput, limit: TimeLimit): Promise<DecideResult> {
+  return callInTime((options) => provider.decide(input, options), limit);
+}
+
+/** `decideInTime` for any provider call that takes `DecideOptions`. */
+export async function callInTime<T>(call: (options: DecideOptions) => Promise<T>, limit: TimeLimit): Promise<T> {
   const left = limit.deadline === undefined ? Number.POSITIVE_INFINITY : limit.deadline - limit.now();
   const clamped = left < limit.timeoutMs;
   const ms = clamped ? left : limit.timeoutMs;
@@ -31,13 +36,13 @@ export async function decideInTime(provider: LlmProvider, input: DecideInput, li
   const timeout = AbortSignal.timeout(ms);
   const signal = run === undefined ? timeout : AbortSignal.any([run, timeout]);
   try {
-    return await untilAborted(provider.decide(input, { signal }), signal);
+    return await untilAborted(call({ signal }), signal);
   } catch (error) {
     if (!signal.aborted) throw error;
     // `AbortSignal.any` takes the reason of whichever signal aborted first.
     if (clamped || signal.reason !== timeout.reason) throw new RunStopping();
     const retries = error instanceof LlmError ? error.retries : 0;
-    throw new LlmError("timeout", `no decision within ${ms} ms (llm.timeoutMs)`, { retries });
+    throw new LlmError("timeout", `no answer within ${ms} ms (llm.timeoutMs)`, { retries });
   }
 }
 

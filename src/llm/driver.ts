@@ -1,22 +1,25 @@
+import type { Page } from "playwright";
 import type { LlmConfig } from "../config/config.ts";
 import { type Action, describeAction, mapActionText } from "../monkey/actions.ts";
 import type { StepRecord } from "../monkey/loop.ts";
 import type { UrlScope } from "../monkey/scope.ts";
 import { serializeSnapshot } from "../snapshot/serialize.ts";
 import type { Snapshot } from "../snapshot/snapshot.ts";
+import { acceptDecision } from "./accept.ts";
 import type { DebugEntry, DebugLog } from "./debug-log.ts";
 import type { PromptPlaceholders } from "./placeholders.ts";
 import { firstLine, recentFindings } from "./prompt.ts";
 import {
   type DecideInput,
   type DecideResult,
-  type Decision,
   type HistoryEntry,
   LlmError,
   type LlmProvider,
   OUTAGE_ERRORS,
   RESPONSE_ERRORS,
+  type Screenshot,
 } from "./provider.ts";
+import type { Capture } from "./screenshot.ts";
 import type { StuckDetector } from "./stuck.ts";
 import { decideInTime, RunStopping, type TimeLimit } from "./time-limit.ts";
 import type { LlmStats } from "./usage.ts";
@@ -56,6 +59,8 @@ export interface LlmDriverOptions {
   signal?: AbortSignal | undefined;
   /** When the run must end (epoch ms, `limits.maxMinutes`); no decision runs past it. */
   deadline?: number | undefined;
+  /** With `llm.vision`: the page for the prompt, every secret blacked out (`maskedScreenshot`). */
+  capture?: (page: Page) => Promise<Capture>;
 }
 
 /** What one provider call came to; `error: undefined` means the run stops and the call was cancelled. */
@@ -72,6 +77,9 @@ type Attempt = { ok: true; action: Action | undefined } | { ok: false; error: Ll
  * failed decisions in a row, or at once on a timeout or an unreachable endpoint, the LLM pauses for
  * `llm.breaker.pauseSteps` steps. When the budget runs out, the rest of the run is a pure monkey. Each call gets
  * `llm.timeoutMs`, cut to the run's deadline; the run's signal cancels it.
+ *
+ * In agent mode (`llm.mode`), a turn of `llm.agent.maxDecisions` starts whenever `llm.agent.monkeySteps` monkey steps
+ * have passed, stuck or not. With `llm.vision`, each decision gets a screenshot, or none when it cannot be masked.
  */
 export class LlmDriver {
   readonly #o: LlmDriverOptions;
@@ -103,12 +111,14 @@ export class LlmDriver {
     this.#o.detector.observe(snapshot, isNewState);
   }
 
-  /** The LLM's action for `step`, or undefined when the monkey decides. */
-  async choose(snapshot: Snapshot, step: number): Promise<Action | undefined> {
+  /** The LLM's action for `step`, or undefined when the monkey decides. `page` is captured with `llm.vision`. */
+  async choose(snapshot: Snapshot, step: number, page?: Page): Promise<Action | undefined> {
     this.#followBreaker(step);
     if (!this.#llmDecides(snapshot, step)) return undefined;
     const { stats } = this.#o;
     const input = this.#input(snapshot);
+    const screenshot = await this.#screenshot(page, step);
+    if (screenshot !== undefined) input.screenshot = screenshot;
     let failure: LlmError | undefined;
     for (let attempt = 1; attempt <= 2; attempt++) {
       const problem = stats.budgetProblem();
@@ -139,19 +149,33 @@ export class LlmDriver {
     this.#decisionsLeft = 0;
   }
 
-  /** Whether the LLM decides `step`: during a handoff, or when the stuck detector starts one now. */
+  /**
+   * Whether the LLM decides `step`: during a handoff, or when one starts now; in agent mode a turn starts whenever
+   * the monkey's steps between turns are over, stuck or not.
+   */
   #llmDecides(snapshot: Snapshot, step: number): boolean {
     const { stats, config } = this.#o;
     if (!stats.active || stats.exhausted || step < this.#pausedUntil) return false;
     if (this.#decisionsLeft !== 0) return true;
     if (step < this.#cooldownUntil) return false;
-    const stuck = this.#o.detector.check(snapshot);
+    const agent = config.mode === "agent";
+    const stuck = this.#o.detector.check(snapshot) ?? (agent ? AGENT_TURN : undefined);
     if (stuck === undefined) return false;
-    this.#decisionsLeft = config.handoff.maxDecisions;
+    this.#decisionsLeft = agent ? config.agent.maxDecisions : config.handoff.maxDecisions;
     this.#goal = stuck.detail;
     stats.handoff(this.#run, stuck.trigger);
     this.#o.log(`step ${step}: handing over to the LLM: ${this.#o.placeholders.hide(stuck.detail)}`);
     return true;
+  }
+
+  /** With `llm.vision`, the page with every secret blacked out; none when it cannot be captured safely. */
+  async #screenshot(page: Page | undefined, step: number): Promise<Screenshot | undefined> {
+    const { capture, config } = this.#o;
+    if (!config.vision || page === undefined || capture === undefined) return undefined;
+    const result = await capture(page);
+    if (result.ok) return result.screenshot;
+    this.#o.log(`step ${step}: no screenshot for the LLM: ${result.reason}`);
+    return undefined;
   }
 
   /** One provider call; any error, including one from recording it, is a failed attempt. */
@@ -260,39 +284,18 @@ export class LlmDriver {
       testDataKeys: placeholders.testDataKeys,
       placeholders: placeholders.offered,
       role: placeholders.hide(this.#o.role),
+      ...(config.goal === undefined ? {} : { objective: placeholders.hide(config.goal) }),
     };
   }
 
-  /** `#accept`, keeping the usage of the call when the decision is rejected. */
+  /** `acceptDecision`, keeping the usage of the call when the decision is rejected. */
   #accepted(result: DecideResult, snapshot: Snapshot): Action | undefined {
     try {
-      return this.#accept(result.decision, snapshot);
+      return acceptDecision(result.decision, snapshot.url, this.#o);
     } catch (error) {
       if (!(error instanceof LlmError)) throw error;
       throw new LlmError(error.kind, error.message, { usage: result.usage, retries: result.retries, raw: result.raw });
     }
-  }
-
-  /** Checks what the provider cannot know: navigation targets. Returns undefined for `done`. */
-  #accept(decision: Decision, snapshot: Snapshot): Action | undefined {
-    if (decision.type === "done") return undefined;
-    if (decision.type !== "navigate") return decision;
-    let target: URL;
-    try {
-      target = new URL(decision.url, snapshot.url);
-    } catch {
-      throw new LlmError("invalid", "tool navigate: url is not a valid URL");
-    }
-    if (target.protocol !== "http:" && target.protocol !== "https:") {
-      throw new LlmError("invalid", "tool navigate: only http(s) URLs are allowed");
-    }
-    if (this.#o.origin !== undefined && target.origin !== this.#o.origin) {
-      throw new LlmError("invalid", "tool navigate: the URL leaves the site under test (stayOnDomain)");
-    }
-    if (this.#o.scope !== undefined && !this.#o.scope.allows(target.href)) {
-      throw new LlmError("invalid", "tool navigate: the URL is outside the configured scope");
-    }
-    return { type: "navigate", url: target.href };
   }
 
   /** A debug log that cannot be written must not count as an LLM failure. */
@@ -303,11 +306,16 @@ export class LlmDriver {
   }
 
   #end(step: number): void {
+    const { config } = this.#o;
     this.#decisionsLeft = 0;
-    this.#cooldownUntil = step + 1 + this.#o.config.handoff.cooldownSteps;
+    this.#cooldownUntil =
+      step + 1 + (config.mode === "agent" ? config.agent.monkeySteps : config.handoff.cooldownSteps);
     this.#o.detector.reset();
   }
 }
+
+/** Why an agent turn starts when the monkey is not stuck; counted like a handoff trigger. */
+const AGENT_TURN = { trigger: "agent", detail: "your turn: continue exploring" } as const;
 
 function messageOf(error: unknown): string {
   return (error instanceof Error ? error.message : String(error)).split("\n")[0] ?? "unknown error";

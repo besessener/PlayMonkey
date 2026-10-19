@@ -24,7 +24,8 @@ Problem in einem deduplizierten Befund, und am Ende des Laufs steht ein Bericht.
 | `src/oracles/` | Befunde erkennen und deduplizieren, Screenshots | umgesetzt |
 | `src/replay/` | Schreiben und Lesen des Aktionsprotokolls, Parser für dauerhafte Locators, Prüfung fremder Protokolle, `monkey replay`, `monkey shrink` (Delta Debugging) | umgesetzt |
 | `src/report/` | `report.json` und der in sich geschlossene `report.html`, Coverage über alle Läufe | umgesetzt |
-| `src/llm/` | Anbieter-Schnittstelle, Backends `anthropic-foundry` und `openai`, Prompt, Vorabprüfung, Erkennung des Feststeckens, Übergabe, Verbrauch | umgesetzt |
+| `src/llm/` | Anbieter-Schnittstelle, Backends `anthropic-foundry` und `openai`, Prompt, Vorabprüfung, Erkennung des Feststeckens, Übergabe und Agentenmodus, geschwärzte Screenshots, die Prüfung des Orakels `visual`, Verbrauch | umgesetzt |
+| `src/run-llm.ts` | Verdrahtet für einen Lauf den LLM-Treiber und die visuelle Prüfung | umgesetzt |
 | `fixtures/site/` | Lokale Seite mit eingebauten Fehlern, die Grundwahrheit für End-to-End-Tests | umgesetzt |
 
 ## Entwurfsentscheidungen
@@ -32,7 +33,9 @@ Problem in einem deduplizierten Befund, und am Ende des Laufs steht ein Bericht.
 - **Die Bibliotheks-API von Playwright, nicht der MCP-Server:** Das Werkzeug braucht die Kontrolle über die Wahl der
   Aktionen, den Seed und die Orakel.
 - **Das LLM ist optional und kommt nur gelegentlich zum Zug.** Standard ist der Zufalls-Monkey; das LLM springt nur
-  ein, wenn er feststeckt. So bleiben Läufe günstig, und ein Ausfall des LLM hält nie einen Lauf an.
+  ein, wenn er feststeckt. So bleiben Läufe günstig, und ein Ausfall des LLM hält nie einen Lauf an. Der
+  [Agentenmodus](llm.md#agentenmodus) lässt es auf Wunsch steuern, mit Pflichtbudget `llm.maxCalls`; auch dann
+  fällt jeder Fehler auf den Monkey zurück.
 - **Befunde müssen reproduzierbar sein.** LLM-Entscheidungen sind nicht deterministisch, deshalb wird jede Aktion
   mit einem dauerhaften Locator protokolliert, und `monkey replay` führt das Protokoll ohne LLM erneut aus.
 - **Ein Kontext pro Lauf:** Cookies und Speicher gehen nie zwischen Rollen oder Seeds über, deshalb können Läufe

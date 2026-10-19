@@ -3,6 +3,7 @@ import { shopRoutes } from "../../demo/shop.ts";
 import { faultRoutes } from "./faults.ts";
 import { escapeHtml, layout } from "./html.ts";
 import { labRoutes } from "./lab.ts";
+import { visualRoutes } from "./visual.ts";
 
 export interface Credentials {
   username: string;
@@ -237,6 +238,7 @@ export function createRoutes(state: SiteState): Route[] {
     ...bugPageRoutes(),
     ...labRoutes(),
     ...faultRoutes(state),
+    ...visualRoutes(),
     ...shopRoutes(state),
   ];
   return routes;

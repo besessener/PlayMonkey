@@ -88,8 +88,8 @@ export interface RunOptions {
 export interface StepAdvisor {
   /** Every new snapshot, before choosing; `isNewState` when its (URL, hash) state is new in this run. */
   observe(snapshot: Snapshot, isNewState: boolean): void;
-  /** The action for `step`, or undefined to let the monkey choose. */
-  choose(snapshot: Snapshot, step: number): Promise<Action | undefined>;
+  /** The action for `step`, or undefined to let the monkey choose; `page` is the page of the snapshot. */
+  choose(snapshot: Snapshot, step: number, page: Page): Promise<Action | undefined>;
   /** Every executed step, with the snapshot it was chosen in. */
   record(record: StepRecord, snapshot: Snapshot): void;
 }

@@ -1,4 +1,4 @@
-import type { ActionType, Engine, OracleName } from "./values.ts";
+import type { ActionType, Engine, LlmMode, OracleName } from "./values.ts";
 
 /** Default values; referenced by the schema (`default`) and by normalization so they cannot drift apart. */
 export const DEFAULTS = {
@@ -20,6 +20,8 @@ export const DEFAULTS = {
     download: true,
     // Off by default: it reports what most sites have plenty of, and auditing each page takes time.
     accessibility: false,
+    // Off by default: every checked page costs an LLM call with a screenshot.
+    visual: false,
   } satisfies Record<OracleName, boolean>,
   report: { dir: "./monkey-report", keepDownloads: false },
   findings: { lastActions: 10, ignoreStatus: [] as number[] },
@@ -30,6 +32,9 @@ export const DEFAULTS = {
     debugLog: false,
     historyActions: 10,
     snapshotChars: 8000,
+    vision: false,
+    mode: "handoff" as LlmMode,
+    agent: { maxDecisions: 20, monkeySteps: 2 },
     handoff: {
       noStateChange: 5,
       noProgress: 25,

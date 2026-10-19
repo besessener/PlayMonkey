@@ -5,6 +5,10 @@ vorbeizukommen: ein Consent-Banner, ein Dialog, ein Formular, das eine gültige 
 Sitzung. Nur dann wird das LLM gefragt, für wenige Entscheidungen. So bleiben Läufe günstig und schnell, und ein
 Ausfall des LLM hält nie einen Lauf an. Ohne `llm` in der Konfiguration ist die Schleife genau der Zufalls-Monkey.
 
+Wer mehr will, schaltet es dazu: den [Agentenmodus](#agentenmodus), in dem das LLM den Lauf in Zügen steuert,
+[Screenshots](#screenshots) zu jeder Entscheidung und das Orakel [`visual`](orakel.md#visuelle-fehler), das jede
+Seite auf sichtbare Fehler ansieht. Alles drei ist standardmäßig aus.
+
 ## Ein Schritt mit LLM
 
 ```text
@@ -47,6 +51,43 @@ eine Übergabe. Die Schwellen stehen unter `llm.handoff`.
 
 Eine Übergabe gibt dem LLM bis zu `maxDecisions` Entscheidungen in Folge; `done` beendet sie früher. Danach hat der
 Monkey mindestens `cooldownSteps` Schritte bis zur nächsten Übergabe, und die Zähler beginnen von vorn.
+
+## Agentenmodus
+
+Mit `llm.mode: "agent"` wartet das LLM nicht, bis der Monkey feststeckt: Es steuert den Lauf in **Zügen** von bis zu
+`llm.agent.maxDecisions` Entscheidungen (Standard 20), dazwischen macht der Monkey `llm.agent.monkeySteps` zufällige
+Schritte (Standard 2). Steckt der Monkey zu Beginn eines Zugs fest, erfährt das LLM den Grund wie bei einer Übergabe;
+sonst heißt es nur, dass es dran ist. `done` beendet einen Zug früher. Mit `llm.goal` gibst du ihm ein Ziel vor, etwa
+„Bestell ein Produkt mit Gutschein und ändere danach die Lieferadresse“; es steht in jedem Prompt, auch im
+Übergabemodus.
+
+Weil fast jeder Schritt ein Aufruf ist, verlangt der Agentenmodus `llm.maxCalls`. Alles andere bleibt: Jede Aktion
+wird validiert und mit dauerhaftem Locator protokolliert, sodass [Replay](replay.md) einen Befund ohne LLM
+nachstellt; Fallback, Circuit Breaker, Budget und `limits` gelten unverändert, und ohne erreichbares LLM ist der Lauf
+wieder der Zufalls-Monkey. Der Bericht zählt Züge als Übergaben mit dem Auslöser `agent`.
+
+## Screenshots
+
+Mit `llm.vision: true` bekommt jede Entscheidung neben dem Text-Snapshot einen JPEG-Screenshot des sichtbaren
+Bereichs. Das hilft bei dem, was der Snapshot nicht zeigt: Icons ohne Namen, Canvas, Überlagerungen, Layout.
+Elemente spricht das LLM weiterhin nur über Refs aus dem Snapshot an. Das Modell muss Bilder annehmen; eines ohne
+Bildeingabe lehnt die Anfrage ab, und der Lauf fällt wie bei jedem Fehler auf den Monkey zurück.
+
+Ein Screenshot kann Secrets zeigen, die im Text längst durch Platzhalter ersetzt wären. Deshalb wird **geschwärzt
+oder nichts geschickt**:
+
+- In jedem Frame werden Passwortfelder markiert, Felder, deren Wert oder Platzhaltertext ein Secret enthält, Auswahllisten,
+  die eines anzeigen, und die innersten Elemente, deren Text eines enthält, auch wenn es über mehrere Kindelemente
+  verteilt ist und in offenen Shadow Roots. Secrets sind alle Werte aus `${VAR}` an Credential-Stellen, der API-Key
+  eingeschlossen, in jeder ihrer Formen (roh, URL-kodiert, JSON-escaped).
+- Markierte Elemente werden für die Aufnahme unsichtbar gemacht, samt Text, der über ihren Rand hinausragt, und
+  schwarz überdeckt.
+- Antwortet ein Frame nicht rechtzeitig, schlägt die Aufnahme fehl oder taucht währenddessen ein neuer Frame auf, geht
+  die Entscheidung **ohne Bild** an das LLM, und die Konsole sagt warum (`no screenshot for the LLM: …`).
+
+Was die Seite selbst als Pixel zeichnet, kann niemand prüfen: Text in einem Canvas oder einem Bild und Inhalt
+geschlossener Shadow Roots. Schalte `llm.vision` nicht ein, wenn die getestete Seite Secrets so darstellt.
+Screenshots werden nirgends gespeichert; `llm.debugLog` schreibt nur ihren Typ und ihre Größe.
 
 ## Fallback und Circuit Breaker
 
@@ -111,14 +152,17 @@ interface LlmProvider {
   readonly name: string;
   preflight(): Promise<PreflightResult>; // one probe that must come back as a `ping` tool call; never throws
   decide(input: DecideInput, options?: DecideOptions): Promise<DecideResult>; // throws LlmError on any failure
+  inspect(input: InspectInput, options?: DecideOptions): Promise<InspectResult>; // the visual oracle; throws too
 }
 ```
 
 - Deklariere die gemeinsamen `ACTION_TOOLS` (und `PING_TOOL` für die Vorabprüfung) aus `src/llm/tools.ts` im
-  Tool-Format des Anbieters, sende `SYSTEM_PROMPT` und `buildUserMessage(input)` aus `src/llm/prompt.ts`, stabile
-  Teile zuerst.
+  Tool-Format des Anbieters, sende `systemPrompt(config)` und `buildUserMessage(input)` aus `src/llm/prompt.ts`,
+  stabile Teile zuerst, und `input.screenshot` als Bild nach dem Text, wenn es da ist.
 - Erzwinge keine Tool-Wahl: Manche Modelle lehnen das ab. Der Prompt verlangt genau einen Tool-Aufruf.
 - Mach aus dem ersten Tool-Aufruf mit `parseToolCall(name, input, input.refs)` eine Entscheidung; das validiert ihn.
+- `inspect` sendet `VISUAL_SYSTEM_PROMPT`, `visualMessage(input)` und den Screenshot mit dem einzigen Werkzeug
+  `VISUAL_TOOL` aus `src/llm/visual.ts` und macht aus dem Aufruf mit `parseVisualReport` die Fehlerliste.
 - Gib `options.signal` als Request-Option an das SDK weiter, damit Zeitlimit und Strg+C die Anfrage samt ihren
   Wiederholungen abbrechen.
 - Bilde Fehler auf einen `LlmError` mit einer Art ab (`auth`, `notFound`, `rateLimited`, `invalid`, …; siehe
@@ -132,7 +176,7 @@ interface LlmProvider {
 `test/helpers/fake-provider.ts` ist ein geskripteter Anbieter für Tests; `test/foundry.test.ts` und
 `test/openai.test.ts` zeigen, wie man ein Backend mit gemockter HTTP-Schicht testet. Trage das neue Backend in
 `test/provider-conformance.test.ts` ein: Es führt dieselben Gespräche (gültige und ungültige Tool-Aufrufe, nur Text,
-Wiederholungen, Fehler, Vorabprüfung) gegen jedes Backend.
+Wiederholungen, Fehler, Vorabprüfung, Screenshots, visuelle Prüfung) gegen jedes Backend.
 
 ## Backends
 

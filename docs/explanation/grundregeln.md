@@ -35,6 +35,10 @@ gewöhnliche Konfiguration: Würde ein kurzer Wert wie `admin` oder `80` überal
 Dedup-Schlüssel und Rollennamen unbrauchbar. Dedup-Schlüssel werden vor der Deduplizierung maskiert, nie danach.
 Fehlermeldungen nennen den Konfigurationspfad und die Variable, nie einen Wert.
 
+Screenshots, die ans LLM gehen (`llm.vision`, Orakel `visual`), werden vorher geschwärzt; lässt sich das nicht
+sicherstellen, geht kein Bild hinaus. Was dabei geprüft wird und was nicht, steht unter
+[Screenshots](llm.md#screenshots).
+
 Ein Aktionsprotokoll entscheidet nie, welche Variablen eingesetzt werden: Replay löst nur die auf, die deine
 Konfiguration verwendet, und nur auf dem Origin ihrer `baseUrl` (siehe
 [Fremde Protokolle](replay.md#fremde-protokolle)).

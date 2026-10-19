@@ -31,13 +31,15 @@ export interface OracleOptions {
    * fields holding a secret in screenshots. Password fields are blacked out without it too.
    */
   secrets?: Secrets;
+  /** The `visual` oracle's check of the page a step ended on; it decides itself which pages to check. */
+  visual?: (page: Page, step: number) => Promise<Omit<Signal, "oracle">[]>;
 }
 
 /**
  * Watches every page of a context, popups and iframes included, and turns problems into deduplicated findings.
  * Event-based oracles (`pageerror`, `console`, `http4xx`, `http5xx`, `crash`) collect signals as they happen; `check`
- * runs after every step, adds the state-based ones (`hang`, `errorPage`, `overflow`) and failed downloads of the
- * step (`download`), and files all collected signals under that step.
+ * runs after every step, adds the state-based ones (`hang`, `errorPage`, `overflow`, `accessibility`, `visual`) and
+ * failed downloads of the step (`download`), and files all collected signals under that step.
  */
 export class Oracles {
   readonly findings: Finding[] = [];
@@ -54,6 +56,7 @@ export class Oracles {
   readonly #documentStatus = new WeakMap<Page, number>();
   readonly #crashed = new WeakSet<Page>();
   readonly #accessibility: AccessibilityAudit;
+  readonly #visual: OracleOptions["visual"];
   /** Overflow seen by the previous check, to count a page that stays overflowing once. */
   #overflow: { page: Page; key: string } | undefined;
   #pending: Signal[] = [];
@@ -72,6 +75,7 @@ export class Oracles {
     this.#origin = new URL(options.config.baseUrl).origin;
     this.#ignore = new IgnoreRules(options.config.findings.ignore);
     this.#accessibility = new AccessibilityAudit(this.#origin);
+    this.#visual = options.visual;
     for (const page of context.pages()) this.#watch(page);
     context.on("page", (page) => this.#watch(page));
   }
@@ -120,6 +124,9 @@ export class Oracles {
   }
 
   async #audit(page: Page): Promise<void> {
+    if (this.#config.oracles.visual) {
+      for (const signal of (await this.#visual?.(page, this.#step)) ?? []) this.#add("visual", signal);
+    }
     if (!this.#config.oracles.accessibility) return;
     // axe needs longer than a click on large pages.
     const signals = await this.#accessibility.audit(page, this.#config.monkey.actionTimeoutMs * 4);

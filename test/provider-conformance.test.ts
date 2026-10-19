@@ -258,6 +258,46 @@ for (const backend of BACKENDS) {
       if (!result.ok) assert.equal(result.error.kind, "timeout");
     });
 
+    it("sends the screenshot after the text, and only when there is one", async () => {
+      const screenshot = { mediaType: "image/jpeg" as const, data: "/9j/c2NyZWVuc2hvdA==" };
+      const { provider: p, requests } = provider(setup(), backend.toolCall("back", {}), backend.toolCall("back", {}));
+      await p.decide({ ...input, screenshot });
+      await p.decide(input);
+      const [withImage, without] = requests.map((request) => JSON.stringify(request.body));
+      assert.match(withImage ?? "", /image\/jpeg/);
+      assert.ok(withImage?.includes(screenshot.data));
+      assert.ok((withImage?.indexOf("Contact form") ?? -1) < (withImage?.indexOf(screenshot.data) ?? -1));
+      assert.doesNotMatch(without ?? "", /image\/jpeg/);
+    });
+
+    it("turns a visual report into bugs and rejects a malformed one", async () => {
+      const inspectInput = {
+        page: "/lab/visual",
+        viewport: { width: 1280, height: 800 },
+        screenshot: { mediaType: "image/jpeg" as const, data: "/9j/eA==" },
+      };
+      const bug = { kind: "overlap", description: "The badge covers the Pay now button.\nSecond line." };
+      const { provider: p, requests } = provider(setup(), backend.toolCall("report_visual_bugs", { bugs: [bug] }));
+      const result = await p.inspect(inspectInput);
+      assert.deepEqual(result.bugs, [{ kind: "overlap", description: "The badge covers the Pay now button." }]);
+      assert.equal(result.usage.inputTokens, 1000);
+      const body = JSON.stringify(requests[0]?.body);
+      assert.match(body, /report_visual_bugs/);
+      assert.doesNotMatch(body, /"click"/);
+      assert.match(body, /Page: \/lab\/visual/);
+
+      for (const answer of [
+        backend.toolCall("report_visual_bugs", { bugs: [{ kind: "ugly", description: "x" }] }),
+        backend.toolCall("click", { ref: "e3" }),
+        backend.textOnly("Looks fine."),
+      ]) {
+        await assert.rejects(provider(setup(), answer).provider.inspect(inspectInput), (error: LlmError) => {
+          assert.equal(error.kind, "invalid", error.message);
+          return true;
+        });
+      }
+    });
+
     it("passes the preflight only with a ping tool call", async () => {
       const ok = provider(setup(), backend.toolCall("ping", { value: "x" }));
       const passed = await ok.provider.preflight();

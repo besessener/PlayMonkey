@@ -14,6 +14,7 @@ export const ORACLES = [
   "overflow",
   "download",
   "accessibility",
+  "visual",
 ] as const;
 export type OracleName = (typeof ORACLES)[number];
 
@@ -47,5 +48,8 @@ export type EffortLevel = (typeof EFFORT_LEVELS)[number];
 /** API surface of the `openai` backend: the Responses API or Chat Completions. */
 export const OPENAI_APIS = ["responses", "chat"] as const;
 export type OpenAiApi = (typeof OPENAI_APIS)[number];
+/** `handoff`: the LLM decides only when the monkey is stuck; `agent`: it drives in turns, the monkey in between. */
+export const LLM_MODES = ["handoff", "agent"] as const;
+export type LlmMode = (typeof LLM_MODES)[number];
 
 export const MAX_SEED = 2 ** 32 - 1;

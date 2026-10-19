@@ -18,9 +18,10 @@ Kontext, um ihn zu reproduzieren. Der Code liegt in `src/oracles/`.
 | `overflow` | Horizontaler Overflow: Die `scrollWidth` des Dokuments ist größer als seine `clientWidth`. | low |
 | `download` | Ein Download, den die Seite gestartet hat, ist fehlgeschlagen, z. B. weil die Verbindung mitten in der Datei abgebrochen ist (`download.failure()`). | medium |
 | `accessibility` | Ein Verstoß gegen eine Regel von WCAG 2.0 oder 2.1, Stufe A oder AA, laut axe-core; siehe [Barrierefreiheit](#barrierefreiheit). Standardmäßig aus. | medium bei Auswirkung `serious` und `critical`, sonst low |
+| `visual` | Das LLM sieht auf einem Screenshot einen sichtbaren Fehler: Überlappung, Abgeschnittenes, Unlesbares, ein kaputtes Bild oder ein verrutschtes Element; siehe [Visuelle Fehler](#visuelle-fehler). Standardmäßig aus, braucht `llm`. | low für `misplaced`, sonst medium |
 
 Jedes lässt sich mit `oracles.<name>: false` in der [Konfiguration](../reference/konfiguration.md) abschalten;
-`accessibility` schaltest du mit `oracles.accessibility: true` ein.
+`accessibility` und `visual` schaltest du mit `oracles.<name>: true` ein.
 
 Die Event-Orakel (`pageerror`, `console`, `http*`, `crash`) lauschen auf jeder Seite des Browserkontexts der Rolle,
 auch auf Tabs und Popups, die die Seite öffnet, und den Iframes darin. `download` sieht sich die Downloads jedes
@@ -90,6 +91,7 @@ Weg dorthin ist.
 | `crash` | Normalisierte Seiten-URL. |
 | `download` | Normalisierte Download-URL. |
 | `accessibility` | Regel (z. B. `image-alt`) + normalisierte Seiten-URL. |
+| `visual` | Normalisierte Seiten-URL + Art (`overlap`, `cut-off`, `unreadable`, `broken-image`, `misplaced`); die Beschreibung des Modells gehört nicht dazu, weil sie bei jedem Aufruf anders lautet. |
 
 Die **Normalisierung** entfernt, was sich zwischen Auftreten desselben Fehlers ändert:
 
@@ -144,6 +146,29 @@ DevTools-Protokoll in die Seite gebracht, eine strenge Content-Security-Policy h
 Prüfung oder dauert sie länger als das Vierfache von `monkey.actionTimeoutMs`, versucht der nächste Besuch der Seite
 es noch einmal; eine gescheiterte Prüfung ist kein Befund. Einzelne Regeln verwirfst du mit einer Ignorierregel, etwa
 `{ "oracle": "accessibility", "message": "^color-contrast " }`.
+
+## Visuelle Fehler
+
+Manche Fehler sieht nur, wer hinschaut: Ein Badge verdeckt den Button „Bezahlen“, ein Text ist abgeschnitten, Schrift
+verschwindet im Hintergrund. Das DOM ist dabei oft in Ordnung, kein anderes Orakel merkt etwas. Mit
+`oracles.visual: true` bekommt das [LLM](llm.md) jede Seite eines Laufs **einmal**, nach ihrer normalisierten URL wie
+bei der Barrierefreiheit, als Screenshot des sichtbaren Bereichs und meldet mit dem Werkzeug `report_visual_bugs`, was
+eindeutig falsch aussieht, höchstens fünf Fehler pro Seite. Jeder wird zu einem Befund mit der Beschreibung des Modells
+in Meldung und `details`.
+
+- **Secrets:** Der Screenshot wird vor dem Senden geschwärzt wie bei [Screenshots](llm.md#screenshots) für
+  Entscheidungen; lässt sich das nicht sicherstellen, wird die Seite nicht geprüft.
+- **Kosten:** Jede Prüfung ist ein LLM-Aufruf mit Bild und zählt gegen `llm.maxCalls` und `llm.maxTokens`. Ist das
+  Budget aufgebraucht, endet auch die Prüfung. Nach `llm.breaker.failures` gescheiterten Prüfungen in Folge, oder
+  einem Ausfall (`timeout`, `unreachable`), prüft der Lauf keine weitere Seite mehr; der Lauf selbst geht weiter.
+- **Nicht deterministisch:** Ob das Modell einen Fehler sieht, kann von Aufruf zu Aufruf schwanken. Der Schlüssel
+  enthält deshalb nur Seite und Art, nicht die Beschreibung. [Replay](replay.md) führt zur Seite und zeigt sie im
+  Trace, fragt aber kein LLM; das Urteil prüfst du am Screenshot des Befunds.
+- **Fehlalarme:** Gewolltes Design sieht ein Modell manchmal als Fehler. Verwirf solche Meldungen mit einer
+  Ignorierregel, etwa `{ "oracle": "visual", "url": "/landing" }`.
+
+Die Fixture-Seite hat dafür eine eigene Seite mit verdecktem Button, siehe
+[Visuelle Fehler](../../fixtures/README.md#visuelle-fehler).
 
 ## Abstürze
 
