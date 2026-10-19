@@ -131,6 +131,23 @@ beenden darf. Eine eingefrorene Seite wird geschlossen und ersetzt, und der Lauf
 `/lab/faults/login` ist kein Fehler der Seite, sondern prüft PlayMonkey: `test/session.test.ts` erwartet, dass
 falsche Zugangsdaten dort scheitern, obwohl die URL danach eine andere ist.
 
+## Visuelle Fehler
+
+`/lab/visual` enthält einen Fehler, der nur auf dem Bild zu sehen ist; das DOM ist in Ordnung, und kein Orakel außer
+`visual` meldet etwas. Weder die Startseite noch das Labor verlinken dorthin; `test/visual.test.ts` startet dort.
+
+| Pfad | Inhalt |
+| --- | --- |
+| `/lab/visual` | Kasse mit dem Button „Pay now“ und einem Badge „Free shipping over 50 euros“, dazu ein Link auf die korrigierte Fassung. |
+| `/lab/visual/clean` | Dieselbe Kasse, das Badge steht neben dem Button. Kontrolle: Darf keinen Befund erzeugen. |
+
+| # | Fehler | Klickpfad | Orakel | Schweregrad | Dedup-Schlüssel |
+| --- | --- | --- | --- | --- | --- |
+| V1 | Das Badge liegt über dem Button und verdeckt seine Beschriftung | `/lab/visual` | `visual` | medium | `/lab/visual` + `overlap` |
+
+Ob ein echtes Modell V1 sieht, hängt vom Modell ab; `test/visual.test.ts` prüft mit einem geskripteten Anbieter, dass
+der Befund genau einmal kommt, jede Seite nur einmal geprüft wird und das Badge den Button wirklich überdeckt.
+
 ## Der Demo-Shop
 
 `/demo` ist „Monkey Market“, ein gestalteter kleiner Obstladen für Vorführungen: Anmeldung, Produktkatalog,

@@ -12,11 +12,8 @@ import {
 } from "./auth/session.ts";
 import type { AuthRole, LoadedConfig } from "./config/config.ts";
 import { DebugLog } from "./llm/debug-log.ts";
-import { LlmBreaker, LlmDriver } from "./llm/driver.ts";
-import { PromptPlaceholders } from "./llm/placeholders.ts";
-import type { LlmProvider } from "./llm/provider.ts";
-import { StuckDetector } from "./llm/stuck.ts";
-import { describeUsage, type LlmStats } from "./llm/usage.ts";
+import { LlmBreaker } from "./llm/driver.ts";
+import { describeUsage } from "./llm/usage.ts";
 import { CoverageTracker, type RunCoverage } from "./monkey/coverage.ts";
 import { removeDownloads } from "./monkey/events.ts";
 import { type ReplayPlan, type RunResult, runMonkey, type StepRecord } from "./monkey/loop.ts";
@@ -25,6 +22,7 @@ import type { Spectator } from "./monkey/spectator.ts";
 import type { Finding } from "./oracles/finding.ts";
 import { Oracles } from "./oracles/oracles.ts";
 import { ActionLogWriter } from "./replay/log.ts";
+import { createAdvisor, createVisualCheck, type LlmRun, type RunLlm } from "./run-llm.ts";
 import { type PlannedRun, planRuns } from "./run-plan.ts";
 import { describeFinding, describeStep, maskFinding, plural, summarize } from "./run-text.ts";
 import type { Snapshot } from "./snapshot/snapshot.ts";
@@ -60,14 +58,6 @@ export interface RunAllOptions {
   llm?: RunLlm;
   /** Spectator mode (`--watch`): visible, slowed-down browser and one console line per step. */
   spectator?: Spectator;
-}
-
-export interface RunLlm {
-  provider: LlmProvider;
-  stats: LlmStats;
-  debugLog?: DebugLog;
-  /** Created by `runAllRoles` when absent. */
-  breaker?: LlmBreaker;
 }
 
 /**
@@ -229,14 +219,20 @@ async function runSession(run: RoleRun, session: RoleSession): Promise<RoleOutco
 async function exploreSession(run: RoleRun, session: RoleSession, downloadDir: string): Promise<RoleOutcome> {
   const { name, label, log, options } = run;
   const { config } = run.loaded;
+  const llmRun = llmRunOf(run);
+  const visual = llmRun === undefined ? undefined : createVisualCheck(llmRun);
   const oracles = new Oracles(session.context, {
     config,
     role: name,
     screenshotDir: join(options.outputDir, "screenshots"),
     secrets: run.loaded.secrets,
+    ...(visual === undefined ? {} : { visual }),
   });
   const writer = options.actionLog ? await createActionLog(run) : undefined;
-  const advisor = createAdvisor(run, oracles);
+  const advisor =
+    llmRun === undefined
+      ? undefined
+      : createAdvisor(llmRun, () => oracles.findings.map((f) => `${f.severity} ${f.oracle}: ${f.message}`));
   const coverage = new CoverageTracker({
     origin: new URL(config.baseUrl).origin,
     stayOnDomain: config.stayOnDomain,
@@ -292,34 +288,12 @@ async function createActionLog(run: RoleRun): Promise<ActionLogWriter> {
   );
 }
 
-/** The LLM driver of a run; none for a replay or without an LLM. */
-function createAdvisor(run: RoleRun, oracles: Oracles): LlmDriver | undefined {
-  const { role, name, label, log, options } = run;
-  const { config, secrets } = run.loaded;
-  const llm = options.llm;
+/** What the LLM parts of a run need; none for a replay or without an LLM. */
+function llmRunOf({ role, name, label, log, loaded, options }: RoleRun): LlmRun | undefined {
+  const { config, secrets } = loaded;
+  const { llm } = options;
   if (options.replay !== undefined || llm === undefined || config.llm === undefined) return undefined;
-  const scope = new UrlScope(config.scope);
-  return new LlmDriver({
-    provider: llm.provider,
-    config: config.llm,
-    stats: llm.stats,
-    detector: new StuckDetector(config.llm.handoff, {
-      authenticated: role !== undefined,
-      ...(role?.kind === "fields" ? { loginUrl: new URL(role.loginUrl, config.baseUrl).href } : {}),
-    }),
-    placeholders: new PromptPlaceholders(config, secrets, name),
-    role: name,
-    run: label,
-    ...(llm.breaker === undefined ? {} : { breaker: llm.breaker }),
-    findings: () => oracles.findings.map((f) => `${f.severity} ${f.oracle}: ${f.message}`),
-    ...(config.stayOnDomain ? { origin: new URL(config.baseUrl).origin } : {}),
-    ...(scope.restricted ? { scope } : {}),
-    ...(llm.debugLog === undefined ? {} : { debugLog: llm.debugLog }),
-    log,
-    signal: options.signal,
-    // A little before the loop's own deadline, which only makes it stricter.
-    deadline: Date.now() + config.limits.maxMinutes * 60_000,
-  });
+  return { role, name, label, log, config: { ...config, llm: config.llm }, secrets, llm, signal: options.signal };
 }
 
 /** What a run's steps feed: the oracles, the coverage, the action log and the keeper of a logged-in role. */

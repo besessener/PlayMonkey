@@ -13,6 +13,7 @@ import {
   type ActionType,
   type EffortLevel,
   type Engine,
+  type LlmMode,
   type LlmProvider,
   MAX_SEED,
   type OpenAiApi,
@@ -84,6 +85,10 @@ export interface LlmConfig {
   debugLog: boolean;
   historyActions: number;
   snapshotChars: number;
+  vision: boolean;
+  mode: LlmMode;
+  goal?: string;
+  agent: { maxDecisions: number; monkeySteps: number };
   handoff: RawHandoff;
   breaker: { failures: number; pauseSteps: number };
   pricing?: LlmPricing;
@@ -272,6 +277,9 @@ function normalizeLlm(raw: RawLlm): LlmConfig {
     debugLog: raw.debugLog ?? defaults.debugLog,
     historyActions: raw.historyActions ?? defaults.historyActions,
     snapshotChars: raw.snapshotChars ?? defaults.snapshotChars,
+    vision: raw.vision ?? defaults.vision,
+    mode: raw.mode ?? defaults.mode,
+    agent: normalizeAgent(raw.agent),
     handoff,
     breaker: {
       failures: raw.breaker?.failures ?? defaults.breaker.failures,
@@ -281,11 +289,25 @@ function normalizeLlm(raw: RawLlm): LlmConfig {
   };
   if (raw.maxCalls !== undefined) llm.maxCalls = raw.maxCalls;
   if (raw.maxTokens !== undefined) llm.maxTokens = raw.maxTokens;
+  if (raw.goal !== undefined) llm.goal = raw.goal;
   if (raw.pricing !== undefined) llm.pricing = { ...raw.pricing };
-  if (raw.options?.thinking !== undefined) llm.options.thinking = raw.options.thinking;
-  if (raw.options?.effort !== undefined) llm.options.effort = raw.options.effort;
-  if (raw.options?.api !== undefined) llm.options.api = raw.options.api;
+  copyOptions(raw.options, llm.options);
   return llm;
+}
+
+function normalizeAgent(raw: RawLlm["agent"]): LlmConfig["agent"] {
+  const defaults = DEFAULTS.llm.agent;
+  return {
+    maxDecisions: raw?.maxDecisions ?? defaults.maxDecisions,
+    monkeySteps: raw?.monkeySteps ?? defaults.monkeySteps,
+  };
+}
+
+/** The `llm.options` without a default, only when set. */
+function copyOptions(raw: RawLlm["options"], options: LlmConfig["options"]): void {
+  if (raw?.thinking !== undefined) options.thinking = raw.thinking;
+  if (raw?.effort !== undefined) options.effort = raw.effort;
+  if (raw?.api !== undefined) options.api = raw.api;
 }
 
 function normalizeRole(role: RawAuth, baseDir: string): AuthRole {

@@ -92,11 +92,11 @@ Pfade sind relativ zum Berichtsverzeichnis.
 | `pricing` | Wiedergabe von `llm.pricing`, wenn gesetzt. |
 | `total`, `roles[]` | Verbrauch des ganzen Aufrufs und pro Lauf (`roles[].role`: die Rolle, oder `role/seed` mit `seeds`), siehe unten. |
 
-Jeder Verbrauchseintrag hat `calls`, `failedCalls`, `errors` (fehlgeschlagene Aufrufe nach Art, z. B.
+Jeder Verbrauchseintrag hat `calls` (Entscheidungen und Prüfungen des Orakels `visual`), `failedCalls`, `errors` (fehlgeschlagene Aufrufe nach Art, z. B.
 `{ "rateLimited": 2 }`), `inputTokens` (Eingabe-Tokens ohne Cache-Zugriffe), `outputTokens`, `cachedTokens`
 (Cache-Lesezugriffe), `cacheWriteTokens` (Cache-Schreibzugriffe), `retries` (Anfragen, die das SDK wiederholt hat;
 zählen nicht als Aufrufe), `handoffs` (nach Auslöser, siehe
-[das LLM](../explanation/llm.md#wann-der-monkey-übergibt)), `actions` (ausgeführte Aktionen, die das LLM gewählt
+[das LLM](../explanation/llm.md#wann-der-monkey-übergibt); Züge im Agentenmodus unter `agent`), `actions` (ausgeführte Aktionen, die das LLM gewählt
 hat), `fallbacks` (Schritte, in denen der Monkey gehandelt hat, weil das LLM fehlschlug, nach Fehlerart),
 `breakerTrips`, `avgLatencyMs`, `p95LatencyMs` und, mit `llm.pricing`, `estimatedCost`: eine **Schätzung** in der
 Währung der Preise, keine Rechnung.

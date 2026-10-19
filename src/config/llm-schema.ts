@@ -3,7 +3,9 @@ import { DEFAULTS } from "./defaults.ts";
 import {
   EFFORT_LEVELS,
   type EffortLevel,
+  LLM_MODES,
   LLM_PROVIDERS,
+  type LlmMode,
   type LlmProvider,
   OPENAI_APIS,
   type OpenAiApi,
@@ -24,6 +26,10 @@ export interface RawLlm {
   debugLog?: boolean;
   historyActions?: number;
   snapshotChars?: number;
+  vision?: boolean;
+  mode?: LlmMode;
+  goal?: string;
+  agent?: { maxDecisions?: number; monkeySteps?: number };
   handoff?: Partial<RawHandoff>;
   breaker?: { failures?: number; pauseSteps?: number };
   pricing?: { inputPerMTok: number; outputPerMTok: number; cacheReadPerMTok?: number; cacheWritePerMTok?: number };
@@ -107,6 +113,49 @@ export const llmSchema: JSONSchemaType<RawLlm> & { nullable: true } = {
       nullable: true,
       default: DEFAULTS.llm.snapshotChars,
       description: "Character budget of the page snapshot in the prompt.",
+    },
+    vision: {
+      type: "boolean",
+      nullable: true,
+      default: DEFAULTS.llm.vision,
+      description: "Attach a screenshot of the viewport, with secrets blacked out, to every action decision.",
+    },
+    mode: {
+      type: "string",
+      enum: LLM_MODES,
+      nullable: true,
+      default: DEFAULTS.llm.mode,
+      description: "handoff: the LLM decides only when the monkey is stuck; agent: it drives in turns.",
+    },
+    goal: {
+      type: "string",
+      minLength: 1,
+      maxLength: 500,
+      nullable: true,
+      description: "What the LLM should pursue during the run, e.g. a user flow; shown in every prompt.",
+    },
+    agent: {
+      type: "object",
+      nullable: true,
+      additionalProperties: false,
+      required: [],
+      description: "Turns in llm.mode agent.",
+      properties: {
+        maxDecisions: {
+          type: "integer",
+          minimum: 1,
+          nullable: true,
+          default: DEFAULTS.llm.agent.maxDecisions,
+          description: "Consecutive LLM decisions per turn.",
+        },
+        monkeySteps: {
+          type: "integer",
+          minimum: 0,
+          nullable: true,
+          default: DEFAULTS.llm.agent.monkeySteps,
+          description: "Random monkey steps between two turns.",
+        },
+      },
     },
     handoff: {
       type: "object",

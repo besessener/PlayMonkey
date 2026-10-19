@@ -42,6 +42,8 @@ function semanticIssues(raw: unknown): Issue[] {
     ...issues,
     ...scopeIssues(raw.scope, raw.baseUrl),
     ...llmIssues(raw.llm),
+    ...agentIssues(raw.llm),
+    ...visualIssues(raw.oracles, raw.llm),
     ...ignoreRulesIssues(raw.findings),
     ...authIssues(raw.auth),
   ];
@@ -101,6 +103,23 @@ function llmIssues(llm: unknown): Issue[] {
     }
   }
   return issues;
+}
+
+/** Agent mode calls the LLM on most steps: it needs a cost limit, and `agent` means nothing without it. */
+function agentIssues(llm: unknown): Issue[] {
+  if (!isObject(llm)) return [];
+  if (llm.mode === "agent") {
+    return llm.maxCalls === undefined
+      ? [{ path: ["llm", "maxCalls"], message: "is required with llm.mode agent, which calls the LLM on most steps" }]
+      : [];
+  }
+  return llm.agent === undefined ? [] : [{ path: ["llm", "agent"], message: "is only used with llm.mode agent" }];
+}
+
+/** The visual oracle asks the LLM about screenshots. */
+function visualIssues(oracles: unknown, llm: unknown): Issue[] {
+  if (!isObject(oracles) || oracles.visual !== true || llm !== undefined) return [];
+  return [{ path: ["oracles", "visual"], message: "needs an llm section: the LLM judges the screenshots" }];
 }
 
 function ignoreRulesIssues(findings: unknown): Issue[] {

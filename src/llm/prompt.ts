@@ -1,27 +1,46 @@
+import type { LlmConfig } from "../config/config.ts";
 import type { DecideInput } from "./provider.ts";
 
-/**
- * Stable across every call of a run, so providers with prompt caching can cache it together with the tool
- * definitions. Everything that changes per step goes into the user message.
- */
-export const SYSTEM_PROMPT = `You are an exploratory tester looking for bugs in a website running in a disposable test environment.
-The environment is reset after the run: destructive actions (deleting, submitting, logging out) are fine.
+const INTRO = `You are an exploratory tester looking for bugs in a website running in a disposable test environment.
+The environment is reset after the run: destructive actions (deleting, submitting, logging out) are fine.`;
 
-A random monkey drives the browser and hands control to you when it is stuck: a dialog or banner blocks the page,
+const HANDOFF_ROLE = `A random monkey drives the browser and hands control to you when it is stuck: a dialog or banner blocks the page,
 a form keeps rejecting its input, the session expired, or it stopped finding new pages. Your job is to get past the
-obstacle and lead the exploration somewhere new.
+obstacle and lead the exploration somewhere new.`;
 
-Guidelines:
+const AGENT_ROLE = `You drive the browser in turns of several steps; between your turns a random monkey takes a few steps. Pursue the
+goal of the run when one is given; otherwise complete realistic user flows (sign-up, search, checkout, settings) and
+probe them with unusual inputs. Keep track of what you already covered in the recent actions.`;
+
+const VISION = `- A screenshot of the visible part of the page may be attached. Use it to understand layout, icons and overlays;
+  address elements only by their ref from the snapshot. Black boxes in it hide secret values on purpose.`;
+
+const RULES = `Guidelines:
 - Prefer areas and features not visited yet, and inputs that are valid enough to get through validation.
 - Also try unusual but plausible inputs (long text, special characters, boundary numbers) where they make sense.
 - Elements are addressed by their ref (e.g. e12) from the current snapshot only; refs change after every action.
 - Never type secrets yourself. Use the listed placeholders, e.g. {{testData.email}} or {{role.password}}; they are
   replaced with the real values after your answer. {{env.NAME}} in the page stands for a hidden value.
 - Native browser dialogs (alert, confirm, prompt) and file choosers are answered automatically; you only see the
-  page. A click on a file input uploads a generated file. Downloads are saved automatically.
-- Call done when the obstacle is gone or nothing sensible is left to do on this page.
+  page. A click on a file input uploads a generated file. Downloads are saved automatically.`;
 
-Respond with exactly one tool call and no other text.`;
+const HANDOFF_DONE = "- Call done when the obstacle is gone or nothing sensible is left to do on this page.";
+const AGENT_DONE =
+  "- Call done to let the monkey take a few random steps, e.g. when nothing sensible is left on this page.";
+const RESPOND = "Respond with exactly one tool call and no other text.";
+
+/**
+ * Stable across every call of a run, so providers with prompt caching can cache it together with the tool
+ * definitions. Everything that changes per step goes into the user message.
+ */
+export function systemPrompt(config: Pick<LlmConfig, "mode" | "vision">): string {
+  const agent = config.mode === "agent";
+  const rules = [RULES, ...(config.vision ? [VISION] : []), agent ? AGENT_DONE : HANDOFF_DONE].join("\n");
+  return [INTRO, agent ? AGENT_ROLE : HANDOFF_ROLE, rules, RESPOND].join("\n\n");
+}
+
+/** The system prompt of the default configuration: handoff mode, no screenshots. */
+export const SYSTEM_PROMPT = systemPrompt({ mode: "handoff", vision: false });
 
 /** Longest finding or goal line in the prompt. */
 const LINE_CHARS = 200;
@@ -53,7 +72,9 @@ export function recentFindings(lines: readonly string[]): string[] {
 
 /** The per-step user message: role, goal, placeholders, history, findings and the snapshot last. */
 export function buildUserMessage(input: DecideInput): string {
-  const lines = [`Role: ${input.role}`, `Why you were called: ${input.goal}`, ""];
+  const lines = [`Role: ${input.role}`];
+  if (input.objective !== undefined) lines.push(`Goal of this run: ${input.objective}`);
+  lines.push(`Why you were called: ${input.goal}`, "");
   lines.push(
     input.placeholders.length === 0 ? "Placeholders: none" : `Placeholders for values: ${input.placeholders.join(" ")}`,
   );
@@ -70,7 +91,9 @@ export function buildUserMessage(input: DecideInput): string {
   lines.push("");
   if (input.findingsSoFar.length === 0) lines.push("Findings so far: none");
   else lines.push(`Findings so far (${input.findingsSoFar.length}):`, ...input.findingsSoFar.map((f) => `- ${f}`));
-  lines.push("", "Current page:", input.snapshot, "", "Choose the next action: exactly one tool call.");
+  lines.push("", "Current page:", input.snapshot, "");
+  if (input.screenshot !== undefined) lines.push("A screenshot of the visible part of the page is attached.");
+  lines.push("Choose the next action: exactly one tool call.");
   return lines.join("\n");
 }
 

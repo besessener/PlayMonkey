@@ -2,10 +2,13 @@ import {
   type DecideInput,
   type DecideOptions,
   type DecideResult,
+  type InspectInput,
+  type InspectResult,
   LlmError,
   type LlmProvider,
   type LlmUsage,
   type PreflightResult,
+  type VisualBug,
 } from "../../src/llm/provider.ts";
 import { parseToolCall } from "../../src/llm/tools.ts";
 
@@ -30,6 +33,8 @@ export class FakeProvider implements LlmProvider {
   readonly inputs: DecideInput[] = [];
   /** The signal of every request, in order. */
   readonly signals: (AbortSignal | undefined)[] = [];
+  readonly inspections: InspectInput[] = [];
+  visual: (input: InspectInput) => VisualBug[] | LlmError = () => [];
   readonly #script: FakeScript[];
   readonly #fallback: FakeScript;
   preflightResult: PreflightResult = { ok: true, latencyMs: 1 };
@@ -41,6 +46,16 @@ export class FakeProvider implements LlmProvider {
 
   preflight(): Promise<PreflightResult> {
     return Promise.resolve(this.preflightResult);
+  }
+
+  /** Answers visual checks from `visual` (default: no bugs); every request is captured in `inspections`. */
+  inspect(input: InspectInput): Promise<InspectResult> {
+    this.inspections.push(input);
+    return new Promise((resolve) => {
+      const answer = this.visual(input);
+      if (answer instanceof LlmError) throw answer;
+      resolve({ bugs: answer, usage: FAKE_USAGE, retries: 0 });
+    });
   }
 
   decide(input: DecideInput, options: DecideOptions = {}): Promise<DecideResult> {

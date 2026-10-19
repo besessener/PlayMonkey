@@ -70,11 +70,16 @@ dort ein Schlüssel steht, der auf dieser Seite fehlt.
 | `llm.required` | boolean | `true` | Ein fehlgeschlagener [Preflight](../how-to/llm-einrichten.md#fehlerbehebung) endet mit Code `2`; `false` warnt und läuft als reiner Zufalls-Monkey. |
 | `llm.timeoutMs` | integer ≥ 1000 | `60000` | Zeitlimit einer LLM-Anfrage in Millisekunden, insgesamt: einschließlich der Wiederholungen nach `llm.maxRetries` und des Lesens der Antwort. Höchstens bis `limits.maxMinutes` des Laufs. Ein Überschreiten öffnet den Circuit Breaker sofort. |
 | `llm.maxRetries` | integer 0 … 10 | `2` | Wiederholungen einer Anfrage nach einem Rate Limit (429), einem Server- oder Verbindungsfehler, mit exponentiellem Backoff. Andere Fehler werden nicht wiederholt. |
-| `llm.maxCalls` | integer ≥ 0 | unbegrenzt | Budget: LLM-Aufrufe pro `monkey run`, über alle Rollen und Seeds, auch wenn sie parallel laufen (laufende Aufrufe zählen mit). Ist es aufgebraucht, laufen die Läufe als reiner Monkey weiter, und der Bericht sagt das. |
+| `llm.maxCalls` | integer ≥ 0 | unbegrenzt | Budget: LLM-Aufrufe pro `monkey run`, über alle Rollen und Seeds, auch wenn sie parallel laufen (laufende Aufrufe zählen mit), Prüfungen des Orakels `visual` eingeschlossen. Ist es aufgebraucht, laufen die Läufe als reiner Monkey weiter, und der Bericht sagt das. Pflicht mit `llm.mode: "agent"`. |
 | `llm.maxTokens` | integer ≥ 0 | unbegrenzt | Budget: Tokens pro `monkey run`, über alle Rollen und Seeds (Eingabe, Ausgabe, Cache-Lese- und -Schreibzugriffe). Parallel bereits laufende Aufrufe können es um ihre eigenen Tokens überschreiten. |
 | `llm.debugLog` | boolean | `false` | Jeden Prompt und jede Antwort bereinigt in `llm-debug.jsonl` im Berichtsverzeichnis schreiben. Aus: Kein Prompt-Inhalt wird irgendwo geschrieben. |
 | `llm.historyActions` | integer ≥ 0 | `10` | Anzahl der letzten Aktionen, die das LLM zu sehen bekommt. |
 | `llm.snapshotChars` | integer ≥ 500 | `8000` | Zeichenbudget des Seiten-Snapshots im Prompt (grob vier Zeichen pro Token). |
+| `llm.vision` | boolean | `false` | Jeder Entscheidung einen Screenshot des sichtbaren Bereichs mitgeben, mit geschwärzten Secrets; ohne sichere Schwärzung geht kein Bild mit. Braucht ein Modell mit Bildeingabe; siehe [Screenshots](../explanation/llm.md#screenshots). |
+| `llm.mode` | `handoff` \| `agent` | `handoff` | `handoff`: Das LLM entscheidet nur, wenn der Monkey feststeckt. `agent`: Es steuert in Zügen, der Monkey dazwischen; braucht `llm.maxCalls`. Siehe [Agentenmodus](../explanation/llm.md#agentenmodus). |
+| `llm.goal` | string, 1 … 500 Zeichen | fehlt | Ziel, das das LLM im Lauf verfolgen soll, z. B. „Bestell ein Produkt mit Gutschein“; steht in jedem Prompt, Secrets darin als Platzhalter. |
+| `llm.agent.maxDecisions` | integer ≥ 1 | `20` | Nur mit `llm.mode: "agent"`. Aufeinanderfolgende LLM-Entscheidungen pro Zug; `done` beendet ihn früher. |
+| `llm.agent.monkeySteps` | integer ≥ 0 | `2` | Nur mit `llm.mode: "agent"`. Zufällige Monkey-Schritte zwischen zwei Zügen. |
 | `llm.handoff.noStateChange` | integer ≥ 1 | `5` | Übergeben nach so vielen Schritten in Folge ohne jede Änderung der Seite. |
 | `llm.handoff.noProgress` | integer ≥ 1 | `25` | Übergeben nach so vielen Schritten in Folge ohne neuen Zustand (URL, Snapshot-Hash). |
 | `llm.handoff.failedActions` | integer ≥ 1 | `5` | Übergeben nach so vielen fehlgeschlagenen Monkey-Aktionen in Folge. |
@@ -104,6 +109,7 @@ dort ein Schlüssel steht, der auf dieser Seite fehlt.
 | `oracles.overflow` | boolean | `true` | Horizontalen Überlauf melden. |
 | `oracles.download` | boolean | `true` | Downloads melden, die fehlschlagen (z. B. weil die Verbindung abbricht). |
 | `oracles.accessibility` | boolean | `false` | Jede Seite einmal mit axe-core auf Verstöße gegen WCAG 2.1 A und AA prüfen; siehe [Barrierefreiheit](../explanation/orakel.md#barrierefreiheit). |
+| `oracles.visual` | boolean | `false` | Jede Seite einmal vom LLM auf einem Screenshot mit geschwärzten Secrets auf sichtbare Fehler prüfen lassen (Überlappung, abgeschnitten, unlesbar, kaputtes Bild, verrutscht). Braucht `llm`; siehe [Visuelle Fehler](../explanation/orakel.md#visuelle-fehler). |
 | `findings.lastActions` | integer ≥ 0 | `10` | Anzahl der Aktionen vor einem Befund, die er zur Reproduktion festhält. |
 | `findings.ignoreStatus` | Array von Integern 400 … 599 | `[]` | HTTP-Status, die nie Befunde sind, z. B. `[401, 403]`. |
 | `findings.ignore` | Array | `[]` | Regeln, die bekanntes Rauschen verwerfen; siehe [Ignorierregeln](../explanation/orakel.md#ignorierregeln). |

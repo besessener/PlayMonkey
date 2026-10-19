@@ -14,6 +14,37 @@ export interface LlmProvider {
    * the error carries the usage of the failed call when there was a response.
    */
   decide(input: DecideInput, options?: DecideOptions): Promise<DecideResult>;
+  /** Asks for the visual bugs in a screenshot (the `visual` oracle). Throws `LlmError` like `decide`. */
+  inspect(input: InspectInput, options?: DecideOptions): Promise<InspectResult>;
+}
+
+/** A viewport screenshot with every secret blacked out, base64-encoded. */
+export interface Screenshot {
+  mediaType: "image/jpeg";
+  data: string;
+}
+
+export interface InspectInput {
+  /** The page's normalized path, e.g. `/lab/visual`. */
+  page: string;
+  viewport: { width: number; height: number };
+  screenshot: Screenshot;
+}
+
+export const VISUAL_KINDS = ["overlap", "cut-off", "unreadable", "broken-image", "misplaced"] as const;
+export type VisualKind = (typeof VISUAL_KINDS)[number];
+
+export interface VisualBug {
+  kind: VisualKind;
+  /** The model's words, cut to one line; untrusted page-derived text. */
+  description: string;
+}
+
+export interface InspectResult {
+  bugs: VisualBug[];
+  usage: LlmUsage;
+  retries: number;
+  raw?: unknown;
 }
 
 export interface DecideOptions {
@@ -39,6 +70,10 @@ export interface DecideInput {
   placeholders: string[];
   /** Name of the role the browser is logged in as. */
   role: string;
+  /** `llm.goal`, secrets hidden. */
+  objective?: string;
+  /** With `llm.vision`, when the page could be captured with every secret blacked out. */
+  screenshot?: Screenshot;
 }
 
 export interface HistoryEntry {
