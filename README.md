@@ -120,12 +120,14 @@ Webseite: <https://besessener.github.io/PlayMonkey/>. Die vollständige Dokument
 
 ## Verwandte Projekte
 
-PlayMonkey, flakipype und Archivist sind aus derselben agentischen Idee entstanden und teilen Grundregeln,
+PlayMonkey, flakipype, Archivist und WOMBOT sind aus derselben agentischen Idee entstanden und teilen Grundregeln,
 Qualitätsprüfungen und den Aufbau der Dokumentation:
 
 - [flakipype](https://github.com/besessener/flakipype) – findet, erklärt und behebt instabile („flaky“)
   GitHub-Actions-Pipelines.
 - [Archivist](https://github.com/besessener/Archivist) – ein persönlicher, agentischer KI-Archivar für Windows.
+- [WOMBOT](https://github.com/besessener/WOMBOT) – ein Agent für Microsoft 365 Copilot, der in Mail, Teams und
+  Besprechungen findet, wer dir was zugesagt hat, mit Status und Quelle; er liest nur.
 
 ## Lizenz
 

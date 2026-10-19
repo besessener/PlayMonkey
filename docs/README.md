@@ -51,5 +51,6 @@ Die Dokumentation folgt [Diátaxis](https://diataxis.fr/): Sie ist nach dem geor
 - [Werkzeugwahl](explanation/werkzeuge.md) – warum `node:test`, Biome, Knip, diese TypeScript-Einstellungen und so wenige Abhängigkeiten.
 
 Verwandte Projekte mit derselben Idee und demselben Aufbau der Dokumentation:
-[flakipype](https://github.com/besessener/flakipype/blob/main/docs/README.md) und
-[Archivist](https://github.com/besessener/Archivist/blob/main/docs/README.md).
+[flakipype](https://github.com/besessener/flakipype/blob/main/docs/README.md),
+[Archivist](https://github.com/besessener/Archivist/blob/main/docs/README.md) und
+[WOMBOT](https://github.com/besessener/WOMBOT/blob/main/docs/README.md).
