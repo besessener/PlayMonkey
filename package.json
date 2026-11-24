@@ -34,9 +34,9 @@
     "@anthropic-ai/foundry-sdk": "^0.5.4",
     "@anthropic-ai/sdk": "^0.133.0",
     "ajv": "^8.20.0",
-    "axe-core": "^4.14.0",
-    "openai": "^7.32.0",
-    "playwright": "^1.64.0"
+    "axe-core": "^4.14.1",
+    "openai": "^7.57.0",
+    "playwright": "^1.65.1"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.5.15",
